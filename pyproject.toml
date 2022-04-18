@@ -1,0 +1,64 @@
+[tool.poetry]
+name = "kukiko"
+version = "2.0.0"
+description = "A fun and lightweight Discord bot for personal use."
+authors = ["Alex Nørgaard <Umbra@AbstractUmbra.dev>"]
+license = "MPL 2.0"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+"discord.py" = {git = "https://github.com/Rapptz/discord.py.git", extras = ["voice", "speedup"]}
+discord-ext-menus = {git = "https://github.com/Rapptz/discord-ext-menus", rev = "master"}
+jishaku = {git = "git@github.com:Gorialis/jishaku.git", rev = "master"}
+hondana = {git = "https://github.com/AbstractUmbra/Hondana.git", rev = "main"}
+"mystbin.py" = {git = "git@github.com:AbstractUmbra/mystbin.py.git", rev = "main"}
+asyncpg = "*"
+psutil = "*"
+lru_dict = "*"
+pytz = "*"
+fuzzywuzzy = "*"
+nhentaio = "*"
+pykakasi = "*"
+beautifulsoup4 = "*"
+Pillow = "*"
+pygit2 = "*"
+yt-dlp = "*"
+typing-extensions = "*"
+parsedatetime = "^2.6"
+
+[tool.poetry.dev-dependencies]
+black = "*"
+guppy3 = "*"
+
+[tool.black]
+line-length = 125
+
+[tool.isort]
+profile = "black"
+lines_after_imports = 2
+
+[tool.pyright]
+ignore = ["docs/conf.py"]
+exclude = ["_testing/**.py"]
+include = ["bot.py", "utilities/**.py", "extensions/**.py"]
+useLibraryCodeForTypes = true
+typeCheckingMode = "basic"
+pythonVersion = "3.10"
+strictListInference = true
+strictDictionaryInference = true
+strictSetInference = true
+strictParameterNoneValue = true
+reportMissingImports = "error"
+reportUnusedImport = "error"
+reportUnusedClass = "error"
+reportUnusedFunction = "error"
+reportUnusedVariable = "error"
+reportGeneralTypeIssues = "error"
+reportDuplicateImport = "error"
+reportUntypedFunctionDecorator = "error"
+reportUnnecessaryTypeIgnoreComment = "warning"
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
