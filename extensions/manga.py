@@ -72,7 +72,10 @@ class MangaView(discord.ui.View):
     @discord.ui.select(min_values=1, max_values=1, options=[])
     async def select(self, interaction: discord.Interaction, item) -> None:
         assert interaction.user is not None
-        embed = await MangaDexEmbed.from_manga(self._lookup[item.values[0]])
+        assert interaction.channel is not None
+        assert not isinstance(interaction.channel, discord.PartialMessageable)
+
+        embed = await MangaDexEmbed.from_manga(self._lookup[item.values[0]], nsfw_allowed=interaction.channel.is_nsfw())
         self.manga_id = item.values[0]
         if await self.bot.is_owner(interaction.user):
             self.follow.disabled = False
@@ -127,12 +130,14 @@ class MangaCog(commands.Cog, name="Manga"):
         """
         This command takes a mangadex link to a chapter or manga and returns the data.
         """
+        nsfw_allowed = isinstance(ctx.channel, discord.DMChannel) or ctx.channel.is_nsfw()
+
         if isinstance(item, hondana.Manga):
             embed = await MangaDexEmbed.from_manga(item)
         elif isinstance(item, hondana.Chapter):
             if item.chapter is None:
                 await item.get_parent_manga()
-            embed = await MangaDexEmbed.from_chapter(item)
+            embed = await MangaDexEmbed.from_chapter(item, nsfw_allowed=nsfw_allowed)
         else:
             await ctx.send("Not found?")
             return
@@ -230,14 +235,9 @@ class MangaCog(commands.Cog, name="Manga"):
 
         assert chapter.manga is not None
 
-        if chapter.manga.content_rating in (
-            hondana.ContentRating.pornographic,
-            hondana.ContentRating.suggestive,
-            hondana.ContentRating.erotica,
-        ):
-            await ctx.send("This manga is a bit too lewd for a non-lewd channel.")
-            return
-        embed = await MangaDexEmbed.from_chapter(chapter)
+        nsfw_allowed = isinstance(ctx.channel, discord.DMChannel) or ctx.channel.is_nsfw()
+
+        embed = await MangaDexEmbed.from_chapter(chapter, nsfw_allowed=nsfw_allowed)
 
         await ctx.send(embed=embed)
 
@@ -268,7 +268,7 @@ class MangaCog(commands.Cog, name="Manga"):
         for chapter in feed.chapters:
             if chapter.manga is None:
                 await chapter.get_parent_manga()
-            embed = await MangaDexEmbed.from_chapter(chapter)
+            embed = await MangaDexEmbed.from_chapter(chapter, nsfw_allowed=True)
             embeds.append(embed)
 
         for embeds in as_chunks(embeds, 10):

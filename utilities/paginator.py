@@ -300,8 +300,9 @@ class SimpleListSource(menus.ListPageSource, Generic[T]):
 
 class MangaDexEmbed(discord.Embed):
     @classmethod
-    async def from_chapter(cls: Type[Self], chapter: hondana.Chapter) -> Self:
+    async def from_chapter(cls: Type[Self], chapter: hondana.Chapter, *, nsfw_allowed: bool = False) -> Self:
         assert chapter.manga is not None
+
         parent = chapter.manga
         parent_title = parent.title
         if chapter.title:
@@ -314,14 +315,23 @@ class MangaDexEmbed(discord.Embed):
 
         self = cls(title=parent_title, colour=discord.Colour.red(), url=chapter.url)
         self.set_footer(text=chapter.id)
-        self.set_image(url=parent.cover_url())
         self.timestamp = chapter.created_at
         self.add_field(name="Manga link is:", value=f"[here!]({parent.url})")
+
+        content_ratings = (
+            (hondana.ContentRating.suggestive, hondana.ContentRating.erotica, hondana.ContentRating.pornographic)
+            if nsfw_allowed
+            else (hondana.ContentRating.safe,)
+        )
+        if chapter.manga.content_rating is content_ratings:
+            if chapter.manga.cover_url() is None:
+                await chapter.manga.get_cover()
+            self.set_thumbnail(url=chapter.manga.cover_url())
 
         return self
 
     @classmethod
-    async def from_manga(cls: Type[Self], manga: hondana.Manga) -> Self:
+    async def from_manga(cls: Type[Self], manga: hondana.Manga, *, nsfw_allowed: bool = False) -> Self:
         self = cls(title=manga.title, colour=discord.Colour.blue(), url=manga.url)
         if manga.description:
             self.description = shorten(manga.description, width=2000)
@@ -341,8 +351,15 @@ class MangaDexEmbed(discord.Embed):
                 self.add_field(name="Last Volume:", value=manga.last_volume)
                 self.add_field(name="Last Chapter:", value=manga.last_chapter)
         self.set_footer(text=manga.id)
-        if manga.content_rating is hondana.ContentRating.safe:
+
+        content_ratings = (
+            (hondana.ContentRating.suggestive, hondana.ContentRating.erotica, hondana.ContentRating.pornographic)
+            if nsfw_allowed
+            else (hondana.ContentRating.safe,)
+        )
+        if manga.content_rating is content_ratings:
             if manga.cover_url() is None:
                 await manga.get_cover()
             self.set_thumbnail(url=manga.cover_url())
+
         return self
