@@ -284,7 +284,9 @@ class RTFX(commands.Cog):
         await self.do_rtfm(ctx, "hondana-master", obj)
 
     @commands.command(name="rtfs")
-    async def rtfs(self, ctx: Context, *, target: (str if TYPE_CHECKING else SourceConverter) | None = None) -> None:
+    async def rtfs(
+        self, ctx: Context, *, target: str | None = commands.param(converter=SourceConverter, default=None)
+    ) -> None:
         if target is None:
             await ctx.send(embed=discord.Embed(title="Available sources of rtfs", description="\n".join(RTFS)))
             return
@@ -306,7 +308,7 @@ class RTFX(commands.Cog):
         self,
         ctx: Context,
         *,
-        codeblock: Codeblock if TYPE_CHECKING else codeblock_converter,
+        codeblock: Codeblock = commands.param(converter=codeblock_converter),
     ) -> None:
         """
         Evaluates Python code through the latest (installed) version of Pyright on my system.

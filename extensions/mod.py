@@ -728,9 +728,9 @@ class Mod(commands.Cog):
     async def kick(
         self,
         ctx: Context,
-        member: discord.Member if TYPE_CHECKING else MemberID,
+        member: discord.Member = commands.param(converter=MemberID),
         *,
-        reason: (str if TYPE_CHECKING else ActionReason) | None = None,
+        reason: str | None = commands.param(converter=ActionReason, default=None),
     ):
         """Kicks a member from the server.
 
@@ -755,9 +755,9 @@ class Mod(commands.Cog):
     async def ban(
         self,
         ctx: Context,
-        member: discord.Member if TYPE_CHECKING else MemberID,
+        member: discord.Member = commands.param(converter=MemberID),
         *,
-        reason: (str if TYPE_CHECKING else ActionReason) | None = None,
+        reason: str | None = commands.param(converter=ActionReason, default=None),
     ):
         """Bans a member from the server.
 
@@ -788,9 +788,9 @@ class Mod(commands.Cog):
     async def multiban(
         self,
         ctx: Context,
-        members: commands.Greedy[discord.Member if TYPE_CHECKING else MemberID],
+        members: list[discord.Member] = commands.param(converter=commands.Greedy[discord.Member]),
         *,
-        reason: (str if TYPE_CHECKING else ActionReason) | None = None,
+        reason: str | None = commands.param(converter=ActionReason, default=None),
     ):
         """Bans multiple members from the server.
 
@@ -1042,9 +1042,9 @@ class Mod(commands.Cog):
     async def softban(
         self,
         ctx: Context,
-        member: discord.Member if TYPE_CHECKING else MemberID,
+        member: discord.Member = commands.param(converter=MemberID),
         *,
-        reason: (str if TYPE_CHECKING else ActionReason) | None = None,
+        reason: str | None = commands.param(converter=ActionReason),
     ):
         """Soft bans a member from the server.
 
@@ -1074,9 +1074,9 @@ class Mod(commands.Cog):
     async def unban(
         self,
         ctx: Context,
-        member: discord.guild.BanEntry if TYPE_CHECKING else BannedMember,
+        member: discord.guild.BanEntry = commands.param(converter=BannedMember),
         *,
-        reason: (str if TYPE_CHECKING else ActionReason) | None = None,
+        reason: str | None = commands.param(converter=ActionReason, default=None),
     ):
         """Unbans a member from the server.
 
@@ -1107,10 +1107,10 @@ class Mod(commands.Cog):
     async def tempban(
         self,
         ctx,
-        duration: datetime.datetime if TYPE_CHECKING else DatetimeConverter,
-        member: discord.Member if TYPE_CHECKING else MemberID,
+        duration: datetime.datetime = commands.param(converter=DatetimeConverter),
+        member: discord.Member = commands.param(converter=MemberID),
         *,
-        reason: (str if TYPE_CHECKING else ActionReason) | None = None,
+        reason: str | None = commands.param(converter=ActionReason),
     ):
         """Temporarily bans a member for the specified duration.
 
@@ -1540,7 +1540,7 @@ class Mod(commands.Cog):
         ctx: Context,
         members: commands.Greedy[discord.Member],
         *,
-        details: tuple[datetime.datetime, str] if TYPE_CHECKING else WhenAndWhatConverter,
+        details: tuple[datetime.datetime, str] = commands.param(converter=WhenAndWhatConverter),
     ):
         """Temporarily mutes members for the specified duration.
 
@@ -1580,7 +1580,7 @@ class Mod(commands.Cog):
         ctx: Context,
         members: commands.Greedy[discord.Member],
         *,
-        reason: (str if TYPE_CHECKING else ActionReason) | None = None,
+        reason: str | None = commands.param(converter=ActionReason),
     ):
         """Unmutes members using the configured mute role.
 

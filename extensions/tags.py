@@ -295,7 +295,12 @@ class Tags(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     @suggest_box()
-    async def tag(self, ctx: Context, *, name: str if TYPE_CHECKING else TagName(lower=True)) -> None:
+    async def tag(
+        self,
+        ctx: Context,
+        *,
+        name: str = commands.param(converter=TagName(lower=True)),
+    ) -> None:
         """Allows you to tag text for later retrieval.
 
         If a subcommand is not called, then this will search the tag database
@@ -324,9 +329,9 @@ class Tags(commands.Cog):
     async def create(
         self,
         ctx: Context,
-        name: str if TYPE_CHECKING else TagName,
+        name: str = commands.param(converter=TagName),
         *,
-        content: str if TYPE_CHECKING else commands.clean_content,
+        content: str = commands.param(converter=commands.clean_content),
     ) -> None:
         """Creates a new tag owned by you.
 
@@ -350,7 +355,11 @@ class Tags(commands.Cog):
     @tag.command()
     @suggest_box()
     async def alias(
-        self, ctx: Context, new_name: str if TYPE_CHECKING else TagName, *, old_name: str if TYPE_CHECKING else TagName
+        self,
+        ctx: Context,
+        new_name: str = commands.param(converter=TagName),
+        *,
+        old_name: str = commands.param(converter=TagName),
     ) -> None:
         """Creates an alias for a pre-existing tag.
 
@@ -631,7 +640,12 @@ class Tags(commands.Cog):
 
     @tag.command()
     @suggest_box()
-    async def stats(self, ctx: Context, *, member: (discord.Member if TYPE_CHECKING else TagMember) | None = None) -> None:
+    async def stats(
+        self,
+        ctx: Context,
+        *,
+        member: discord.Member | None = commands.param(converter=TagMember, default=None),
+    ) -> None:
         """Gives tag statistics for a member or the server."""
 
         if member is None:
@@ -848,7 +862,12 @@ class Tags(commands.Cog):
 
     @tag.command(name="list")
     @suggest_box()
-    async def _list(self, ctx: Context, *, member: (discord.Member if TYPE_CHECKING else TagMember) | None = None) -> None:
+    async def _list(
+        self,
+        ctx: Context,
+        *,
+        member: discord.Member | None = commands.param(converter=TagMember, default=None),
+    ) -> None:
         """Lists all the tags that belong to you or someone else."""
         assert ctx.guild is not None
 
@@ -873,7 +892,12 @@ class Tags(commands.Cog):
 
     @commands.command()
     @suggest_box()
-    async def tags(self, ctx: Context, *, member: (discord.Member if TYPE_CHECKING else TagMember) | None = None) -> None:
+    async def tags(
+        self,
+        ctx: Context,
+        *,
+        member: discord.Member | None = commands.param(converter=TagMember, default=None),
+    ) -> None:
         """An alias for tag list command."""
         await self._list(ctx, member=member)
 
@@ -1229,7 +1253,12 @@ class Tags(commands.Cog):
         await ctx.send(embed=embed)
 
     @box.command(name="search")
-    async def box_search(self, ctx: Context, *, query: str if TYPE_CHECKING else commands.clean_content) -> None:
+    async def box_search(
+        self,
+        ctx: Context,
+        *,
+        query: str = commands.param(converter=commands.clean_content),
+    ) -> None:
         """Searches for a tag in the tag box.
 
         The query must be at least 3 characters long.

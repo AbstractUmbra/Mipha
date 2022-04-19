@@ -251,7 +251,7 @@ class Reminder(commands.Cog):
         self,
         ctx: Context,
         *,
-        when: tuple[datetime.datetime, str] if TYPE_CHECKING else WhenAndWhatConverter,
+        when: tuple[datetime.datetime, str] = commands.param(converter=WhenAndWhatConverter),
     ) -> None:
         """Reminds you of something after a certain amount of time.
 

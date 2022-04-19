@@ -125,7 +125,10 @@ class MangaCog(commands.Cog, name="Manga"):
 
     @mangadex.command(name="get")
     async def get_(
-        self, ctx: Context, *, item: (hondana.Manga | hondana.Chapter if TYPE_CHECKING else MangaDexConverter)
+        self,
+        ctx: Context,
+        *,
+        item: hondana.Manga | hondana.Chapter = commands.param(converter=MangaDexConverter),
     ) -> None:
         """
         This command takes a mangadex link to a chapter or manga and returns the data.

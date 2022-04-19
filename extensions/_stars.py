@@ -714,7 +714,7 @@ class Stars(commands.Cog):
     async def star(
         self,
         ctx: Context,
-        message: int if TYPE_CHECKING else MessageID,
+        message: int = commands.param(converter=MessageID),
     ) -> None:
         """Stars a message via message ID.
 
@@ -737,7 +737,7 @@ class Stars(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def unstar(self, ctx, message: int if TYPE_CHECKING else MessageID) -> None:
+    async def unstar(self, ctx, message: int = commands.param(converter=MessageID)) -> None:
         """Unstars a message via message ID.
 
         To unstar a message you should right click on the on a message and then
@@ -803,7 +803,7 @@ class Stars(commands.Cog):
 
     @star.command(name="show")
     @requires_starboard()
-    async def star_show(self, ctx: Context, message: int if TYPE_CHECKING else MessageID) -> None:
+    async def star_show(self, ctx: Context, message: int = commands.param(converter=MessageID)) -> None:
         """Shows a starred message via its ID.
 
         To get the ID of a message you should right click on the
@@ -865,7 +865,7 @@ class Stars(commands.Cog):
     async def star_who(
         self,
         ctx: Context,
-        message: int if TYPE_CHECKING else MessageID,
+        message: int = commands.param(converter=MessageID),
     ) -> None:
         """Show who starred a message.
 

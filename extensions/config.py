@@ -56,17 +56,6 @@ class LazyEntity:
         return self._cache
 
 
-class ChannelOrMember(commands.Converter[discord.TextChannel | discord.Member]):
-    """Channel or member converter."""
-
-    async def convert(self, ctx: Context, argument: str) -> discord.TextChannel | discord.Member:
-        """perform conversion."""
-        try:
-            return await commands.TextChannelConverter().convert(ctx, argument)
-        except commands.BadArgument:
-            return await commands.MemberConverter().convert(ctx, argument)
-
-
 class CommandName(commands.Converter[str]):
     """Command name converter."""
 
@@ -318,9 +307,7 @@ class Config(commands.Cog):
 
     @config.group(invoke_without_command=True)
     @checks.is_mod()
-    async def ignore(
-        self, ctx: Context, *entities: (discord.TextChannel | discord.Member if TYPE_CHECKING else ChannelOrMember)
-    ) -> None:
+    async def ignore(self, ctx: Context, *entities: discord.TextChannel | discord.Member) -> None:
         """Ignores text channels or members from using the bot.
 
         If no channel or member is specified, the current channel is ignored.
@@ -404,9 +391,7 @@ class Config(commands.Cog):
 
     @config.group(pass_context=True, invoke_without_command=True)
     @checks.is_mod()
-    async def unignore(
-        self, ctx: Context, *entities: (discord.TextChannel | discord.Member if TYPE_CHECKING else ChannelOrMember)
-    ) -> None:
+    async def unignore(self, ctx: Context, *entities: discord.TextChannel | discord.Member) -> None:
         """Allows channels or members to use the bot again.
 
         If nothing is specified, it unignores the current channel.
@@ -478,7 +463,7 @@ class Config(commands.Cog):
                 raise RuntimeError(msg)
 
     @channel.command(name="disable")
-    async def channel_disable(self, ctx: Context, *, command: str if TYPE_CHECKING else CommandName) -> None:
+    async def channel_disable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
         """Disables a command for this channel."""
         assert ctx.guild is not None
 
@@ -490,7 +475,7 @@ class Config(commands.Cog):
             await ctx.send("Command successfully disabled for this channel.")
 
     @channel.command(name="enable")
-    async def channel_enable(self, ctx: Context, *, command: str if TYPE_CHECKING else CommandName) -> None:
+    async def channel_enable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
         """Enables a command for this channel."""
         assert ctx.guild is not None
 
@@ -502,7 +487,7 @@ class Config(commands.Cog):
             await ctx.send("Command successfully enabled for this channel.")
 
     @server.command(name="disable")
-    async def server_disable(self, ctx: Context, *, command: str if TYPE_CHECKING else CommandName) -> None:
+    async def server_disable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
         """Disables a command for this server."""
         assert ctx.guild is not None
 
@@ -514,7 +499,7 @@ class Config(commands.Cog):
             await ctx.send("Command successfully disabled for this server")
 
     @server.command(name="enable")
-    async def server_enable(self, ctx: Context, *, command: str if TYPE_CHECKING else CommandName) -> None:
+    async def server_enable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
         """Enables a command for this server."""
         assert ctx.guild is not None
 
@@ -532,7 +517,7 @@ class Config(commands.Cog):
         ctx: Context,
         channel: discord.TextChannel | None,
         *,
-        command: str if TYPE_CHECKING else CommandName,
+        command: str = commands.param(converter=CommandName),
     ) -> None:
         """Enables a command the server or a channel."""
         assert ctx.guild is not None
@@ -553,7 +538,7 @@ class Config(commands.Cog):
         ctx: Context,
         channel: discord.TextChannel | None,
         *,
-        command: str if TYPE_CHECKING else CommandName,
+        command: str = commands.param(converter=CommandName),
     ) -> None:
         """Disables a command for the server or a channel."""
         assert ctx.guild is not None

@@ -91,7 +91,11 @@ class Meta(commands.Cog):
 
     @prefix.command(name="add", ignore_extra=False)
     @checks.is_mod()
-    async def prefix_add(self, ctx: Context, prefix: str if TYPE_CHECKING else Prefix) -> None:
+    async def prefix_add(
+        self,
+        ctx: Context,
+        prefix: str = commands.param(converter=Prefix),
+    ) -> None:
         """Appends a prefix to the list of custom prefixes.
 
         Previously set prefixes are not overridden.
@@ -123,7 +127,11 @@ class Meta(commands.Cog):
 
     @prefix.command(name="remove", aliases=["delete"], ignore_extra=False)
     @checks.is_mod()
-    async def prefix_remove(self, ctx: Context, prefix: str if TYPE_CHECKING else Prefix) -> None:
+    async def prefix_remove(
+        self,
+        ctx: Context,
+        prefix: str = commands.param(converter=Prefix),
+    ) -> None:
         """Removes a prefix from the list of custom prefixes.
 
         This is the inverse of the 'prefix add' command. You can
@@ -446,7 +454,7 @@ class Meta(commands.Cog):
     async def debugpermissions(
         self,
         ctx: Context,
-        channel: MessageableGuildChannel if TYPE_CHECKING else GuildChannel,
+        channel: MessageableGuildChannel = commands.param(converter=GuildChannel),
         author: discord.Member | None = None,
     ):
         """Shows permission resolution for a channel and an optional author."""

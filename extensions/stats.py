@@ -813,7 +813,11 @@ class Stats(commands.Cog):
 
     @commands.command(hidden=True, aliases=["cancel_task"])
     @commands.is_owner()
-    async def debug_task(self, ctx: Context, memory_id: int if TYPE_CHECKING else hex_value) -> None:
+    async def debug_task(
+        self,
+        ctx: Context,
+        memory_id: int = commands.param(converter=hex_value),
+    ) -> None:
         """Debug a task by a memory location."""
         task = object_at(memory_id)
         if task is None or not isinstance(task, asyncio.Task):

@@ -139,7 +139,7 @@ class Fun(commands.Cog):
         await message.channel.send(embed=embed)
 
     @commands.group(invoke_without_command=True, skip_extra=False)
-    async def abt(self, ctx: Context, *, content: str if TYPE_CHECKING else commands.clean_content) -> None:
+    async def abt(self, ctx: Context, *, content: str = commands.param(converter=commands.clean_content)) -> None:
         """I love this language."""
         keep = ABT_REG.findall(content)
 
@@ -169,7 +169,10 @@ class Fun(commands.Cog):
 
     @commands.command()
     async def translate(
-        self, ctx: Context, *, message: (str if TYPE_CHECKING else commands.clean_content) | None = None
+        self,
+        ctx: Context,
+        *,
+        message: str | None = commands.param(converter=commands.clean_content, default=None),
     ) -> None:
         """Translates a message to English using Google translate."""
 

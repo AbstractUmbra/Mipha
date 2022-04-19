@@ -98,7 +98,12 @@ class Time(commands.Cog):
         return time.hf_time(dt_obj)
 
     @commands.command(aliases=["tz"])
-    async def timezone(self, ctx: Context, *, timezone: (pytz.BaseTzInfo if TYPE_CHECKING else TimezoneConverter)) -> None:
+    async def timezone(
+        self,
+        ctx: Context,
+        *,
+        timezone: pytz.BaseTzInfo = commands.param(converter=TimezoneConverter),
+    ) -> None:
         """This will return the time in a specified timezone."""
         embed = discord.Embed(
             title=f"Current time in {timezone}",
@@ -145,7 +150,12 @@ class Time(commands.Cog):
 
     @time.command(name="set")
     @commands.guild_only()
-    async def _set(self, ctx: Context, *, set_timezone: pytz.BaseTzInfo if TYPE_CHECKING else TimezoneConverter) -> None:
+    async def _set(
+        self,
+        ctx: Context,
+        *,
+        set_timezone: pytz.BaseTzInfo = commands.param(converter=TimezoneConverter),
+    ) -> None:
         """Add your time zone, with a warning about public info."""
         assert ctx.guild is not None
 
