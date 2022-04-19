@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import uuid
+import pathlib
 from typing import Any
 
 
@@ -26,7 +26,7 @@ def _create_encoder(cls) -> type[json.JSONEncoder]:
 class Config:
     """The "database" object. Internally based on ``json``."""
 
-    def __init__(self, name: str, **options: Any) -> None:
+    def __init__(self, name: pathlib.Path, **options: Any) -> None:
         self.name = name
         self.object_hook = options.pop("object_hook", None)
         self.encoder = options.pop("encoder", None)
@@ -58,7 +58,7 @@ class Config:
             await self.loop.run_in_executor(None, self.load_from_file)
 
     def _dump(self) -> None:
-        temp = "%s-%s.tmp" % (uuid.uuid4(), self.name)
+        temp = self.name.with_suffix(".tmp")
         with open(temp, "w", encoding="utf-8") as tmp:
             json.dump(
                 self._db.copy(),
@@ -66,7 +66,7 @@ class Config:
                 ensure_ascii=True,
                 cls=self.encoder,
                 separators=(",", ":"),
-                indent=4,
+                indent=2,
             )
 
         # atomically move the file

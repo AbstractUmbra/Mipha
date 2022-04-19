@@ -33,9 +33,10 @@ from utilities.prefix import callable_prefix as _callable_prefix
 
 
 LOGGER = logging.getLogger(__name__)
-jishaku.Flags.NO_UNDERSCORE = True
+jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
-jishaku.Flags.ALWAYS_DM_TRACEBACK = True
+jishaku.Flags.NO_UNDERSCORE = True
+jishaku.Flags.NO_DM_TRACEBACK = True
 
 
 class KukikoCommandTree(app_commands.CommandTree):
@@ -100,8 +101,8 @@ class Kukiko(commands.Bot):
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
-        self._prefix_data: Config = Config("configs/prefixes.json")
-        self._blacklist_data: Config = Config("configs/blacklist.json")
+        self._prefix_data: Config = Config(pathlib.Path("configs/prefixes.json"))
+        self._blacklist_data: Config = Config(pathlib.Path("configs/blacklist.json"))
 
         # auto spam detection
         self._spam_cooldown_mapping: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(
@@ -338,7 +339,7 @@ async def main():
         bot.session = session
 
         await bot.load_extension("jishaku")
-        for file in pathlib.Path("extensions").glob("**/[!_]*.py"):
+        for file in sorted(pathlib.Path("extensions").glob("**/[!_]*.py")):
             ext = ".".join(file.parts).removesuffix(".py")
             try:
                 await bot.load_extension(ext)
