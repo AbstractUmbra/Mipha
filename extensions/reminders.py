@@ -18,9 +18,7 @@ from typing_extensions import Self
 
 from utilities import formats, time
 from utilities.context import Context
-from utilities.converters import (
-    WhenAndWhatConverter,  # type: ignore # it actually is but annotations abuse
-)
+from utilities.converters import WhenAndWhatConverter
 from utilities.db import MaybeAcquire
 
 

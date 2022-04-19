@@ -25,12 +25,7 @@ from discord.ext import commands, tasks
 
 from utilities import cache, checks, time
 from utilities.context import Context
-from utilities.converters import (
-    DatetimeConverter,  # type: ignore # it is but annotation hacks
-)
-from utilities.converters import (
-    WhenAndWhatConverter,  # type: ignore # it is but annotation hacks
-)
+from utilities.converters import DatetimeConverter, WhenAndWhatConverter
 from utilities.formats import format_dt, plural
 
 

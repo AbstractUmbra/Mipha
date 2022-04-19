@@ -23,10 +23,7 @@ import hondana  # type: ignore # rtfs
 import jishaku  # type: ignore # rtfs
 import mystbin  # type: ignore # rtfs
 from discord.ext import commands, menus, tasks  # type: ignore # rtfs
-from jishaku.codeblocks import (
-    codeblock_converter,  # type: ignore # this is used just not when type checking
-)
-from jishaku.codeblocks import Codeblock
+from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
 
 from utilities import fuzzy
