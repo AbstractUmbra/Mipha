@@ -35,12 +35,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from bot import Kukiko
-    from utilities._types import (
-        JishoWordsResponse,
-        KanjiDevKanjiPayload,
-        KanjiDevWordsPayload,
-        _JishoJapanesePayload,
-    )
+    from utilities._types import JishoWordsResponse, KanjiDevKanjiPayload, KanjiDevWordsPayload, _JishoJapanesePayload
 
 BASE_URL = "https://kanjiapi.dev/v1"
 HIRAGANA = "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよらりるれろわを"
@@ -456,7 +451,7 @@ class Nihongo(commands.Cog):
     @kanji.error
     @words.error
     @reading.error
-    async def nihongo_error(self, ctx: Context, error: BaseException) -> None:
+    async def nihongo_error(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
 
         if isinstance(error, aiohttp.ContentTypeError):
@@ -464,7 +459,7 @@ class Nihongo(commands.Cog):
             return
 
     @commands.command()
-    async def jisho(self, ctx: Context, *, query: str):
+    async def jisho(self, ctx: Context, *, query: str) -> None:
         """Query the Jisho api with your kanji/word."""
         async with self.bot.session.get(JISHO_WORDS_URL, params={"keyword": query}) as response:
             if response.status == 200:
@@ -589,7 +584,7 @@ class Nihongo(commands.Cog):
             task.cancel()
 
     @kanarace.error
-    async def race_error(self, ctx: Context, error: BaseException) -> None:
+    async def race_error(self, ctx: Context, error: commands.CommandError) -> None:
         if isinstance(error, asyncio.TimeoutError):
             await ctx.send("Kanarace has no winners!", delete_after=5.0)
             return
