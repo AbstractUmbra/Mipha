@@ -89,6 +89,9 @@ class Fun(commands.Cog):
         if message.author.bot or message.embeds or message.guild is None:
             return
 
+        if not message.guild or not message.guild.id == 149998214810959872:
+            return
+
         assert isinstance(message.channel, discord.TextChannel)
         perms = message.channel.permissions_for(message.guild.me)
         if perms.send_messages is False or perms.embed_links is False:
@@ -113,6 +116,9 @@ class Fun(commands.Cog):
         channel = message.guild.get_channel(channel_id)
         if channel is None:
             # deleted or private?
+            return
+
+        if channel.permissions_for(message.guild.default_role).read_messages is False:
             return
 
         assert isinstance(channel, discord.TextChannel)
@@ -174,7 +180,7 @@ class Fun(commands.Cog):
         *,
         message: str | None = commands.param(converter=commands.clean_content, default=None),
     ) -> None:
-        """Translates a message to English using Google translate."""
+        """Translates a message to English using DeepL's translatation API."""
 
         if message is None:
             ref = ctx.message.reference
