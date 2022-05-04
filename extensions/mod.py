@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
-from discord.abc import Snowflake
 from discord.ext import commands, tasks
 
 from utilities import cache, checks, time
@@ -132,7 +131,14 @@ class MemberID(commands.Converter):
 class BannedMember(commands.Converter):
     async def convert(self, ctx: Context, argument: str) -> discord.guild.BanEntry:
         assert ctx.guild is not None
-        ban_list = [ban async for ban in ctx.guild.bans()]
+        if argument.isdigit():
+            target_id = int(argument, base=10)
+            try:
+                return await ctx.guild.fetch_ban(discord.Object(id=target_id))
+            except discord.NotFound:
+                raise commands.BadArgument("This member has not been banned before.") from None
+
+        ban_list = [ban async for ban in ctx.guild.bans(limit=None)]
         try:
             member_id = int(argument, base=10)
             entity = discord.utils.find(lambda u: u.user.id == member_id, ban_list)
@@ -140,7 +146,7 @@ class BannedMember(commands.Converter):
             entity = discord.utils.find(lambda u: str(u.user) == argument, ban_list)
 
         if entity is None:
-            raise commands.BadArgument("Not a valid previously-banned member.")
+            raise commands.BadArgument("Not a valid previously-banned member.") from None
         return entity
 
 
@@ -162,7 +168,7 @@ def safe_reason_append(base: str, to_append: str) -> str:
 
 
 class CooldownByContent(commands.CooldownMapping):
-    def _bucket_key(self, message) -> tuple[int, str]:
+    def _bucket_key(self, message: discord.Message) -> tuple[int, str]:
         return (message.channel.id, message.content)
 
 
@@ -1298,20 +1304,22 @@ class Mod(commands.Cog):
         limit: int,
         predicate: Callable[..., bool],
         *,
-        before: Snowflake | None = None,
-        after: Snowflake | None = None,
+        before_: int | None = None,
+        after_: int | None = None,
     ) -> None:
         if limit > 2000:
             await ctx.send(f"Too many messages to search given ({limit}/2000)")
             return
 
-        if before is None:
+        if before_ is None:
             before = ctx.message
         else:
-            before = discord.Object(id=before.id)
+            before = discord.Object(id=before_)
 
-        if after is not None:
-            after = discord.Object(id=after.id)
+        if after_ is not None:
+            after = discord.Object(id=after_)
+        else:
+            after = after_
 
         assert isinstance(ctx.channel, discord.TextChannel)
         try:
@@ -1526,7 +1534,7 @@ class Mod(commands.Cog):
             args.search = 100
 
         args.search = max(0, min(2000, args.search))  # clamp from 0-2000
-        await self.do_removal(ctx, args.search, predicate, before=args.before, after=args.after)
+        await self.do_removal(ctx, args.search, predicate, before_=args.before, after_=args.after)
 
     @commands.command(aliases=["timeout"])
     @can_mute()
