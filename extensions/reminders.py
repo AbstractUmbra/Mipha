@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import textwrap
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 import asyncpg
 import discord
@@ -58,11 +58,11 @@ class Timer:
     )
 
     def __init__(self, *, record: asyncpg.Record) -> None:
-        self.id = record["id"]
+        self.id: int = record["id"]
 
         extra: Mapping[Any, Any] = record["extra"]
-        self.args: list[Any] = extra.get("args", [])
-        self.kwargs: Mapping[Any, Any] = extra.get("kwargs", {})
+        self.args: Sequence[Any] = extra.get("args", [])
+        self.kwargs: dict[str, Any] = extra.get("kwargs", {})
         self.event: str = record["event"]
         self.created_at: datetime.datetime = record["created"]
         self.expires: datetime.datetime = record["expires"]
@@ -74,8 +74,8 @@ class Timer:
         expires: datetime.datetime,
         created: datetime.datetime,
         event: str,
-        args: tuple[Any],
-        kwargs: Mapping[Any, Any],
+        args: Sequence[Any],
+        kwargs: dict[str, Any],
     ) -> Self:
         pseudo = {
             "id": None,
@@ -99,6 +99,12 @@ class Timer:
     def human_delta(self) -> str:
         return time.format_relative(self.created_at)
 
+    @property
+    def author_id(self) -> int | None:
+        if self.args:
+            return int(self.args[0])
+        return
+
     def __repr__(self) -> str:
         return f"<Timer created={self.created_at} expires={self.expires} event={self.event}>"
 
@@ -107,9 +113,9 @@ class Reminder(commands.Cog):
     """Reminders to do something."""
 
     def __init__(self, bot: Kukiko) -> None:
-        self.bot = bot
+        self.bot: Kukiko = bot
         self._have_data = asyncio.Event()
-        self._current_timer = None
+        self._current_timer: Timer | None = None
         self._task = bot.loop.create_task(self.dispatch_timers())
 
     def cog_unload(self) -> None:
