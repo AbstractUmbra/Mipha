@@ -7,7 +7,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Generator, Sequence
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Generator, TypeVar
 
 import asyncpg
 import discord
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
 
 __all__ = ("Context",)
 
+T = TypeVar("T")
+
 
 class _ContextDBAcquire:
     __slots__ = (
@@ -35,22 +38,24 @@ class _ContextDBAcquire:
         self.ctx: Context = ctx
         self.timeout: float | None = timeout
 
-    def __await__(self) -> Generator[None, None, asyncpg.Connection]:
+    def __await__(self) -> Generator[Any, None, asyncpg.Connection]:
         return self.ctx._acquire(timeout=self.timeout).__await__()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> asyncpg.Pool | asyncpg.Connection:
         await self.ctx._acquire(timeout=self.timeout)
         assert isinstance(self.ctx.db, asyncpg.Connection)
         return self.ctx.db
 
-    async def __aexit__(self, *_):
+    async def __aexit__(self, *_) -> None:
         await self.ctx.release()
 
 
 class Context(commands.Context["Kukiko"]):
-    _db: asyncpg.Connection | None
+    _db: asyncpg.Connection | asyncpg.Pool | None
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
     starboard: StarboardConfig
+    bot: Kukiko
+    command: commands.Command[Any, ..., Any]
 
     __slots__ = (
         "pool",
@@ -61,7 +66,7 @@ class Context(commands.Context["Kukiko"]):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.pool = self.bot.pool
-        self._db: asyncpg.Connection | None = None
+        self._db: asyncpg.Connection | asyncpg.Pool | None = None
 
     def __repr__(self) -> str:
         return "<Context>"
@@ -80,7 +85,7 @@ class Context(commands.Context["Kukiko"]):
         if ref and isinstance(ref.resolved, discord.Message):
             return ref.resolved.to_reference()
 
-    async def disambiguate(self, matches: Sequence[Any], entry: Any) -> None:
+    async def disambiguate(self, matches: list[T], entry: Callable[[T], Any]) -> T:
         if len(matches) == 0:
             raise ValueError("No results found.")
 

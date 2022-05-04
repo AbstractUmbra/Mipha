@@ -1,36 +1,42 @@
+# -*- coding: utf-8 -*-
+
 """
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
+# help with: http://chairnerd.seatgeek.com/fuzzywuzzy-fuzzy-string-matching-in-python/
+
+from __future__ import annotations
+
 import heapq
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Generator, Iterable, Sequence
 from difflib import SequenceMatcher
-from typing import Any, Callable, Generator, Literal, Sequence, TypeVar, overload
+from typing import Literal, TypeVar, overload
 
 
 T = TypeVar("T")
 
 
-def ratio(a: Sequence[Any], b: Sequence[Any]) -> int:
+def ratio(a: str, b: str) -> int:
     m = SequenceMatcher(None, a, b)
     return int(round(100 * m.ratio()))
 
 
-def quick_ratio(a: Sequence[Any], b: Sequence[Any]) -> int:
+def quick_ratio(a: str, b: str) -> int:
     m = SequenceMatcher(None, a, b)
     return int(round(100 * m.quick_ratio()))
 
 
-def partial_ratio(a: Sequence[Any], b: Sequence[Any]) -> int:
+def partial_ratio(a: str, b: str) -> int:
     short, long = (a, b) if len(a) <= len(b) else (b, a)
     m = SequenceMatcher(None, short, long)
 
     blocks = m.get_matching_blocks()
 
-    scores = []
+    scores: list[float] = []
     for i, j, _ in blocks:
         start = max(j - i, 0)
         end = start + len(short)
@@ -72,72 +78,112 @@ def partial_token_sort_ratio(a: str, b: str) -> int:
 
 @overload
 def _extraction_generator(
-    query: Sequence[Any],
-    choices: Sequence[T],
-    scorer: Callable[[Sequence[Any], Sequence[Any]], int] = quick_ratio,
-    score_cutoff: int = 0,
-) -> Generator[tuple[T, int], Any, Any]:
+    query: str,
+    choices: Sequence[str],
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+) -> Generator[tuple[str, int], None, None]:
     ...
 
 
 @overload
 def _extraction_generator(
-    query: Sequence[Any],
-    choices: dict[Sequence[T], Any],
-    scorer: Callable[[Sequence[Any], Sequence[Any]], int] = quick_ratio,
-    score_cutoff: int = 0,
-) -> Generator[tuple[T, int, Any], Any, Any]:
+    query: str,
+    choices: dict[str, T],
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+) -> Generator[tuple[str, int, T], None, None]:
     ...
 
 
 def _extraction_generator(
-    query: Sequence[Any],
-    choices: Sequence[T] | dict[Sequence[T], Any],
-    scorer: Callable[[Sequence[Any], Sequence[Any]], int] = quick_ratio,
+    query: str,
+    choices: Sequence[str] | dict[str, T],
+    scorer: Callable[[str, str], int] = quick_ratio,
     score_cutoff: int = 0,
-):
-    try:
-        for key, value in choices.items():  # type: ignore  # this is okay.
+) -> Generator[tuple[str, int, T] | tuple[str, int], None, None]:
+    if isinstance(choices, dict):
+        for key, value in choices.items():
             score = scorer(query, key)
             if score >= score_cutoff:
                 yield (key, score, value)
-    except AttributeError:
+    else:
         for choice in choices:
-            score = scorer(query, choice)  # type: ignore # TODO: figure this out later
+            score = scorer(query, choice)
             if score >= score_cutoff:
                 yield (choice, score)
 
 
+@overload
 def extract(
-    query: Sequence[Any],
-    choices: Sequence[Any] | dict[Sequence[Any], Any],
+    query: str,
+    choices: Sequence[str],
     *,
-    scorer: Callable[[Sequence[Any], Sequence[Any]], int] = quick_ratio,
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+    limit: int | None = ...,
+) -> list[tuple[str, int]]:
+    ...
+
+
+@overload
+def extract(
+    query: str,
+    choices: dict[str, T],
+    *,
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+    limit: int | None = ...,
+) -> list[tuple[str, int, T]]:
+    ...
+
+
+def extract(
+    query: str,
+    choices: dict[str, T] | Sequence[str],
+    *,
+    scorer: Callable[[str, str], int] = quick_ratio,
     score_cutoff: int = 0,
-    limit: int | None = 10
-):
+    limit: int | None = 10,
+) -> list[tuple[str, int]] | list[tuple[str, int, T]]:
     it = _extraction_generator(query, choices, scorer, score_cutoff)
-
-    def key(t):
-        return t[1]
-
+    key = lambda t: t[1]
     if limit is not None:
-        return heapq.nlargest(limit, it, key=key)
-    return sorted(it, key=key, reverse=True)
+        return heapq.nlargest(limit, it, key=key)  # type: ignore
+    return sorted(it, key=key, reverse=True)  # type: ignore
+
+
+@overload
+def extract_one(
+    query: str,
+    choices: Sequence[str],
+    *,
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+) -> tuple[str, int] | None:
+    ...
+
+
+@overload
+def extract_one(
+    query: str,
+    choices: dict[str, T],
+    *,
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+) -> tuple[str, int, T] | None:
+    ...
 
 
 def extract_one(
-    query: Sequence[Any],
-    choices: Sequence[Any] | dict[Sequence[Any], Any],
+    query: str,
+    choices: dict[str, T] | Sequence[str],
     *,
-    scorer: Callable[[Sequence[Any], Sequence[Any]], int] = quick_ratio,
-    score_cutoff: int = 0
-) -> tuple[Any, int] | tuple[Any, int, Any] | None:
+    scorer: Callable[[str, str], int] = quick_ratio,
+    score_cutoff: int = 0,
+) -> tuple[str, int] | tuple[str, int, T] | None:
     it = _extraction_generator(query, choices, scorer, score_cutoff)
-
-    def key(t):
-        return t[1]
-
+    key = lambda t: t[1]
     try:
         return max(it, key=key)
     except:
@@ -145,14 +191,38 @@ def extract_one(
         return None
 
 
+@overload
 def extract_or_exact(
-    query: Sequence[Any],
-    choices: Sequence[Any] | dict[Sequence[Any], Any],
+    query: str,
+    choices: Sequence[str],
     *,
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+    limit: int | None = ...,
+) -> list[tuple[str, int]]:
+    ...
+
+
+@overload
+def extract_or_exact(
+    query: str,
+    choices: dict[str, T],
+    *,
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+    limit: int | None = ...,
+) -> list[tuple[str, int, T]]:
+    ...
+
+
+def extract_or_exact(
+    query: str,
+    choices: dict[str, T] | Sequence[str],
+    *,
+    scorer: Callable[[str, str], int] = quick_ratio,
+    score_cutoff: int = 0,
     limit: int | None = None,
-    scorer: Callable[[Sequence[Any], Sequence[Any]], int] = quick_ratio,
-    score_cutoff: int = 0
-) -> list[tuple[Any, int] | tuple[Any, int, Any]]:
+) -> list[tuple[str, int]] | list[tuple[str, int, T]]:
     matches = extract(query, choices, scorer=scorer, score_cutoff=score_cutoff, limit=limit)
     if len(matches) == 0:
         return []
@@ -165,18 +235,40 @@ def extract_or_exact(
 
     # check if the top one is exact or more than 30% more correct than the top
     if top == 100 or top > (second + 30):
-        return [matches[0]]
+        return [matches[0]]  # type: ignore
 
     return matches
 
 
+@overload
 def extract_matches(
-    query: Sequence[Any],
-    choices: Sequence[Any] | dict[Sequence[Any], Any],
+    query: str,
+    choices: Sequence[str],
     *,
-    scorer: Callable[[Sequence[Any], Sequence[Any]], int] = quick_ratio,
-    score_cutoff: int = 0
-):
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+) -> list[tuple[str, int]]:
+    ...
+
+
+@overload
+def extract_matches(
+    query: str,
+    choices: dict[str, T],
+    *,
+    scorer: Callable[[str, str], int] = ...,
+    score_cutoff: int = ...,
+) -> list[tuple[str, int, T]]:
+    ...
+
+
+def extract_matches(
+    query: str,
+    choices: dict[str, T] | Sequence[str],
+    *,
+    scorer: Callable[[str, str], int] = quick_ratio,
+    score_cutoff: int = 0,
+) -> list[tuple[str, int]] | list[tuple[str, int, T]]:
     matches = extract(query, choices, scorer=scorer, score_cutoff=score_cutoff, limit=None)
     if len(matches) == 0:
         return []
@@ -201,25 +293,45 @@ def extract_matches(
 
 @overload
 def finder(
-    text: str, collection: Iterable[Any], *, key: Callable[[T], T] | None = ..., lazy: Literal[True]
-) -> Generator[Any, None, None]:
-    ...
-
-
-@overload
-def finder(text: str, collection: Iterable[Any], *, key: Callable[[T], T] | None = ..., lazy: Literal[False]) -> list[Any]:
+    text: str,
+    collection: Iterable[str],
+    *,
+    key: Callable[[str], str] | None = ...,
+    lazy: Literal[True] = ...,
+) -> Generator[str, None, None]:
     ...
 
 
 @overload
 def finder(
-    text: str, collection: Iterable[Any], *, key: Callable[[T], T] | None = ..., lazy: bool = ...
-) -> Generator[Any, None, None]:
+    text: str,
+    collection: Iterable[str],
+    *,
+    key: Callable[[str], str] | None = ...,
+    lazy: Literal[False],
+) -> list[str]:
     ...
 
 
-def finder(text: str, collection: Iterable[Any], *, key: Callable[[T], T] | None = None, lazy: bool = True):
-    suggestions: list[tuple[int, int, Any]] = []
+@overload
+def finder(
+    text: str,
+    collection: Iterable[str],
+    *,
+    key: Callable[[str], str] | None = ...,
+    lazy: bool = ...,
+) -> Generator[str, None, None] | list[str]:
+    ...
+
+
+def finder(
+    text: str,
+    collection: Iterable[str],
+    *,
+    key: Callable[[str], str] | None = ...,
+    lazy: bool = True,
+) -> Generator[str, None, None] | list[str]:
+    suggestions: list[tuple[int, int, str]] = []
     text = str(text)
     pat = ".*?".join(map(re.escape, text))
     regex = re.compile(pat, flags=re.IGNORECASE)
@@ -229,7 +341,7 @@ def finder(text: str, collection: Iterable[Any], *, key: Callable[[T], T] | None
         if r:
             suggestions.append((len(r.group()), r.start(), item))
 
-    def sort_key(tup):
+    def sort_key(tup: tuple[int, int, str]) -> tuple[int, int, str]:
         if key:
             return tup[0], tup[1], key(tup[2])
         return tup
@@ -240,9 +352,8 @@ def finder(text: str, collection: Iterable[Any], *, key: Callable[[T], T] | None
         return [z for _, _, z in sorted(suggestions, key=sort_key)]
 
 
-def find(text: str, collection: Iterable[Any], *, key: Callable[[T], T] | None = None) -> Any | None:
+def find(text: str, collection: Iterable[str], *, key: Callable[[str], str] | None = None) -> str | None:
     try:
-        found: list[Any] = finder(text, collection, key=key, lazy=False)
-        return found[0]
+        return finder(text, collection, key=key, lazy=False)[0]
     except IndexError:
         return None

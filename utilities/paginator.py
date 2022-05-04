@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar, overloa
 
 import discord
 import hondana
-from discord.ext import commands, menus
+import nhentaio
+from discord.ext import menus
 from discord.ext.commands import Paginator as CommandPaginator
 
 from utilities.context import Context
@@ -38,7 +39,7 @@ class RoboPages(discord.ui.View, Generic[SourceT]):
         super().__init__()
         self.source: SourceT = source
         self.check_embeds: bool = check_embeds
-        self.ctx: commands.Context = ctx
+        self.ctx: Context = ctx
         self.message: Optional[discord.Message] = None
         self.current_page: int = 0
         self.compact: bool = compact
@@ -294,16 +295,16 @@ class SimpleListSource(menus.ListPageSource, Generic[T]):
     async def format_page(self, menu: menus.Menu, entries: T) -> T:
         ...
 
-    async def format_page(self, menu: menus.Menu, entries: T | list[T]):
+    async def format_page(self, menu: menus.Menu, entries: T | list[T]) -> T | list[T]:
         return entries
 
 
 class MangaDexEmbed(discord.Embed):
     @classmethod
     async def from_chapter(cls: Type[Self], chapter: hondana.Chapter, *, nsfw_allowed: bool = False) -> Self:
-        assert chapter.manga is not None
-
         parent = chapter.manga
+        assert parent is not None
+
         parent_title = parent.title
         if chapter.title:
             parent_title += f" - {chapter.title}"
@@ -323,10 +324,10 @@ class MangaDexEmbed(discord.Embed):
             if nsfw_allowed
             else (hondana.ContentRating.safe,)
         )
-        if chapter.manga.content_rating is content_ratings:
-            if chapter.manga.cover_url() is None:
-                await chapter.manga.get_cover()
-            self.set_thumbnail(url=chapter.manga.cover_url())
+        if parent.content_rating is content_ratings:
+            if parent.cover_url() is None:
+                await parent.get_cover()
+            self.set_thumbnail(url=parent.cover_url())
 
         return self
 
@@ -361,5 +362,27 @@ class MangaDexEmbed(discord.Embed):
             if manga.cover_url() is None:
                 await manga.get_cover()
             self.set_thumbnail(url=manga.cover_url())
+
+        return self
+
+
+class NHentaiEmbed(discord.Embed):
+    @classmethod
+    def from_gallery(cls, gallery: nhentaio.Gallery) -> NHentaiEmbed:
+        self = cls(title=gallery.title, url=gallery.url)
+        self.timestamp = gallery.uploaded
+        self.add_field(name="Page count", value=gallery.page_count)
+        self.add_field(name="Local name", value="N/A")
+        self.add_field(name="# of favourites", value=gallery.favourites)
+        self.set_image(url=gallery.cover.url)
+
+        tags = sorted(gallery.tags, key=lambda t: t.count, reverse=True)
+        gt = True if len(tags) > 25 else False
+        tags = tags[:25]
+        fmt = ", ".join(f"`{tag.name.title()}`" for tag in tags)
+
+        self.description = fmt
+        if gt:
+            self.description += "... (truncated at 25)"
 
         return self

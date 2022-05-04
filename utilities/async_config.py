@@ -10,38 +10,33 @@ import asyncio
 import json
 import os
 import pathlib
-from typing import Any
+from collections.abc import Callable
+from typing import Any, Generic, TypeAlias, TypeVar, overload
 
 
-def _create_encoder(cls) -> type[json.JSONEncoder]:
-    class _Encoder(json.JSONEncoder):
-        def _default(self, o):
-            if isinstance(o, cls):
-                return o.to_json()
-            return super().default(o)
-
-    return _Encoder
+ObjectHook: TypeAlias = Callable[[dict[str, Any]], Any]
+_T = TypeVar("_T")
 
 
-class Config:
+class Config(Generic[_T]):
     """The "database" object. Internally based on ``json``."""
 
-    def __init__(self, name: pathlib.Path, **options: Any) -> None:
+    def __init__(
+        self,
+        name: pathlib.Path,
+        *,
+        object_hook: ObjectHook | None = None,
+        encoder: type[json.JSONEncoder] | None = None,
+        load_later: bool = False,
+    ) -> None:
         self.name = name
-        self.object_hook = options.pop("object_hook", None)
-        self.encoder = options.pop("encoder", None)
-
-        try:
-            hook = options.pop("hook")
-        except KeyError:
-            pass
-        else:
-            self.object_hook = hook.from_json
-            self.encoder = _create_encoder(hook)
-
+        self.object_hook = object_hook
+        self.encoder = encoder
         self.loop = asyncio.get_event_loop()
         self.lock = asyncio.Lock()
-        if options.pop("load_later", False):
+        self._db: dict[str, _T | Any] = {}
+
+        if load_later:
             self.loop.create_task(self.load())
         else:
             self.load_from_file()
@@ -76,11 +71,19 @@ class Config:
         async with self.lock:
             await self.loop.run_in_executor(None, self._dump)
 
-    def get(self, key: Any, *args) -> Any:
-        """Retrieves a config entry."""
-        return self._db.get(str(key), *args)
+    @overload
+    def get(self, key: Any) -> _T | Any | None:
+        ...
 
-    async def put(self, key: Any, value: Any, *args) -> None:
+    @overload
+    def get(self, key: Any, default: Any) -> _T | Any:
+        ...
+
+    def get(self, key: Any, default: Any = None) -> _T | Any | None:
+        """Retrieves a config entry."""
+        return self._db.get(str(key), default)
+
+    async def put(self, key: Any, value: _T | Any) -> None:
         """Edits a config entry."""
         self._db[str(key)] = value
         await self.save()
@@ -93,11 +96,11 @@ class Config:
     def __contains__(self, item: Any) -> bool:
         return str(item) in self._db
 
-    def __getitem__(self, item: Any) -> Any:
+    def __getitem__(self, item: Any) -> _T | Any:
         return self._db[str(item)]
 
     def __len__(self) -> int:
         return len(self._db)
 
-    def all(self) -> dict[str, Any]:
+    def all(self) -> dict[str, _T | Any]:
         return self._db

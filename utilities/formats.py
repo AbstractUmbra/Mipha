@@ -11,7 +11,7 @@ import re
 import sys
 import unicodedata
 from collections.abc import Iterable, Sequence
-from typing import Any, Optional, SupportsAbs
+from typing import Any, SupportsAbs
 
 from discord.utils import escape_markdown
 
@@ -58,11 +58,11 @@ def human_join(seq: Sequence[str], delim: str = ", ", final: str = "or") -> str:
 
 class TabularData:
     def __init__(self) -> None:
-        self._widths = []
-        self._columns = []
-        self._rows = []
+        self._widths: list[int] = []
+        self._columns: list[str] = []
+        self._rows: list[list[str]] = []
 
-    def set_columns(self, columns: Iterable[Any]) -> None:
+    def set_columns(self, columns: list[str]) -> None:
         self._columns = columns
         self._widths = [len(c) + 2 for c in columns]
 
@@ -74,7 +74,7 @@ class TabularData:
             if width > self._widths[index]:
                 self._widths[index] = width
 
-    def add_rows(self, rows: Iterable[Iterable[str | int]]) -> None:
+    def add_rows(self, rows: Iterable[Iterable[Any]]) -> None:
         for row in rows:
             self.add_row(row)
 
@@ -108,7 +108,7 @@ class TabularData:
         return "\n".join(to_draw)
 
 
-def format_dt(dt: datetime.datetime, style: Optional[str] = None) -> str:
+def format_dt(dt: datetime.datetime, style: str | None = None) -> str:
     if style is None:
         return f"<t:{int(dt.timestamp())}>"
     return f"<t:{int(dt.timestamp())}:{style}>"
@@ -128,7 +128,7 @@ def to_codeblock(
     return f"```{language}\n{content}\n```"
 
 
-def escape_invis(decode_error):
+def escape_invis(decode_error: UnicodeError):
     decode_error.end = decode_error.start + 1
     if CONTROL_CHARS.match(decode_error.object[decode_error.start : decode_error.end]):
         return codecs.backslashreplace_errors(decode_error)
