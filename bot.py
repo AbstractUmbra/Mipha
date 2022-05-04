@@ -14,7 +14,7 @@ import pathlib
 import sys
 import traceback
 from collections import Counter, deque
-from typing import Any, Callable, Coroutine, Literal, overload
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, overload
 
 import aiohttp
 import asyncpg
@@ -22,6 +22,7 @@ import discord
 import hondana
 import jishaku
 import mystbin
+import nhentaio
 from discord import app_commands
 from discord.ext import commands
 
@@ -32,6 +33,10 @@ from utilities.db import db_init
 from utilities.prefix import callable_prefix as _callable_prefix
 
 
+if TYPE_CHECKING:
+    from extensions.reminders import Reminder
+    from extensions.stats import Stats
+
 LOGGER = logging.getLogger(__name__)
 jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
@@ -40,7 +45,9 @@ jishaku.Flags.NO_DM_TRACEBACK = True
 
 
 class KukikoCommandTree(app_commands.CommandTree):
-    async def tree_on_error(
+    client: Kukiko
+
+    async def on_error(
         self,
         interaction: discord.Interaction,
         error: app_commands.AppCommandError,
@@ -53,9 +60,9 @@ class KukikoCommandTree(app_commands.CommandTree):
         trace = traceback.format_exception(exc_type, exc, tb)
         e.add_field(name="Error", value=f"```py\n{trace}\n```")
         e.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        hook = self.client.get_cog("Stats").webhook
+        stats: Stats = self.client.get_cog("Stats")  # type: ignore
         try:
-            await hook.send(embed=e)
+            await stats.webhook.send(embed=e)
         except discord.HTTPException:
             pass
 
@@ -64,9 +71,11 @@ class Kukiko(commands.Bot):
     """Kukiko's bot class."""
 
     pool: asyncpg.Pool
+    user: discord.ClientUser
     session: aiohttp.ClientSession
     mb_client: mystbin.Client
     md_client: hondana.Client
+    h_client: nhentaio.Client
     start_time: datetime.datetime
     command_stats: Counter[str]
     socket_stats: Counter[Any]
@@ -76,7 +85,7 @@ class Kukiko(commands.Bot):
     __slots__ = (
         "session",
         "paste",
-        "h",
+        "h_client",
         "md_client",
         "start_time",
         "pool",
@@ -101,8 +110,8 @@ class Kukiko(commands.Bot):
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
-        self._prefix_data: Config = Config(pathlib.Path("configs/prefixes.json"))
-        self._blacklist_data: Config = Config(pathlib.Path("configs/blacklist.json"))
+        self._prefix_data: Config[list[str]] = Config(pathlib.Path("configs/prefixes.json"))
+        self._blacklist_data: Config[list[str]] = Config(pathlib.Path("configs/blacklist.json"))
 
         # auto spam detection
         self._spam_cooldown_mapping: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(
@@ -124,6 +133,10 @@ class Kukiko(commands.Bot):
     @property
     def config(self) -> _bot_config:  # type: ignore # this actually can be used a type but I guess it's not correct practice.
         return __import__("_bot_config")
+
+    @property
+    def reminder(self) -> Reminder | None:
+        return self.get_cog("Reminder")  # type: ignore # valid
 
     @discord.utils.cached_property
     def logging_webhook(self) -> discord.Webhook:
@@ -182,7 +195,7 @@ class Kukiko(commands.Bot):
 
     def _get_guild_prefixes(
         self,
-        guild: discord.Guild,
+        guild: discord.abc.Snowflake,
         *,
         local_: Callable[[Kukiko, discord.Message], list[str]] = _callable_prefix,
         raw: bool = False,
@@ -194,7 +207,7 @@ class Kukiko(commands.Bot):
         snowflake_proxy.guild = guild  # type: ignore # this is actually valid, the class just has no slots or attr to override.
         return local_(self, snowflake_proxy)  # type: ignore # this is actually valid, the class just has no slots or attr to override.
 
-    async def _set_guild_prefixes(self, guild: discord.Guild, prefixes: list[str] | None) -> None:
+    async def _set_guild_prefixes(self, guild: discord.abc.Snowflake, prefixes: list[str] | None) -> None:
         if not prefixes:
             await self._prefix_data.put(guild.id, [])
         elif len(prefixes) > 10:
@@ -298,6 +311,7 @@ class Kukiko(commands.Bot):
         await self.mb_client.close()
         await self.md_client.close()
         await self.session.close()
+        await self.h_client.close()
         await super().close()
 
     async def start(self) -> None:
@@ -318,6 +332,7 @@ class Kukiko(commands.Bot):
 
         self.mb_client = mystbin.Client(session=self.session)
         self.md_client = hondana.Client(**self.config.MANGADEX_AUTH, session=self.session)
+        self.h_client = nhentaio.Client()
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
 
 
