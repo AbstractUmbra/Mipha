@@ -44,6 +44,17 @@ RTFS = (
     "mystbin",
 )
 
+RTFM_PAGE_TYPES = {
+    "discord.py": "https://discordpy.readthedocs.io/en/stable",
+    "discord.py-master": "https://discordpy.readthedocs.io/en/latest",
+    "python": "https://docs.python.org/3",
+    "python-jp": "https://docs.python.org/ja/3",
+    "asyncpg": "https://magicstack.github.io/asyncpg/current",
+    "aiohttp": "https://docs.aiohttp.org/en/stable",
+    "hondana": "https://hondana.readthedocs.io/en/stable",
+    "hondana-master": "https://hondana.readthedocs.io/en/latest",
+}
+
 
 class BadSource(commands.CommandError):
     pass
@@ -170,14 +181,16 @@ class RTFX(commands.Cog):
                 key = key.replace("discord.ext.commands.", "").replace("discord.", "")
             elif projname == "asyncpg":
                 key = key.replace("asyncpg.", "")
+            elif projname == "Hondana":
+                key = key.replace("hondana.", "")
 
             result[f"{prefix}{key}"] = os.path.join(url, location)
 
         return result
 
-    async def build_rtfm_lookup_table(self, page_types: dict[str, str]) -> None:
+    async def build_rtfm_lookup_table(self) -> None:
         cache = {}
-        for key, page in page_types.items():
+        for key, page in RTFM_PAGE_TYPES.items():
             _ = cache[key] = {}
             async with self.bot.session.get(page + "/objects.inv") as resp:
                 if resp.status != 200:
@@ -189,26 +202,15 @@ class RTFX(commands.Cog):
         self._rtfm_cache = cache
 
     async def do_rtfm(self, ctx: Context, key: str, obj: str | None) -> None:
-        page_types = {
-            "discord.py": "https://discordpy.readthedocs.io/en/stable",
-            "discord.py-master": "https://discordpy.readthedocs.io/en/master",
-            "python": "https://docs.python.org/3",
-            "python-jp": "https://docs.python.org/ja/3",
-            "asyncpg": "https://magicstack.github.io/asyncpg/current",
-            "aiohttp": "https://docs.aiohttp.org/en/stable",
-            "hondana": "https://hondana.readthedocs.io/en/stable",
-            "hondana-master": "https://hondana.readthedocs.io/en/latest",
-        }
-
         if obj is None:
-            await ctx.send(page_types[key])
+            await ctx.send(RTFM_PAGE_TYPES[key])
             return
 
         if not hasattr(self, "_rtfm_cache"):
             await ctx.trigger_typing()
-            await self.build_rtfm_lookup_table(page_types)
+            await self.build_rtfm_lookup_table()
 
-        obj = re.sub(r"^(?:discord\.(?:ext\.)?)?(?:commands\.)?(.+)", r"\1", obj)
+        obj = re.sub(r"^(?:(?:discord\.(?:ext\.)?)?(?:commands\.)|hondana\.)?(.+)", r"\1", obj)
 
         if key.startswith("discord."):
             # point the abc.Messageable types properly:
@@ -235,7 +237,7 @@ class RTFX(commands.Cog):
 
     @commands.group(aliases=["rtfd"], invoke_without_command=True)
     async def rtfm(self, ctx: Context, *, obj: str | None = None) -> None:
-        """Gives you a documentation link for a discord.py entity.
+        """Gives you a documentation link for a python project entity. Defaults to providing information on discord.py
 
         Events, objects, and functions are all supported through a
         a cruddy fuzzy algorithm.
@@ -247,7 +249,7 @@ class RTFX(commands.Cog):
 
     @rtfm.command(name="master", aliases=["dpym"])
     async def rtfm_dpy_master(self, ctx: Context, *, obj: str | None = None) -> None:
-        """Gives you a documentation link for a Python entity."""
+        """Gives you a documentation link for a discord.py entity targetting the master branch."""
         await self.do_rtfm(ctx, "discord.py-master", obj)
 
     @rtfm.command(name="python", aliases=["py"])
@@ -277,8 +279,18 @@ class RTFX(commands.Cog):
 
     @rtfm.command(name="hondana-m")
     async def rtfm_hondana_master(self, ctx: Context, *, obj: str | None = None) -> None:
-        """Gives you the documentation link for a `Hondana` entity."""
+        """Gives you the documentation link for a `Hondana` entity targetting the master branch."""
         await self.do_rtfm(ctx, "hondana-master", obj)
+
+    @rtfm.command(name="refresh")
+    @commands.is_owner()
+    async def rtfm_refresh(self, ctx: Context):
+        """Refreshes the RTFM and FAQ cache"""
+
+        async with ctx.typing():
+            await self.build_rtfm_lookup_table()
+
+        await ctx.send("\N{THUMBS UP SIGN}")
 
     @commands.command(name="rtfs")
     async def rtfs(
