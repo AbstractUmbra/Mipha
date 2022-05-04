@@ -102,3 +102,13 @@ CREATE TABLE IF NOT EXISTS todos (
     added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() AT TIME ZONE 'utc',
     jump_url TEXT
 );
+CREATE TABLE IF NOT EXISTS notes (
+    id SERIAL PRIMARY KEY,
+    target BIGINT,
+    note TEXT
+);
+CREATE TABLE IF NOT EXISTS family (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE,
+    amount INTEGER NOT NULL
+);

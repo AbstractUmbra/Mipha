@@ -7,17 +7,17 @@ license = "MPL 2.0"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-"discord.py" = {git = "https://github.com/Rapptz/discord.py.git", extras = ["voice", "speedup"]}
+"discord.py" = {git = "https://github.com/Rapptz/discord.py.git", extras = ["voice", "speedup"], rev = "master"}
 discord-ext-menus = {git = "https://github.com/Rapptz/discord-ext-menus", rev = "master"}
 jishaku = {git = "git@github.com:Gorialis/jishaku.git", rev = "master"}
 hondana = {git = "https://github.com/AbstractUmbra/Hondana.git", rev = "main"}
 "mystbin.py" = {git = "git@github.com:AbstractUmbra/mystbin.py.git", rev = "main"}
+nhentaio = {git = "git@github.com:AbstractUmbra/nhentaio.git", rev = "cum"}
 asyncpg = "*"
 psutil = "*"
 lru_dict = "*"
 pytz = "*"
 fuzzywuzzy = "*"
-nhentaio = "*"
 pykakasi = "*"
 beautifulsoup4 = "*"
 Pillow = "*"
@@ -36,6 +36,10 @@ line-length = 125
 [tool.isort]
 profile = "black"
 lines_after_imports = 2
+line_length = 125
+combine_as_imports = true
+combine_star = true
+
 
 [tool.pyright]
 ignore = ["docs/conf.py"]
