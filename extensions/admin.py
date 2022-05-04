@@ -20,31 +20,9 @@ from utilities.context import Context
 
 
 if TYPE_CHECKING:
+    from asyncpg import Record
+
     from bot import Kukiko
-
-
-class GlobalChannel(
-    commands.Converter[discord.abc.GuildChannel | discord.Thread | discord.abc.PrivateChannel | discord.PartialMessageable]
-):
-    """GlobalChannel converter object."""
-
-    async def convert(
-        self, ctx: Context, argument: str
-    ) -> discord.abc.GuildChannel | discord.abc.PrivateChannel | discord.Thread | discord.PartialMessageable:
-        """Perform conversion."""
-        try:
-            return await commands.TextChannelConverter().convert(ctx, argument)
-        except commands.BadArgument:
-            # Not found... so fall back to ID + global lookup
-            try:
-                channel_id = int(argument, base=10)
-            except ValueError:
-                raise commands.BadArgument(f"Could not find a channel by ID {argument!r}.")
-            else:
-                channel = ctx.bot.get_channel(channel_id)
-                if channel is None:
-                    raise commands.BadArgument(f"Could not find a channel by ID {argument!r}.")
-                return channel
 
 
 class Admin(commands.Cog):
@@ -81,7 +59,7 @@ class Admin(commands.Cog):
     @commands.command()
     async def load(self, ctx: Context, *, module: str) -> None:
         """Loads a module."""
-        module = f"cogs.{module}"
+        module = f"extensions.{module}"
 
         try:
             await self.bot.load_extension(module)
@@ -93,7 +71,7 @@ class Admin(commands.Cog):
     @commands.command()
     async def unload(self, ctx: Context, *, module: str) -> None:
         """Unloads a module."""
-        module = f"cogs.{module}"
+        module = f"extensions.{module}"
 
         try:
             await self.bot.unload_extension(module)
@@ -105,7 +83,7 @@ class Admin(commands.Cog):
     @commands.command(name="reload")
     async def _reload(self, ctx: Context, *, module: str) -> None:
         """Reloads a module."""
-        module = f"cogs.{module}"
+        module = f"extensions.{module}"
 
         try:
             await self.bot.reload_extension(module)
@@ -137,7 +115,7 @@ class Admin(commands.Cog):
             return
 
         rows = len(results)
-        if is_multistatement or rows == 0:
+        if isinstance(results, str) or rows == 0:
             await ctx.send(f"`{dati:.2f}ms: {results}`")
             return
 
@@ -164,7 +142,7 @@ class Admin(commands.Cog):
                    WHERE table_name = $1
                 """
 
-        results = await ctx.db.fetch(query, table_name)
+        results: list[Record] = await ctx.db.fetch(query, table_name)
 
         headers = list(results[0].keys())
         table = formats.TabularData()
