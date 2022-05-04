@@ -4,3 +4,4 @@ extensions/private/*
 static/
 configs/*.json
 *.log
+_pyright/
