@@ -316,7 +316,7 @@ class Stats(commands.Cog):
 
         embed.description = f"{count[0]} commands used."
         embed.set_footer(text="Tracking command usage since")
-        embed.timestamp = count[1] or datetime.datetime.now(datetime.timezone.utc)  # type: ignore # yeah idk on this one?
+        embed.timestamp = count[1] or datetime.datetime.now(datetime.timezone.utc)
 
         query = """SELECT command,
                           COUNT(*) as "uses"
@@ -418,7 +418,7 @@ class Stats(commands.Cog):
 
         embed.description = f"{count[0]} commands used."
         embed.set_footer(text="First command used")
-        embed.timestamp = count[1] or datetime.datetime.now(datetime.timezone.utc)  # type: ignore # yeah idk on this one?
+        embed.timestamp = count[1] or datetime.datetime.now(datetime.timezone.utc)
 
         query = """SELECT command,
                           COUNT(*) as "uses"
