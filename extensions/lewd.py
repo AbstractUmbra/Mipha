@@ -209,7 +209,7 @@ class Lewd(commands.Cog):
         """
         assert ctx.guild is not None
 
-        await ctx.trigger_typing()
+        await ctx.typing()
         async with ctx.bot.session.get(url) as response:
             data = await response.text()
 

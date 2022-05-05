@@ -207,7 +207,7 @@ class RTFX(commands.Cog):
             return
 
         if not hasattr(self, "_rtfm_cache"):
-            await ctx.trigger_typing()
+            await ctx.typing()
             await self.build_rtfm_lookup_table()
 
         obj = re.sub(r"^(?:(?:discord\.(?:ext\.)?)?(?:commands\.)|hondana\.)?(.+)", r"\1", obj)
@@ -341,7 +341,7 @@ class RTFX(commands.Cog):
                     )
                 )
 
-        await ctx.trigger_typing()
+        await ctx.typing()
         rand = os.urandom(16).hex()
         with_file = pyright_dump / f"{rand}_tmp_pyright.py"
         with_file.touch(mode=0o0777, exist_ok=True)

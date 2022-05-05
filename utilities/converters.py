@@ -66,7 +66,7 @@ class RedditMediaURL:
             raise commands.BadArgument("Not a valid URL.")
 
         headers = {"User-Agent": "Discord:Kukiko:v1.0 (by /u/AbstractUmbra)"}
-        await ctx.trigger_typing()
+        await ctx.typing()
         if url.host == "v.redd.it":
             # have to do a request to fetch the 'main' URL.
             async with ctx.session.get(url, headers=headers) as resp:
