@@ -128,7 +128,10 @@ def to_codeblock(
     return f"```{language}\n{content}\n```"
 
 
-def escape_invis(decode_error: UnicodeError):
+def escape_invis(decode_error: UnicodeDecodeError | UnicodeEncodeError) -> tuple[str | bytes, int] | None:
+    if isinstance(decode_error, UnicodeDecodeError):
+        return
+
     decode_error.end = decode_error.start + 1
     if CONTROL_CHARS.match(decode_error.object[decode_error.start : decode_error.end]):
         return codecs.backslashreplace_errors(decode_error)
@@ -138,7 +141,7 @@ def escape_invis(decode_error: UnicodeError):
     )
 
 
-codecs.register_error("escape-invis", escape_invis)
+codecs.register_error("escape-invis", escape_invis)  # type: ignore
 
 
 def escape_invis_chars(content: str) -> str:
