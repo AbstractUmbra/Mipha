@@ -319,12 +319,7 @@ class MangaDexEmbed(discord.Embed):
         self.timestamp = chapter.created_at
         self.add_field(name="Manga link is:", value=f"[here!]({parent.url})")
 
-        content_ratings = (
-            (hondana.ContentRating.suggestive, hondana.ContentRating.erotica, hondana.ContentRating.pornographic)
-            if nsfw_allowed
-            else (hondana.ContentRating.safe,)
-        )
-        if parent.content_rating is content_ratings:
+        if parent.content_rating is hondana.ContentRating.safe or (nsfw_allowed is True):
             if parent.cover_url() is None:
                 await parent.get_cover()
             self.set_thumbnail(url=parent.cover_url())
@@ -353,15 +348,10 @@ class MangaDexEmbed(discord.Embed):
                 self.add_field(name="Last Chapter:", value=manga.last_chapter)
         self.set_footer(text=manga.id)
 
-        content_ratings = (
-            (hondana.ContentRating.suggestive, hondana.ContentRating.erotica, hondana.ContentRating.pornographic)
-            if nsfw_allowed
-            else (hondana.ContentRating.safe,)
-        )
-        if manga.content_rating is content_ratings:
-            if manga.cover_url() is None:
-                await manga.get_cover()
-            self.set_thumbnail(url=manga.cover_url())
+        if manga.content_rating is hondana.ContentRating.safe or (nsfw_allowed is True):
+            cover = manga.cover_url() or await manga.get_cover()
+            if cover:
+                self.set_image(url=manga.cover_url())
 
         return self
 
