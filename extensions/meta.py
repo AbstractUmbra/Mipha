@@ -484,6 +484,17 @@ class Meta(commands.Cog):
             f"```json\n{formats.clean_triple_backtick(formats.escape_invis_chars(json.dumps(msg, indent=2, ensure_ascii=False, sort_keys=True)))}\n```"
         )
 
+    @commands.check(lambda ctx: bool(ctx.guild and ctx.guild.voice_client))
+    @commands.command(name="disconnect")
+    async def disconnect_(self, ctx: Context) -> None:
+        """Disconnects the bot from the voice channel."""
+        assert ctx.guild is not None  # guarded by check
+        assert ctx.guild.voice_client is not None  # guarded by check
+
+        v_client: discord.VoiceClient = ctx.guild.voice_client  # type: ignore # python types are gae
+        v_client.stop()
+        await v_client.disconnect(force=True)
+
 
 async def setup(bot: Kukiko) -> None:
     await bot.add_cog(Meta(bot))
