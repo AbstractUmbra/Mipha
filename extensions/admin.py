@@ -30,7 +30,6 @@ class Admin(commands.Cog):
 
     def __init__(self, bot: Kukiko) -> None:
         self.bot = bot
-        self.my_guilds: set[int] = {705500489248145459, 766520806289178646}
 
     def cleanup_code(self, content: str) -> str:
         """Automatically removes code blocks from the code."""
@@ -91,7 +90,7 @@ class Admin(commands.Cog):
             return await self.bot.load_extension(module)
         except commands.ExtensionError as err:
             await ctx.send(f"{err.__class__.__name__}: {err}")
-        else:
+        finally:
             await ctx.message.add_reaction(ctx.tick(True))
 
     @commands.group(invoke_without_command=True)
@@ -159,7 +158,9 @@ class Admin(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def sync(self, ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Literal["~", "*"]] = None) -> None:
+    async def sync(
+        self, ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Literal["~", "*", "^"]] = None
+    ) -> None:
         assert ctx.guild is not None
 
         if not guilds:
@@ -168,6 +169,10 @@ class Admin(commands.Cog):
             elif spec == "*":
                 ctx.bot.tree.copy_global_to(guild=ctx.guild)
                 fmt = await ctx.bot.tree.sync(guild=ctx.guild)
+            elif spec == "^":
+                ctx.bot.tree.clear_commands(guild=ctx.guild)
+                await ctx.bot.tree.sync(guild=ctx.guild)
+                fmt = []
             else:
                 fmt = await ctx.bot.tree.sync()
 
