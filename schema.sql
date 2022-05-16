@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS reminders (
     id SERIAL PRIMARY KEY,
     expires TIMESTAMP WITH TIME ZONE,
-    created TIMESTAMP WITH TIME ZONE DEFAULT NOW() AT TIME ZONE 'utc',
+    created TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
     event TEXT,
     extra JSONB DEFAULT '{}'::JSONB
 );
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS tags (
     owner_id BIGINT,
     uses INTEGER DEFAULT 0,
     location_id BIGINT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() AT TIME ZONE 'utc'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 CREATE INDEX IF NOT EXISTS tags_name_idx ON tags (name);
 CREATE INDEX IF NOT EXISTS tags_location_id_idx ON tags (location_id);
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS tag_lookup (
     name TEXT,
     location_id BIGINT,
     owner_id BIGINT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() AT TIME ZONE 'utc',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
     tag_id INTEGER REFERENCES tags (id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 CREATE INDEX IF NOT EXISTS tag_lookup_name_idx ON tag_lookup (name);
@@ -99,13 +99,14 @@ CREATE TABLE IF NOT EXISTS todos (
     id SERIAL PRIMARY KEY,
     owner_id BIGINT,
     content TEXT,
-    added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() AT TIME ZONE 'utc',
+    added_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
     jump_url TEXT
 );
 CREATE TABLE IF NOT EXISTS notes (
     id SERIAL PRIMARY KEY,
     target BIGINT,
-    note TEXT
+    entry TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc')
 );
 CREATE TABLE IF NOT EXISTS family (
     id SERIAL PRIMARY KEY,
