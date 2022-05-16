@@ -111,14 +111,18 @@ class RedditMediaURL:
 class DatetimeConverter(commands.Converter[datetime.datetime]):
     @staticmethod
     async def get_timezone(ctx: Context) -> zoneinfo.ZoneInfo | None:
-        assert ctx.guild is not None
+        if ctx.guild is None:
+            tz = zoneinfo.ZoneInfo("UTC")
+        else:
+            row = await ctx.bot.pool.fetchval(
+                "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
+            )
+            if row:
+                tz = zoneinfo.ZoneInfo(row)
+            else:
+                tz = zoneinfo.ZoneInfo("UTC")
 
-        row = await ctx.bot.pool.fetchval(
-            "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
-        )
-        if row:
-            row = zoneinfo.ZoneInfo(row)
-            return row
+        return tz
 
     @classmethod
     async def parse(
