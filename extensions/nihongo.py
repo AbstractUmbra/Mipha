@@ -321,7 +321,7 @@ class KanjiEmbed(discord.Embed):
         for key, value in payload.attributions.items():
             if value is True:
                 attributions.append(key.title())
-            if value is False:
+            elif value is False:
                 continue
             elif value:
                 attributions.append(f"{key.title()}: {value}")
