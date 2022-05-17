@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import re
 import shlex
 from io import BytesIO
@@ -226,7 +227,7 @@ class Lewd(commands.Cog):
             author: str | None = None
             fmt = ""
             if title_match:
-                title = re.sub(r"(?:\s)?(\(.*\)|\[.*\]|\[.*\])(?:\s)?", "", title_match[1])
+                title = re.sub(r"(\s?[\[\(].*?[\]\)]\s?)", "", title_match[1])  # https://regex101.com/r/tFLbEF/2
                 fmt += f"{title}\n"
             if author_match:
                 author = author_match[1]
@@ -246,6 +247,7 @@ class Lewd(commands.Cog):
             await ctx.send(f"The file is too large, have the url: {cache_url}")
             return
 
+        fmt.seek(0)
         await ctx.send(file=discord.File(fmt, filename="you_horny_fuck.m4a"))
 
     async def _play_asmr(self, url: str, /, *, ctx: Context, v_client: discord.VoiceClient | None) -> None:
@@ -271,18 +273,17 @@ class Lewd(commands.Cog):
         query = """
                 SELECT *
                 FROM audio
-                TABLESAMPLE BERNOULLI (20)
-                WHERE filename LIKE '%.m4a'
-                LIMIT 1;
+                TABLESAMPLE BERNOULLI (20);
                 """
 
         conn: asyncpg.Connection = await asyncpg.connect(**ctx.bot.config.POSTGRES_AUDIO_DSN)
 
-        row = await conn.fetchrow(query)
-        if not row:
+        rows = await conn.fetch(query)
+        await conn.close()
+        if not rows:
             await ctx.send("No more asmr.")
             return
-        await conn.close()
+        row = random.choice(rows)
 
         url = f"https://audio.saikoro.moe/{row['filename']}"
 
