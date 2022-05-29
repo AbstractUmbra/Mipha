@@ -1065,7 +1065,12 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
     e.add_field(name="Event", value=event)
     trace = traceback.format_exception(exc_type, exc, tb)
     clean = "".join(trace)
-    e.description = f"```py\n{clean}\n```"
+    if len(clean) >= 4000:
+        bytes_ = io.BytesIO(clean.encode())
+        file = discord.File(bytes_, filename="traceback.py")
+    else:
+        e.description = f"```py\n{clean}\n```"
+        file = None
     e.timestamp = datetime.datetime.now(datetime.timezone.utc)
 
     args_str = ["```py"]
@@ -1074,12 +1079,12 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
     args_str.append("```")
     e.add_field(name="Args", value="\n".join(args_str), inline=False)
     hook = self.get_cog("Stats").webhook
-    await hook.send(embed=e)
+    await hook.send(embed=e, file=file)
 
-    assert self.bot.owner_id
-    umbra = self.bot.get_user(self.bot.owner_id)
-    assert umbra is not None
-    await umbra.send(embed=e)
+    if self.owner_id:
+        umbra = self.get_user(self.owner_id)
+        if umbra:
+            await umbra.send(embed=e, file=file)
 
 
 old_on_error = commands.Bot.on_error
