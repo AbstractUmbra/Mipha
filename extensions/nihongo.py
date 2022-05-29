@@ -590,11 +590,15 @@ class Nihongo(commands.Cog):
             return
 
     @commands.command()
-    async def jlpt(self, ctx: Context, level: JLPTConverter = JLPT_N5) -> None:  # type: ignore
+    async def jlpt(
+        self,
+        ctx: Context,
+        level: list[str] = commands.param(converter=JLPTConverter, default=JLPT_N5, displayed_default="n5"),
+    ) -> None:
         """
         Returns a random word from the specified JLPT level.
         """
-        word, reading, meaning, _ = random.choice(level)  # type: ignore
+        word, reading, meaning, _ = random.choice(level)
         embed = discord.Embed(title=word, description=meaning, colour=discord.Colour.random())
         embed.add_field(name="Reading", value=f"『{reading}』")
 
