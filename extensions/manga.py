@@ -244,18 +244,18 @@ class MangaCog(commands.Cog, name="Manga"):
 
         await ctx.send(embed=embed)
 
-    @tasks.loop(minutes=10)
+    @tasks.loop(hours=1)
     async def get_personal_feed(self) -> None:
         """Gets the current user (me)'s manga feed.
         This is all the latest released chapters in order.
         """
         order = FeedOrderQuery(created_at=Order.ascending)
-        ten_m_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
+        one_h_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
         feed = await self.bot.md_client.get_my_feed(
             limit=32,
             translated_language=["en", "ja"],
             order=order,
-            created_at_since=ten_m_ago,
+            created_at_since=one_h_ago,
             content_rating=[
                 hondana.ContentRating.pornographic,
                 hondana.ContentRating.safe,
