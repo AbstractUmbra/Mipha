@@ -14,6 +14,7 @@ import pathlib
 import sys
 import traceback
 from collections import Counter, deque
+from logging.handlers import RotatingFileHandler
 from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, overload
 
 import aiohttp
@@ -25,6 +26,7 @@ import mystbin
 import nhentaio
 from discord import app_commands
 from discord.ext import commands
+from typing_extensions import Self
 
 import _bot_config
 from utilities.async_config import Config
@@ -65,6 +67,45 @@ class KukikoCommandTree(app_commands.CommandTree):
             await stats.webhook.send(embed=e)
         except discord.HTTPException:
             pass
+
+
+class RemoveNoise(logging.Filter):
+    def __init__(self):
+        super().__init__(name="discord.state")
+
+    def filter(self, record):
+        if record.levelname == "WARNING" and "referencing an unknown" in record.msg:
+            return False
+        return True
+
+
+class SetupLogging:
+    def __init__(self) -> None:
+        self.log: logging.Logger = logging.getLogger()
+        self.max_bytes: int = 32 * 1024 * 1024
+
+    def __enter__(self: Self) -> Self:
+        logging.getLogger("discord").setLevel(logging.INFO)
+        logging.getLogger("discord.http").setLevel(logging.WARNING)
+        logging.getLogger("hondana.http").setLevel(logging.WARNING)
+        logging.getLogger("discord.state").addFilter(RemoveNoise())
+
+        self.log.setLevel(logging.INFO)
+        handler = RotatingFileHandler(
+            filename="Kukiko.log", encoding="utf-8", mode="w", maxBytes=self.max_bytes, backupCount=5
+        )
+        dt_fmt = "%Y-%m-%d %H:%M:%S"
+        fmt = logging.Formatter("[{asctime}] [{levelname:<7}] {name}: {message}", dt_fmt, style="{")
+        handler.setFormatter(fmt)
+        self.log.addHandler(handler)
+
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        handlers = self.log.handlers[:]
+        for hdlr in handlers:
+            hdlr.close()
+            self.log.removeHandler(hdlr)
 
 
 class Kukiko(commands.Bot):
@@ -141,24 +182,6 @@ class Kukiko(commands.Bot):
     @discord.utils.cached_property
     def logging_webhook(self) -> discord.Webhook:
         return discord.Webhook.from_url(self.config.LOGGING_WEBHOOK_URL, session=self.session)
-
-    def _setup_logging(self) -> None:
-        logging.getLogger("discord").setLevel(logging.INFO)
-        logging.getLogger("discord.http").setLevel(logging.WARNING)
-        logging.getLogger("hondana.http").setLevel(logging.DEBUG)
-
-        log = logging.getLogger()
-        log.setLevel(logging.INFO)
-        handler = logging.FileHandler(filename="Kukiko.log", encoding="utf-8", mode="w")
-        dt_fmt = "%Y-%m-%d %H:%M:%S"
-        fmt = logging.Formatter("[{asctime}] [{levelname:<7}] {name}: {message}", dt_fmt, style="{")
-        handler.setFormatter(fmt)
-        log.addHandler(handler)
-
-        handlers = log.handlers[:]
-        for hdlr in handlers:
-            hdlr.close()
-            log.removeHandler(hdlr)
 
     async def on_socket_response(self, message: Any) -> None:
         """Quick override to log websocket events."""
@@ -270,6 +293,8 @@ class Kukiko(commands.Bot):
             return
 
         bucket = self._spam_cooldown_mapping.get_bucket(message)
+        if not bucket:
+            return
         current = message.created_at.timestamp()
         retry_after = bucket.update_rate_limit(current)
         if retry_after and message.author.id != self.owner_id:
@@ -308,10 +333,7 @@ class Kukiko(commands.Bot):
             await guild.leave()
 
     async def close(self) -> None:
-        await self.mb_client.close()
-        await self.md_client.close()
         await self.session.close()
-        await self.h_client.close()
         await super().close()
 
     async def start(self) -> None:
@@ -328,8 +350,6 @@ class Kukiko(commands.Bot):
                         f.write(f"{last_log}\n")
 
     async def setup_hook(self) -> None:
-        self._setup_logging()
-
         self.mb_client = mystbin.Client(session=self.session)
         self.md_client = hondana.Client(**self.config.MANGADEX_AUTH, session=self.session)
         self.h_client = nhentaio.Client()
@@ -362,7 +382,8 @@ async def main():
                 print(f"Failed to load extension: {ext}", file=sys.stderr)
                 traceback.print_exc()
 
-        await bot.start()
+        with SetupLogging() as _:
+            await bot.start()
 
 
 if __name__ == "__main__":
