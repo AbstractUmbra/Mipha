@@ -7,44 +7,19 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import random
-import re
 from collections import Counter
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
-import discord
 from discord.ext import commands
 
 from utilities.context import Context
-from utilities.formats import plural, to_codeblock
+from utilities.formats import plural
 
 
 if TYPE_CHECKING:
     from bot import Kukiko
 
     from .tags import Tags
-
-DICE_RE = re.compile(r"^(?P<rolls>\d+)[dD](?P<die>\d+)$")
-
-
-class DiceType(TypedDict):
-    rolls: int
-    die: int
-    totals: list[int]
-
-
-class DiceRoll(commands.Converter[DiceType]):
-    async def convert(self, _: commands.Context, argument: str) -> DiceType:
-        search = DICE_RE.fullmatch(argument)
-        if not search:
-            raise commands.BadArgument("Dice roll doesn't seem valid, please use it in the format of `2d20`.")
-
-        search = search.groupdict()
-        rolls = max(min(int(search["rolls"]), 15), 1)
-        die = max(min(int(search["die"]), 1000), 2)
-
-        totals = [random.randint(1, die) for _ in range(rolls)]
-
-        return {"rolls": rolls, "die": die, "totals": totals}
 
 
 class RNG(commands.Cog):
@@ -134,43 +109,6 @@ class RNG(commands.Cog):
             builder.append(f"{index}. {elem} ({plural(count):time}, {count/times:.2%})")
 
         await ctx.send("\n".join(builder))
-
-    @commands.command()
-    async def roll(self, ctx: Context, *dice: DiceType if TYPE_CHECKING else DiceRoll) -> None:
-        """Roll DnD die!"""
-        if len(dice) >= 25:
-            await ctx.send("No more than 25 rolls per invoke, please.")
-            return
-
-        embed = discord.Embed(title="Rolls", colour=discord.Colour.random())
-
-        for i in dice:
-            fmt = ""
-            total = i["totals"]
-            die = i["die"]
-            rolls = i["rolls"]
-
-            builder = []
-            roll_sum = 0
-            for count, roll in enumerate(total, start=1):
-                builder.append(f"{count}: {roll}")
-                roll_sum += roll
-            fmt += "\n".join(builder)
-            fmt += f"\nSum: {roll_sum}\n"
-
-            embed.add_field(name=f"{rolls}d{die}", value=to_codeblock(fmt, language="prolog"))
-
-        embed.set_footer(text=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
-
-        await ctx.send(embed=embed)
-
-    @roll.error
-    async def roll_error(self, ctx: Context, error: BaseException) -> None:
-        error = getattr(error, "original", error)
-
-        if isinstance(error, commands.BadArgument):
-            await ctx.send(str(error), delete_after=5)
-            return
 
 
 async def setup(bot: Kukiko) -> None:
