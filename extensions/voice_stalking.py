@@ -54,6 +54,9 @@ class VoiceStalking(commands.Cog):
         self.bot: Kukiko = bot
         self._config: Config[VoiceStalkingConfig] = Config(pathlib.Path("configs/voice_stalking.json"))
 
+    async def cog_check(self, ctx: Context) -> bool:
+        return await ctx.bot.is_owner(ctx.author)
+
     def _is_safe_channel(self, channel: VocalGuildChannel) -> bool:
         config: VoiceStalkingConfig = self._config.get(channel.guild.id, {})
         if not config:
