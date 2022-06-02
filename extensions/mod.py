@@ -212,19 +212,23 @@ class SpamChecker:
 
         if message.author.id in self.fast_joiners:
             bucket = self.hit_and_run.get_bucket(message)
+            assert bucket
             if bucket.update_rate_limit(current):
                 return True
 
         if self.is_new(message.author):
             new_bucket = self.new_user.get_bucket(message)
+            assert new_bucket
             if new_bucket.update_rate_limit(current):
                 return True
 
         user_bucket = self.by_user.get_bucket(message)
+        assert user_bucket
         if user_bucket.update_rate_limit(current):
             return True
 
         content_bucket = self.by_content.get_bucket(message)
+        assert content_bucket
         if content_bucket.update_rate_limit(current):
             return True
 
