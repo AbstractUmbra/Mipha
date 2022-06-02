@@ -256,8 +256,8 @@ class TextPageSource(menus.ListPageSource):
         return content
 
 
-class SimplePageSource(menus.ListPageSource):
-    async def format_page(self, menu, entries):
+class SimplePageSource(menus.ListPageSource, Generic[T]):
+    async def format_page(self, menu: menus.MenuPages, entries: list[T]) -> discord.Embed:
         pages = []
         for index, entry in enumerate(entries, start=menu.current_page * self.per_page):
             pages.append(f"{index + 1}. {entry}")
@@ -265,19 +265,19 @@ class SimplePageSource(menus.ListPageSource):
         maximum = self.get_max_pages()
         if maximum > 1:
             footer = f"Page {menu.current_page + 1}/{maximum} ({len(self.entries)} entries)"
-            menu.embed.set_footer(text=footer)
+            menu.embed.set_footer(text=footer)  # type: ignore # this is added by the Pages below
 
-        menu.embed.description = "\n".join(pages)
-        return menu.embed
+        menu.embed.description = "\n".join(pages)  # type: ignore # this is added by the Pages below
+        return menu.embed  # type: ignore # this is added by the Pages below
 
 
-class SimplePages(RoboPages):
+class SimplePages(RoboPages, Generic[T]):
     """A simple pagination session reminiscent of the old Pages interface.
 
     Basically an embed with some normal formatting.
     """
 
-    def __init__(self, entries: list[Any], *, ctx: Context, per_page: int = 12) -> None:
+    def __init__(self, entries: list[T], *, ctx: Context, per_page: int = 12) -> None:
         super().__init__(SimplePageSource(entries, per_page=per_page), ctx=ctx)
         self.embed = discord.Embed(colour=discord.Colour.blurple())
 
@@ -305,7 +305,7 @@ class MangaDexEmbed(discord.Embed):
         parent = chapter.manga
         assert parent is not None
 
-        parent_title = parent.title
+        parent_title = parent.alt_titles.get("ja-ro", parent.title)
         if chapter.title:
             parent_title += f" - {chapter.title}"
         if chapter.chapter:
