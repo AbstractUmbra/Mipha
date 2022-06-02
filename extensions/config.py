@@ -300,6 +300,7 @@ class Config(commands.Cog):
             await ctx.send(str(error))
 
     @commands.group()
+    @checks.is_mod()
     async def config(self, ctx: Context) -> None:
         """Handles the server or channel permission configuration for the bot."""
         if ctx.invoked_subcommand is None:
