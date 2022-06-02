@@ -35,7 +35,12 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from bot import Kukiko
-    from utilities._types import JishoWordsResponse, KanjiDevKanjiPayload, KanjiDevWordsPayload, _JishoJapanesePayload
+    from utilities._types.nihongo import (
+        JishoWordsResponse,
+        KanjiDevKanjiPayload,
+        KanjiDevWordsPayload,
+        _JishoJapanesePayload,
+    )
 
 BASE_URL = "https://kanjiapi.dev/v1"
 HIRAGANA = "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよらりるれろわを"
@@ -348,18 +353,18 @@ class KanjiEmbed(discord.Embed):
             if key == "links":
                 # list[dict[str, str]]
                 if value:
-                    subdict = value[0]  # type: ignore
+                    subdict = value[0]
                     links += f"[{subdict.get('text')}]({subdict.get('url')})\n"
                 else:
                     continue
             elif key == "source":
                 # list[dict[str, str]]
                 if value:
-                    subdict = value[0]  # type: ignore # TODO: investigate this type
+                    subdict = value[0]
                     sources += f"Language: {subdict['language']}\nWord: {subdict['word']}"
             else:
                 if value:
-                    senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"  # type: ignore
+                    senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"
 
         if senses:
             embed.description += to_codeblock(senses, language="prolog", escape_md=False)

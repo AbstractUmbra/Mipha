@@ -19,7 +19,7 @@ import discord
 from discord.ext import commands, tasks
 
 from utilities import cache, checks
-from utilities._types import MessageableGuildChannel
+from utilities._types.discord_ import MessageableGuildChannel
 from utilities.context import Context
 from utilities.formats import human_join, plural
 from utilities.paginator import SimplePages

@@ -18,7 +18,7 @@ import discord
 from discord.ext import commands
 
 from utilities import checks, formats, time
-from utilities._types import MessageableGuildChannel
+from utilities._types.discord_ import MessageableGuildChannel
 from utilities.context import Context
 
 
