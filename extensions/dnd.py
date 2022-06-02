@@ -10,7 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities._types import DnDClassTopLevel
+from utilities._types.dnd import DnDClassTopLevel
 from utilities.context import Context
 from utilities.formats import to_codeblock
 

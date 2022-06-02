@@ -353,18 +353,18 @@ class KanjiEmbed(discord.Embed):
             if key == "links":
                 # list[dict[str, str]]
                 if value:
-                    subdict = value[0]
+                    subdict = value[0]  # type: ignore  # bleh
                     links += f"[{subdict.get('text')}]({subdict.get('url')})\n"
                 else:
                     continue
             elif key == "source":
                 # list[dict[str, str]]
                 if value:
-                    subdict = value[0]
+                    subdict = value[0]  # type: ignore  # bleh
                     sources += f"Language: {subdict['language']}\nWord: {subdict['word']}"
             else:
                 if value:
-                    senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"
+                    senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"  # type: ignore  # bleh
 
         if senses:
             embed.description += to_codeblock(senses, language="prolog", escape_md=False)
