@@ -180,7 +180,7 @@ class Fun(commands.Cog):
         *,
         message: str | None = commands.param(converter=commands.clean_content, default=None),
     ) -> None:
-        """Translates a message to English using DeepL's translatation API."""
+        """Translates a message to English using DeepL's translation API."""
 
         if message is None:
             ref = ctx.message.reference
