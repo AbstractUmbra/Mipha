@@ -24,7 +24,7 @@ Pillow = "*"
 pygit2 = "*"
 yt-dlp = "*"
 typing-extensions = "*"
-parsedatetime = "^2.6"
+parsedatetime = "*"
 
 [tool.poetry.dev-dependencies]
 black = "*"
