@@ -1079,7 +1079,10 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
     args_str.append("```")
     e.add_field(name="Args", value="\n".join(args_str), inline=False)
     hook = self.get_cog("Stats").webhook
-    await hook.send(embed=e, file=file)
+    if file:
+        await hook.send(embed=e, file=file)
+    else:
+        await hook.send(embed=e)
 
     if self.owner_id:
         umbra = self.get_user(self.owner_id)
