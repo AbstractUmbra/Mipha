@@ -1390,8 +1390,8 @@ class Mod(commands.Cog):
     async def _bot(self, ctx: Context, prefix=None, search=100) -> None:
         """Removes a bot user's messages and messages with their optional prefix."""
 
-        def predicate(m):
-            return (m.webhook_id is None and m.author.bot) or (prefix and m.content.startswith(prefix))
+        def predicate(m: discord.Message) -> bool:
+            return bool((m.webhook_id is None and m.author.bot) or (prefix and m.content.startswith(prefix)))
 
         await self.do_removal(ctx, search, predicate)
 

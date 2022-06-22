@@ -1,26 +1,18 @@
 from __future__ import annotations
 
-import json
-import pathlib
 import random
 import re
 from typing import TYPE_CHECKING
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
-from utilities._types.dnd import DnDClassTopLevel
 from utilities.context import Context
 from utilities.formats import to_codeblock
 
 
 if TYPE_CHECKING:
     from bot import Kukiko
-
-ROOT_PATH = pathlib.Path("5e.tools_data")
-ROOT_DATA_PATH = ROOT_PATH / "data"
-ROOT_CLASS_PATH = ROOT_DATA_PATH / "class"
 
 DICE_RE = re.compile(r"(?P<rolls>[0-9]+)d(?P<die>[0-9]+)(?P<mod>[\+\-][0-9]+)?")
 
@@ -71,50 +63,6 @@ class DnD(commands.GroupCog, name="dnd"):
         self.bot: Kukiko = bot
         self._classes: list[str] | None = None
         super().__init__()
-
-    @app_commands.command(name="data-for")
-    @app_commands.rename(class_="class")
-    async def dnd_data_for(self, itx: discord.Interaction, class_: str) -> None:
-        """
-        Returns the data for the specified DnD class.
-        """
-        assert self._classes
-
-        if not class_ in self._classes:
-            await itx.response.send_message(f"`{class_}` is not a valid DnD Class choice.")
-            return
-
-        await itx.response.defer()
-
-        class_path = ROOT_CLASS_PATH / f"class-{class_}.json"
-        with open(class_path, "r") as fp:
-            data: DnDClassTopLevel = json.load(fp)
-
-        possible_subclasses = "\n".join([x["name"] for x in data["subclass"]])
-
-        await itx.followup.send(f"Possible subclasses for {class_.title()}:\n\n{possible_subclasses}")
-
-    @dnd_data_for.autocomplete(name="class_")
-    async def data_for_autocomplete(self, itx: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        if self._classes is None:
-            ret: list[str] = []
-            class_data_path = ROOT_CLASS_PATH
-            for path in class_data_path.glob("*.json"):
-                class_ = path.stem
-                if class_ in {"foundry", "index", "class-generic"}:
-                    continue
-
-                name = re.sub(r"class\-", "", class_)
-                ret.append(name)
-
-            self._classes = ret
-
-        if not current:
-            return [app_commands.Choice(name=class_.title(), value=class_) for class_ in self._classes]
-
-        return [
-            app_commands.Choice(name=class_.title(), value=class_) for class_ in self._classes if current.lower() in class_
-        ]
 
     @commands.hybrid_command()
     async def roll(

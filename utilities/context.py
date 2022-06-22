@@ -38,7 +38,7 @@ class _ContextDBAcquire:
         self.ctx: Context = ctx
         self.timeout: float | None = timeout
 
-    def __await__(self) -> Generator[Any, None, asyncpg.Connection]:
+    def __await__(self) -> Generator[Any, None, asyncpg.Connection | asyncpg.Pool]:
         return self.ctx._acquire(timeout=self.timeout).__await__()
 
     async def __aenter__(self) -> asyncpg.Pool | asyncpg.Connection:
@@ -175,7 +175,7 @@ class Context(commands.Context["Kukiko"]):
             return f"{emoji}: {label}"
         return emoji
 
-    async def _acquire(self, *, timeout: float | None = None) -> asyncpg.Connection:
+    async def _acquire(self, *, timeout: float | None = None) -> asyncpg.Connection | asyncpg.Pool:
         if self._db is None:
             self._db = await self.pool.acquire(timeout=timeout)
 
