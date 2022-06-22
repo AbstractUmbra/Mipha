@@ -382,7 +382,7 @@ async def main():
                 print(f"Failed to load extension: {ext}", file=sys.stderr)
                 traceback.print_exc()
 
-        with SetupLogging() as _:
+        with SetupLogging():
             await bot.start()
 
 
