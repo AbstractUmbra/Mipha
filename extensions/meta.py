@@ -237,7 +237,7 @@ class Meta(commands.Cog):
         shared = sum(g.get_member(user.id) is not None for g in self.bot.guilds)
         e.set_author(name=str(user))
 
-        def format_date(dt: datetime.datetime):
+        def format_date(dt: datetime.datetime | None) -> str:
             if dt is None:
                 return "N/A"
             return f"{dt:%Y-%m-%d %H:%M} ({discord.utils.format_dt(dt, 'R')})"
