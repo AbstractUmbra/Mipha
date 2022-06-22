@@ -7,12 +7,15 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import asyncio
+import datetime
+import traceback
 from textwrap import shorten
 from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar, overload
 
 import discord
 import hondana
 import nhentaio
+from discord import app_commands
 from discord.ext import menus
 from discord.ext.commands import Paginator as CommandPaginator
 
@@ -305,7 +308,7 @@ class MangaDexEmbed(discord.Embed):
         parent = chapter.manga
         assert parent is not None
 
-        parent_title = parent.alt_titles.get("ja-ro", parent.title)
+        parent_title = parent.title
         if chapter.title:
             parent_title += f" - {chapter.title}"
         if chapter.chapter:
@@ -317,7 +320,8 @@ class MangaDexEmbed(discord.Embed):
         self = cls(title=parent_title, colour=discord.Colour.red(), url=chapter.url)
         self.set_footer(text=chapter.id)
         self.timestamp = chapter.created_at
-        self.add_field(name="Manga link is:", value=f"[here!]({parent.url})")
+        self.add_field(name="Manga link is:", value=f"[here!]({parent.url})", inline=False)
+        self.add_field(name="Number of pages:", value=chapter.pages, inline=False)
 
         if parent.content_rating is hondana.ContentRating.safe or (nsfw_allowed is True):
             if parent.cover_url() is None:
@@ -376,3 +380,23 @@ class NHentaiEmbed(discord.Embed):
             self.description += "... (truncated at 25)"
 
         return self
+
+
+class KukikoModal(discord.ui.Modal):
+    async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        e = discord.Embed(title="IRLs Modal Error", colour=0xA32952)
+        e.add_field(name="Modal", value=self.__class__.__name__, inline=False)
+        (exc_type, exc, tb) = type(error), error, error.__traceback__
+        trace = "\n".join(traceback.format_exception(exc_type, exc, tb))
+        e.add_field(name="Error", value=f"```py\n{trace}\n```")
+        e.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        stats: Stats = interaction.client.get_cog("Stats")  # type: ignore
+        try:
+            await stats.webhook.send(embed=e)
+        except discord.HTTPException:
+            pass
+
+        if interaction.response.is_done() or interaction.is_expired():
+            await interaction.followup.send(f"Broke it: {error}")
+        else:
+            await interaction.response.send_message(f"Broke it: {error}")
