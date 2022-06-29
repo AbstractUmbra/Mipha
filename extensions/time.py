@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import zoneinfo
 from typing import TYPE_CHECKING
 
 import discord
-import pytz
 from discord.ext import commands
 from fuzzywuzzy import process
 
@@ -19,16 +19,14 @@ from utilities import time
 from utilities.context import Context
 
 
-PYTZ_LOWER_TIMEZONES = [*map(str.lower, pytz.all_timezones)]
-
 if TYPE_CHECKING:
     from bot import Kukiko
 
 
 class TimezoneConverter(commands.Converter):
     async def convert(self, ctx: Context, argument: str):
-        query = process.extract(query=argument.lower(), choices=pytz.all_timezones_set, limit=5)
-        if argument.lower() not in {timezone.lower() for timezone in pytz.all_timezones_set}:
+        query = process.extract(query=argument.lower(), choices=zoneinfo.available_timezones(), limit=5)
+        if argument.lower() not in {timezone.lower() for timezone in zoneinfo.available_timezones()}:
             matches = "\n".join([f"`{index}.` {match[0]}" for index, match in enumerate(query, start=1)])
             await ctx.send(f"That was not a recognised timezone. Maybe you meant one of these?\n{matches}")
 
@@ -45,16 +43,16 @@ class TimezoneConverter(commands.Converter):
             except asyncio.TimeoutError:
                 raise commands.BadArgument("No valid timezone given or selected.")
 
-            return pytz.timezone(query[int(result.content) - 1][0])
+            return zoneinfo.ZoneInfo(query[int(result.content) - 1][0])
 
-        return pytz.timezone(query[0][0])
+        return zoneinfo.ZoneInfo(query[0][0])
 
 
 class Time(commands.Cog):
     """Time cog for fun time stuff."""
 
     def __init__(self, bot: Kukiko) -> None:
-        self.bot = bot
+        self.bot: Kukiko = bot
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild) -> None:
@@ -90,7 +88,7 @@ class Time(commands.Cog):
             embeds.append(embed)
         return embeds
 
-    def _curr_tz_time(self, curr_timezone: pytz.BaseTzInfo, *, ret_datetime: bool = False):
+    def _curr_tz_time(self, curr_timezone: zoneinfo.ZoneInfo, *, ret_datetime: bool = False):
         """We assume it's a good tz here."""
         dt_obj = datetime.datetime.now(curr_timezone)
         if ret_datetime:
@@ -102,7 +100,7 @@ class Time(commands.Cog):
         self,
         ctx: Context,
         *,
-        timezone: pytz.BaseTzInfo = commands.param(converter=TimezoneConverter),
+        timezone: zoneinfo.ZoneInfo = commands.param(converter=TimezoneConverter),
     ) -> None:
         """This will return the time in a specified timezone."""
         embed = discord.Embed(
@@ -112,12 +110,6 @@ class Time(commands.Cog):
         embed.set_footer(text=f"Requested by: {ctx.author}")
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         await ctx.send(embed=embed)
-
-    @commands.command(aliases=["tzs"])
-    @commands.cooldown(1, 15, commands.BucketType.channel)
-    async def timezones(self, ctx: Context) -> None:
-        """List all possible timezones..."""
-        await ctx.send("<https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568>")
 
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
@@ -154,7 +146,7 @@ class Time(commands.Cog):
         self,
         ctx: Context,
         *,
-        set_timezone: pytz.BaseTzInfo = commands.param(converter=TimezoneConverter),
+        set_timezone: zoneinfo.ZoneInfo = commands.param(converter=TimezoneConverter),
     ) -> None:
         """Add your time zone, with a warning about public info."""
         assert ctx.guild is not None
@@ -173,7 +165,7 @@ class Time(commands.Cog):
         if not confirm:
             return
 
-        await self.bot.pool.execute(query, ctx.author.id, [ctx.guild.id], set_timezone.zone)
+        await self.bot.pool.execute(query, ctx.author.id, [ctx.guild.id], set_timezone.key)
         await ctx.message.add_reaction(ctx.tick(True))
 
     @time.command(name="remove")
