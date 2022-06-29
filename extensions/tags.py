@@ -11,7 +11,7 @@ import asyncio
 import datetime
 import io
 import shlex
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import asyncpg
 import discord
@@ -33,30 +33,6 @@ class Arguments(argparse.ArgumentParser):
         raise RuntimeError(message)
 
 
-class UnavailableTagCommand(commands.CheckFailure):
-    def __str__(self) -> str:
-        return (
-            "Sorry. This command is unavailable in private messages.\n"
-            "Consider browsing or using the tag box instead.\nSee ?tag box for more info."
-        )
-
-
-class UnableToUseBox(commands.CheckFailure):
-    def __str__(self) -> str:
-        return "You do not have permissions to use the tag box. Manage Messages required!"
-
-
-def suggest_box() -> Callable[[T], T]:
-    """Custom commands.guild_only with different error checking."""
-
-    def pred(ctx) -> bool:
-        if ctx.guild is None:
-            raise UnavailableTagCommand()
-        return True
-
-    return commands.check(pred)
-
-
 class TagPageEntry:
     __slots__ = (
         "id",
@@ -75,22 +51,6 @@ class TagPages(SimplePages):
     def __init__(self, entries: list[dict[str, Any]], *, ctx: Context, per_page: int = 12) -> None:
         converted = [TagPageEntry(entry) for entry in entries]
         super().__init__(converted, per_page=per_page, ctx=ctx)
-
-
-def can_use_box() -> Callable[[T], T]:
-    def pred(ctx) -> bool:
-        if ctx.guild is None:
-            return True
-        if ctx.author.id == ctx.bot.owner_id:
-            return True
-
-        has_perms = ctx.channel.permissions_for(ctx.author).manage_messages
-        if not has_perms:
-            raise UnableToUseBox()
-
-        return True
-
-    return commands.check(pred)
 
 
 # The tag data is heavily duplicated (denormalized) and heavily indexed to speed up
@@ -162,9 +122,7 @@ class Tags(commands.Cog):
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         assert ctx.command is not None
-        if isinstance(error, (UnavailableTagCommand, UnableToUseBox)):
-            await ctx.send(str(error))
-        elif isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
+        if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
             if ctx.command.qualified_name == "tag":
                 await ctx.send_help(ctx.command)
             else:
@@ -294,7 +252,6 @@ class Tags(commands.Cog):
             del self._reserved_tags_being_made[guild_id]
 
     @commands.group(invoke_without_command=True)
-    @suggest_box()
     async def tag(
         self,
         ctx: Context,
@@ -325,7 +282,6 @@ class Tags(commands.Cog):
         await ctx.db.execute(query, tag["name"], ctx.guild.id)
 
     @tag.command(aliases=["add"])
-    @suggest_box()
     async def create(
         self,
         ctx: Context,
@@ -353,7 +309,6 @@ class Tags(commands.Cog):
         await self.create_tag(ctx, name, content)
 
     @tag.command()
-    @suggest_box()
     async def alias(
         self,
         ctx: Context,
@@ -390,7 +345,6 @@ class Tags(commands.Cog):
                 await ctx.send(f'Tag alias "{new_name}" that points to "{old_name}" successfully created.')
 
     @tag.command(ignore_extra=False)
-    @suggest_box()
     async def make(self, ctx: Context) -> None:
         """Interactive makes a tag for you.
 
@@ -639,7 +593,6 @@ class Tags(commands.Cog):
         await ctx.send(embed=e)
 
     @tag.command()
-    @suggest_box()
     async def stats(
         self,
         ctx: Context,
@@ -654,7 +607,6 @@ class Tags(commands.Cog):
             await self.member_tag_stats(ctx, member)
 
     @tag.command()
-    @suggest_box()
     async def edit(self, ctx: Context, name: TagName(lower=True), *, content: commands.clean_content) -> None:  # type: ignore # dpy annotations
         """Modifies an existing tag that you own.
 
@@ -677,7 +629,6 @@ class Tags(commands.Cog):
             await ctx.send("Successfully edited tag.")
 
     @tag.command(aliases=["delete"])
-    @suggest_box()
     async def remove(self, ctx: Context, *, name: TagName(lower=True)) -> None:  # type: ignore # dpy annotations
         """Removes a tag that you own.
 
@@ -718,7 +669,6 @@ class Tags(commands.Cog):
             await ctx.send("Tag and corresponding aliases successfully deleted.")
 
     @tag.command(aliases=["delete_id"])
-    @suggest_box()
     async def remove_id(self, ctx: Context, tag_id: int) -> None:
         """Removes a tag by ID.
 
@@ -811,7 +761,6 @@ class Tags(commands.Cog):
         await ctx.send(embed=embed)
 
     @tag.command(aliases=["owner"])
-    @suggest_box()
     async def info(self, ctx: Context, *, name: TagName(lower=True)) -> None:  # type: ignore # dpy annotations
         """Retrieves info about a tag.
 
@@ -842,7 +791,6 @@ class Tags(commands.Cog):
             await self._send_tag_info(ctx, record)
 
     @tag.command()
-    @suggest_box()
     async def raw(self, ctx: Context, *, name: TagName(lower=True)) -> None:  # type: ignore # dpy annotations
         """Gets the raw content of the tag.
 
@@ -861,7 +809,6 @@ class Tags(commands.Cog):
         await ctx.send(first_step.replace("<", "\\<"))
 
     @tag.command(name="list")
-    @suggest_box()
     async def _list(
         self,
         ctx: Context,
@@ -891,7 +838,6 @@ class Tags(commands.Cog):
             await ctx.send(f"{member} has no tags.")
 
     @commands.command()
-    @suggest_box()
     async def tags(
         self,
         ctx: Context,
@@ -939,7 +885,6 @@ class Tags(commands.Cog):
         await ctx.send(file=discord.File(fp, "tags.txt"))
 
     @tag.command(name="all")
-    @suggest_box()
     async def _all(self, ctx: Context, *, args: str | None = None) -> None:
         """Lists all server-specific tags for this server.
 
@@ -976,7 +921,6 @@ class Tags(commands.Cog):
             await ctx.send("This server has no server-specific tags.")
 
     @tag.command()
-    @suggest_box()
     @checks.has_guild_permissions(manage_messages=True)
     async def purge(self, ctx: Context, member: TagMember) -> None:
         """Removes all server-specific tags by a user.
@@ -1008,7 +952,6 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully removed all {count} tags that belong to {member}.")
 
     @tag.command()
-    @suggest_box()
     async def search(self, ctx: Context, *, query: commands.clean_content) -> None:
         """Searches for a tag.
 
@@ -1039,7 +982,6 @@ class Tags(commands.Cog):
             await ctx.send("No tags found.")
 
     @tag.command()
-    @suggest_box()
     async def claim(self, ctx: Context, *, tag: TagName) -> None:
         """Claims an unclaimed tag.
 
@@ -1078,7 +1020,6 @@ class Tags(commands.Cog):
             await ctx.send("Successfully transferred tag ownership to you.")
 
     @tag.command()
-    @suggest_box()
     async def transfer(self, ctx: Context, member: discord.Member, *, tag: TagName) -> None:
         """Transfers a tag to another member.
 
@@ -1106,262 +1047,6 @@ class Tags(commands.Cog):
                 await ctx.db.execute(query, member.id, row[0])
 
         await ctx.send(f"Successfully transferred tag ownership to {member}.")
-
-    @tag.group()
-    @can_use_box()
-    async def box(self, ctx: Context) -> None:
-        """The tag box is where global tags are stored.
-
-        The tags in the box are not part of your server's tag list
-        unless you explicitly enable them. As a result, only those
-        with Manage Messages can check out the tag box, or anyone
-        if it's a private message.
-
-        To play around with the tag box, you should use the subcommands
-        provided.
-        """
-
-        if ctx.invoked_subcommand is None or ctx.subcommand_passed == "box":
-            await ctx.send_help("tag box")
-
-    @box.command(name="put")
-    async def box_put(self, ctx: Context, name: TagName, *, content: commands.clean_content) -> None:
-        """Puts a tag in the tag box.
-
-        These are global tags that anyone can opt-in to receiving
-        via the "tag box take" subcommand.
-        """
-
-        query = "INSERT INTO tags (name, content, owner_id) VALUES ($1, $2, $3);"
-
-        try:
-            await ctx.db.execute(query, name, content, ctx.author.id)
-        except asyncpg.UniqueViolationError:
-            await ctx.send("A tag with this name exists in the box already.")
-        else:
-            await ctx.send("Successfully put tag in the box.")
-
-    @box.command(name="take")
-    @commands.guild_only()
-    async def box_take(self, ctx: Context, *, name: TagName(lower=True)) -> None:  # type: ignore # dpy annotations
-        """Takes a tag from the tag box.
-
-        When you take a tag from the tag box, you essentially
-        duplicate the tag for use for your own server. Any updates
-        to the tag in the tag box does not affect your duplicated
-        tag and your duplicated tag acts like a regular server
-        specific tag that you now own.
-        """
-
-        query = "SELECT name, content FROM tags WHERE LOWER(name)=$1 AND location_id IS NULL;"
-
-        tag = await ctx.db.fetchrow(query, name)
-
-        if tag is None:
-            await ctx.send("A tag with this name cannot be found in the box.")
-            return
-
-        await self.create(ctx, name=tag["name"], content=tag["content"])
-
-    @box.command(name="show", aliases=["get"])
-    async def box_show(self, ctx: Context, *, name: TagName(lower=True)) -> None:  # type: ignore # dpy annotations
-        """Shows a tag from the tag box."""
-
-        query = "SELECT name, content FROM tags WHERE LOWER(name)=$1 AND location_id IS NULL;"
-
-        tag = await ctx.db.fetchrow(query, name)
-
-        if tag is None:
-            await ctx.send("A tag with this name cannot be found in the box.")
-            return
-
-        await ctx.send(tag["content"])
-
-        query = "UPDATE tags SET uses = uses + 1 WHERE name=$1 AND location_id IS NULL;"
-        await ctx.db.execute(query, tag["name"])
-
-    @box.command(name="edit", aliases=["change"])
-    async def box_edit(self, ctx: Context, name: TagName(lower=True), *, content: commands.clean_content) -> None:  # type: ignore # dpy annotations
-        """Edits tag from the tag box.
-
-        You must own the tag to edit it.
-
-        Editing the tag does not affect tags where people
-        took it for their own personal use.
-        """
-
-        query = "UPDATE tags SET content = $2 WHERE LOWER(name)=$1 AND owner_id=$3 AND location_id IS NULL;"
-        status = await ctx.db.execute(query, name, content, ctx.author.id)
-
-        if status[-1] == "0":
-            await ctx.send("This tag is either not in the box or you do not own it.")
-        else:
-            await ctx.send("Successfully edited tag.")
-
-    @box.command(name="delete", aliases=["remove"])
-    async def box_delete(self, ctx: Context, *, name: TagName(lower=True)) -> None:  # type: ignore # dpy annotations
-        """Deletes a tag from the tag box.
-
-        You must own the tag to delete it.
-
-        Deleting the tag does not affect tags where people
-        took it for their own personal use.
-        """
-
-        query = "DELETE FROM tags WHERE LOWER(name)=$1 AND owner_id=$2 AND location_id IS NULL;"
-        status = await ctx.db.execute(query, name, ctx.author.id)
-
-        if status[-1] == "0":
-            await ctx.send("This tag is either not in the box or you do not own it.")
-        else:
-            await ctx.send("Successfully deleted tag.")
-
-    @box.command(name="info")
-    async def box_info(self, ctx: Context, *, name: TagName(lower=True)) -> None:  # type: ignore # dpy annotations
-        """Shows information about a tag in the box."""
-
-        query = """SELECT first.*, (
-                       SELECT COUNT(*)
-                       FROM tags second
-                       WHERE (second.uses, second.id) >= (first.uses, first.id)
-                         AND second.location_id IS NULL
-                   ) AS rank
-                   FROM tags first
-                   WHERE LOWER(first.name)=$1 AND first.location_id IS NULL;
-                """
-
-        data = await ctx.db.fetchrow(query, name)
-
-        if data is None or data["name"] is None:
-            await ctx.send("This tag is not in the box.")
-            return
-
-        embed = discord.Embed(colour=discord.Colour.blurple())
-
-        owner_id = data["owner_id"]
-        embed.title = data["name"]
-        embed.timestamp = data["created_at"].replace(tzinfo=datetime.timezone.utc)
-        embed.set_footer(text="Tag added to box")
-
-        user = self.bot.get_user(owner_id) or (await self.bot.fetch_user(owner_id))
-        embed.set_author(name=str(user), icon_url=user.display_avatar.url)
-
-        embed.add_field(name="Owner", value=f"<@{owner_id}>")
-        embed.add_field(name="Uses", value=data["uses"])
-        embed.add_field(name="Rank", value=data["rank"])
-
-        await ctx.send(embed=embed)
-
-    @box.command(name="search")
-    async def box_search(
-        self,
-        ctx: Context,
-        *,
-        query: str = commands.param(converter=commands.clean_content),
-    ) -> None:
-        """Searches for a tag in the tag box.
-
-        The query must be at least 3 characters long.
-        """
-        if len(query) < 3:
-            await ctx.send("Query must be 3 characters or longer.")
-            return
-
-        sql = "SELECT name FROM tags WHERE name % $1 AND location_id IS NULL LIMIT 100;"
-        data = await ctx.db.fetch(sql, query)
-
-        if len(data) == 0:
-            await ctx.send("No tags found.")
-            return
-
-        await ctx.release()
-
-        data = [r[0] for r in data]
-        data.sort()
-
-        p = SimplePages(entries=data, per_page=20, ctx=ctx)
-        await p.start()
-
-    @box.command(name="stats")
-    async def box_stats(self, ctx: Context) -> None:
-        """Shows statistics about the tag box."""
-
-        # This is the best I could split it to.
-        # Originally it was 3 different queries but 2 is the best I could do
-        # Splitting it into a single query incurred insane overhead for some reason.
-
-        query = """SELECT
-                       COUNT(*) AS "Creator Total",
-                       SUM(uses) AS "Creator Uses",
-                       owner_id AS "Creator ID",
-                       COUNT(*) OVER () AS "Creator Count"
-                   FROM tags
-                   WHERE location_id IS NULL
-                   GROUP BY owner_id
-                   ORDER BY SUM(uses) DESC
-                   LIMIT 3;
-                """
-
-        top_creators = await ctx.db.fetch(query)
-
-        query = """SELECT
-                       name AS "Tag Name",
-                       uses AS "Tag Uses",
-                       COUNT(*) OVER () AS "Total Tags",
-                       SUM(uses) OVER () AS "Total Uses"
-                   FROM tags
-                   WHERE location_id IS NULL
-                   ORDER BY uses DESC
-                   LIMIT 3;
-                """
-
-        top_tags = await ctx.db.fetch(query)
-
-        embed = discord.Embed(colour=discord.Colour.blurple(), title="Tag Box Stats")
-
-        embed.add_field(name="Total Tags", value=top_tags[0]["Total Tags"])
-        embed.add_field(name="Total Uses", value=top_tags[0]["Total Uses"])
-        embed.add_field(name="Tag Creators", value=top_creators[0]["Creator Count"])
-
-        emoji = 129351  # ord(':first_place:')
-
-        for offset, (name, uses, _, _) in enumerate(top_tags):
-            embed.add_field(name=f"{chr(emoji + offset)} Tag", value=f"{name} ({uses} uses)")
-
-        values = []
-        for offset, (total, uses, owner_id, _) in enumerate(top_creators):
-            values.append(f"{chr(emoji + offset)}: {self.bot.get_user(owner_id) or owner_id} -- {total} tags ({uses} uses)")
-
-        embed.add_field(name=f"Tag Creators", value="\n".join(values), inline=False)
-        embed.set_footer(text="These statistics are for the tag box.")
-        await ctx.send(embed=embed)
-
-    @box.command(name="list")
-    async def box_list(self, ctx: Context, *, user: discord.User | None = None) -> None:
-        """Lists all the tags in the box that belong to you or someone else.
-
-        Unlike the regular tag list command, this one is sorted by uses.
-        """
-
-        fmt_user = user or ctx.author
-
-        query = """SELECT name, uses
-                   FROM tags
-                   WHERE location_id IS NULL AND owner_id=$1
-                   ORDER BY uses DESC
-                """
-
-        rows = await ctx.db.fetch(query, fmt_user.id)
-        await ctx.release()
-
-        if rows:
-            entries = [f"{name} ({uses} uses)" for name, uses in rows]
-            p = SimplePages(entries=entries, ctx=ctx)
-            p.embed.set_author(name=fmt_user.display_name, icon_url=fmt_user.display_avatar.url)
-            p.embed.title = f"{sum(u for _, u in rows)} total uses"
-            await p.start()
-        else:
-            await ctx.send(f"{user} has no tags.")
 
     @tag.command(hidden=True)
     async def config(self, ctx):
