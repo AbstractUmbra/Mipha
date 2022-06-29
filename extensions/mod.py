@@ -476,7 +476,8 @@ class Mod(commands.Cog):
 
         if not fmt:
             return
-        formatted = "\n".join(f"{member.name} || {member.display_name} ({member.id})" for member in fmt)
+        formatted = "{0:20} || {1:<20} ({2})\n\n".format("~~ Name ~~", "~~ Nickname ~~", "~~ ID ~~")
+        formatted += "\n".join(f"{member.name:20} || {member.display_name:<20} ({member.id})" for member in fmt)
 
         out = io.BytesIO(formatted.encode())
 
