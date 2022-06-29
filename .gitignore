@@ -3,5 +3,7 @@ poetry.lock
 extensions/private/*
 static/
 configs/*.json
-*.log
+*.log*
 _pyright/
+buffer/
+*.ipynb
