@@ -23,9 +23,16 @@ if TYPE_CHECKING:
     from bot import Kukiko
     from extensions._stars import StarboardConfig
 
-__all__ = ("Context",)
+__all__ = (
+    "Context",
+    "Interaction",
+)
 
 T = TypeVar("T")
+
+
+class Interaction(discord.Interaction):
+    client: Kukiko
 
 
 class _ContextDBAcquire:
