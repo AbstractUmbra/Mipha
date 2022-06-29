@@ -82,7 +82,7 @@ class RemoveNoise(logging.Filter):
 class SetupLogging:
     def __init__(self) -> None:
         self.log: logging.Logger = logging.getLogger()
-        self.max_bytes: int = 32 * 1024 * 1024
+        self.max_bytes: int = 32 * 1024
 
     def __enter__(self: Self) -> Self:
         logging.getLogger("discord").setLevel(logging.INFO)
@@ -167,6 +167,7 @@ class Kukiko(commands.Bot):
         )
         self.command_stats = Counter()
         self.socket_stats = Counter()
+        self.global_log: logging.Logger = LOGGER
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
@@ -373,16 +374,15 @@ async def main():
         session = aiohttp.ClientSession()
         bot.session = session
 
-        await bot.load_extension("jishaku")
-        for file in sorted(pathlib.Path("extensions").glob("**/[!_]*.py")):
-            ext = ".".join(file.parts).removesuffix(".py")
-            try:
-                await bot.load_extension(ext)
-            except Exception:
-                print(f"Failed to load extension: {ext}", file=sys.stderr)
-                traceback.print_exc()
-
         with SetupLogging():
+            await bot.load_extension("jishaku")
+            for file in sorted(pathlib.Path("extensions").glob("**/[!_]*.py")):
+                ext = ".".join(file.parts).removesuffix(".py")
+                try:
+                    await bot.load_extension(ext)
+                except Exception as error:
+                    LOGGER.exception("Failed to load extension: %s\n\n%s", ext, error)
+
             await bot.start()
 
 
