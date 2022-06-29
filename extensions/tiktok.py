@@ -18,7 +18,7 @@ ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True})
 
 MOBILE_PATTERN = re.compile(r"(https?://(?:vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*)?")
 DESKTOP_PATTERN = re.compile(r"(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))\?(?:.*)")
-INSTAGRAM_PATTERN = re.compile(r"(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/(?:\?.*)?\=")
+INSTAGRAM_PATTERN = re.compile(r"(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/\?.*\=")
 
 
 class TiktokCog(commands.Cog):
@@ -46,11 +46,22 @@ class TiktokCog(commands.Cog):
         async with message.channel.typing():
             loop = asyncio.get_running_loop()
             for idx, _url in enumerate(matches, start=1):
-                exposed_url = _url[0]
+                if isinstance(_url, str):
+                    exposed_url = _url
+                else:
+                    exposed_url = _url[0]
+
                 if not exposed_url.endswith("/"):
                     exposed_url = exposed_url + "/"
 
-                info = await loop.run_in_executor(None, ydl.extract_info, exposed_url)
+                try:
+                    info = await loop.run_in_executor(None, ydl.extract_info, exposed_url)
+                except yt_dlp.DownloadError as error:
+                    if "You need to log in" in str(error):
+                        await message.channel.send("Need to log in.")
+                        return
+                    raise
+
                 file_loc = pathlib.Path(f"buffer/{info['id']}.{info['ext']}")
                 fixed_file_loc = pathlib.Path(f"buffer/{info['id']}_fixed.{info['ext']}")
 
