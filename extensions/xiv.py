@@ -23,6 +23,16 @@ XIV_ROLE_ID = 970754264643293264
 FASHION_REPORT_PATTERN = re.compile(
     r"Fashion Report - Full Details - For Week of (?P<date>[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}) \(Week (?P<week_num>[0-9]{3})\)"
 )
+FASHION_REPORT_START = datetime.datetime(
+    year=2018,
+    month=1,
+    day=27,
+    hour=8,
+    minute=0,
+    second=0,
+    microsecond=0,
+    tzinfo=datetime.timezone.utc,
+)
 
 
 class XIV(commands.Cog):
@@ -52,6 +62,23 @@ class XIV(commands.Cog):
         self.fashion_report_loop.cancel()
         self.jumbo_cactpot.cancel()
 
+    def weeks_since_start(self, dt: datetime.datetime) -> int:
+        td = dt - FASHION_REPORT_START
+
+        seconds = round(td.total_seconds())
+        weeks, _ = divmod(seconds, 60 * 60 * 24 * 7)
+
+        return weeks
+
+    def humanify_delta(self, *, td: datetime.timedelta, format: str) -> str:
+        seconds = round(td.total_seconds())
+
+        days, seconds = divmod(seconds, 60 * 60 * 24)
+        hours, seconds = divmod(seconds, 60 * 60)
+        minutes, seconds = divmod(seconds, 60)
+
+        return f"{format.title()} in {days} days, {hours} hours, {minutes} minutes and {seconds} seconds."
+
     async def get_kaiyoko_submissions(self) -> TopLevelListingResponse:
         headers = {"User-Agent": "Kukiko Discord Bot (by /u/AbstractUmbra)"}
         async with self.bot.session.get("https://reddit.com/user/kaiyoko/submitted.json", headers=headers) as resp:
@@ -59,17 +86,35 @@ class XIV(commands.Cog):
 
         return data
 
-    async def filter_submissions(self) -> tuple[str, str]:
+    async def filter_submissions(self) -> tuple[str, str, str]:
         submissions = await self.get_kaiyoko_submissions()
 
         for submission in submissions["data"]["children"]:
             if match := FASHION_REPORT_PATTERN.search(submission["data"]["title"]):
-                created = datetime.datetime.fromtimestamp(submission["data"]["created_utc"], tz=datetime.timezone.utc)
                 now = datetime.datetime.now(datetime.timezone.utc)
+                if not self.weeks_since_start(now) == int(match["week_num"]):
+                    continue
+
+                created = datetime.datetime.fromtimestamp(submission["data"]["created_utc"], tz=datetime.timezone.utc)
                 if (now - created) > datetime.timedelta(days=7):
                     continue
 
-                return f"Fashion Report details for week {match['week_num']}.", submission["data"]["url"]
+                if 1 < now.weekday() < 5:
+                    delta = datetime.timedelta((4 - now.weekday()) % 7)
+                    fmt = "Available"
+                else:
+                    delta = datetime.timedelta((1 - now.weekday()) % 7)
+                    fmt = "Resets"
+
+                upcoming_event = now + delta
+                upcoming_event = upcoming_event.replace(hour=8, minute=0, second=0, microsecond=0)
+                reset_str = self.humanify_delta(td=(upcoming_event - now), format=fmt)
+
+                return (
+                    f"Fashion Report details for week of {match['date']} (Week {match['week_num']})",
+                    reset_str,
+                    submission["data"]["url"],
+                )
 
         raise ValueError("Unabled to fetch the reddit post details.")
 
@@ -81,9 +126,10 @@ class XIV(commands.Cog):
         return channel
 
     async def _gen_fashion_embed(self) -> discord.Embed:
-        prose, url = await self.filter_submissions()
+        prose, reset, url = await self.filter_submissions()
 
-        embed = discord.Embed(title=prose)
+        embed = discord.Embed(title=prose, url=url)
+        embed.description = reset
         embed.set_image(url=url)
 
         return embed
@@ -156,7 +202,10 @@ class XIV(commands.Cog):
         channel = await self._get_channel()
 
         fmt = f"Yo <@&{XIV_ROLE_ID}>, it's fashion report time in 15 minutes."
-        embed = await self._gen_fashion_embed()
+        try:
+            embed = await self._gen_fashion_embed()
+        except ValueError:
+            embed = discord.Embed(description="Embed cannot be generated as the post doesn't exist yet.")
 
         await channel.send(fmt, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
 
