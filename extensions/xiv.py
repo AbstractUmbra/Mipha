@@ -23,16 +23,6 @@ XIV_ROLE_ID = 970754264643293264
 FASHION_REPORT_PATTERN = re.compile(
     r"Fashion Report - Full Details - For Week of (?P<date>[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}) \(Week (?P<week_num>[0-9]{3})\)"
 )
-FASHION_REPORT_START = datetime.datetime(
-    year=2018,
-    month=1,
-    day=27,
-    hour=8,
-    minute=0,
-    second=0,
-    microsecond=0,
-    tzinfo=datetime.timezone.utc,
-)
 
 
 class XIV(commands.Cog):
@@ -48,6 +38,16 @@ class XIV(commands.Cog):
         "Squadron Missions",
         "Currency Limits",
     ]
+    FASHION_REPORT_START: ClassVar[datetime.datetime] = datetime.datetime(
+        year=2018,
+        month=1,
+        day=26,
+        hour=8,
+        minute=0,
+        second=0,
+        microsecond=0,
+        tzinfo=datetime.timezone.utc,
+    )
 
     def __init__(self, bot: Kukiko) -> None:
         self.bot: Kukiko = bot
@@ -63,7 +63,7 @@ class XIV(commands.Cog):
         self.jumbo_cactpot.cancel()
 
     def weeks_since_start(self, dt: datetime.datetime) -> int:
-        td = dt - FASHION_REPORT_START
+        td = dt - self.FASHION_REPORT_START
 
         seconds = round(td.total_seconds())
         weeks, _ = divmod(seconds, 60 * 60 * 24 * 7)
@@ -86,12 +86,12 @@ class XIV(commands.Cog):
 
         return data
 
-    async def filter_submissions(self) -> tuple[str, str, str]:
+    async def filter_submissions(self, now: datetime.datetime | None = None, /) -> tuple[str, str, str]:
         submissions = await self.get_kaiyoko_submissions()
 
         for submission in submissions["data"]["children"]:
             if match := FASHION_REPORT_PATTERN.search(submission["data"]["title"]):
-                now = datetime.datetime.now(datetime.timezone.utc)
+                now = now or datetime.datetime.now(datetime.timezone.utc)
                 if not self.weeks_since_start(now) == int(match["week_num"]):
                     continue
 
@@ -99,7 +99,7 @@ class XIV(commands.Cog):
                 if (now - created) > datetime.timedelta(days=7):
                     continue
 
-                if 1 < now.weekday() < 5:
+                if 1 < now.weekday() < 4:
                     delta = datetime.timedelta((4 - now.weekday()) % 7)
                     fmt = "Available"
                 else:
@@ -125,8 +125,8 @@ class XIV(commands.Cog):
 
         return channel
 
-    async def _gen_fashion_embed(self) -> discord.Embed:
-        prose, reset, url = await self.filter_submissions()
+    async def _gen_fashion_embed(self, now: datetime.datetime | None = None, /) -> discord.Embed:
+        prose, reset, url = await self.filter_submissions(now)
 
         embed = discord.Embed(title=prose, url=url)
         embed.description = reset
@@ -137,7 +137,10 @@ class XIV(commands.Cog):
     @commands.command(name="fashion-report", aliases=["fr"])
     async def fashion_report(self, ctx: Context) -> None:
         """Fetch the latest fashion report data from /u/Kaiyoko."""
-        embed = await self._gen_fashion_embed()
+        try:
+            embed = await self._gen_fashion_embed()
+        except ValueError:
+            embed = discord.Embed(description="Seems the post for this week isn't up yet.")
 
         await ctx.send(embed=embed)
 
@@ -202,8 +205,9 @@ class XIV(commands.Cog):
         channel = await self._get_channel()
 
         fmt = f"Yo <@&{XIV_ROLE_ID}>, it's fashion report time in 15 minutes."
+        then = now + datetime.timedelta(minutes=15, seconds=1)
         try:
-            embed = await self._gen_fashion_embed()
+            embed = await self._gen_fashion_embed(then)
         except ValueError:
             embed = discord.Embed(description="Embed cannot be generated as the post doesn't exist yet.")
 
