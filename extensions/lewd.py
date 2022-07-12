@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import random
 import re
@@ -15,6 +16,8 @@ import nhentaio
 from discord.ext import commands, tasks
 
 from utilities import checks
+from utilities._types.danbooru import DanbooruPayload
+from utilities._types.gelbooru import GelbooruPayload, GelbooruPostPayload
 from utilities.cache import cache
 from utilities.formats import to_codeblock
 from utilities.paginator import NHentaiEmbed, RoboPages, SimpleListSource
@@ -25,7 +28,6 @@ if TYPE_CHECKING:
     from utilities.context import Context
 
 SIX_DIGITS = re.compile(r"\{(\d{1,6})\}")
-RATING = {"e": "explicit", "q": "questionable", "s": "safe"}
 SOUNDGASM_MEDIA_PATTERN = re.compile(r"(https?://media\.soundgasm\.net\/sounds\/(?P<media>[a-f0-9]+)\.(?P<ext>m4a|mp3))")
 SOUNDGASM_TITLE_PATTERN = re.compile(r"\=\"title\"\>(.*?)\<\/div\>")  # https://regex101.com/r/BJyiGM/1
 SOUNDGASM_AUTHOR_PATTERN = re.compile(r"\<a href\=\"(?:(?:https?://)?soundgasm\.net\/u\/(?:.*)\")\>(.*)\<\/a>")
@@ -33,6 +35,13 @@ CONTENT_TYPE_LOOKUP = {
     "m4a": "audio/mp4",
     "mp3": "audio/mp3",
 }
+RATING = {"e": "explicit", "q": "questionable", "s": "safe", "g": "general"}
+RATING_LOOKUP = {v: k for k, v in RATING.items()}
+
+
+def _reverse_rating_repl(match: re.Match[str]) -> str:
+    key = RATING_LOOKUP.get(match.group(1), "N/A")
+    return f"rating:{key}"
 
 
 class _LewdTableData(TypedDict):
@@ -183,11 +192,65 @@ class Lewd(commands.Cog):
         record = await connection.fetchrow(query, guild_id)
         return BooruConfig(guild_id=guild_id, bot=self.bot, record=record)
 
-    def _gelbooru_embeds(self, payloads: list[Any], config: BooruConfig) -> list[discord.Embed]:
-        raise NotImplementedError()  # TODO
+    def _gelbooru_embeds(self, payloads: list[GelbooruPostPayload], config: BooruConfig) -> list[discord.Embed]:
+        source: list[discord.Embed] = []
 
-    def _danbooru_embeds(self, payloads: list[Any], config: BooruConfig) -> list[discord.Embed]:
-        raise NotImplementedError()  # TODO
+        for payload in payloads:
+            tags_ = set(payload["tags"].split())
+            if tags_ & config.blacklist:
+                continue
+
+            if not payload["image"]:
+                continue
+
+            if payload["image"].partition(".")[2] not in ("png", "jpg", "jpeg", "webm", "gif"):
+                continue
+
+            created_at = datetime.datetime.strptime(payload["created_at"], "%a %b %d %H:%M:%S %z %Y")
+            embed = discord.Embed(colour=discord.Colour.red(), timestamp=created_at.astimezone(datetime.timezone.utc))
+
+            if payload["source"]:
+                embed.title = "See Source"
+                embed.url = payload["source"]
+
+            embed.set_footer(text=f"Rating: {payload['rating'].title()}")
+            embed.set_image(url=payload["file_url"])
+
+            source.append(embed)
+
+        return source
+
+    def _danbooru_embeds(self, payloads: list[DanbooruPayload], config: BooruConfig) -> list[discord.Embed]:
+        source: list[discord.Embed] = []
+
+        for payload in payloads:
+            tags_ = set(payload["tag_string"].split())
+            if tags_ & config.blacklist:
+                continue
+
+            if not payload["file_ext"] in ("jpg", "jpeg", "png", "gif", "webm"):
+                continue
+
+            created_at = datetime.datetime.fromisoformat(payload["created_at"])
+            embed = discord.Embed(colour=discord.Colour.red(), timestamp=created_at.astimezone(datetime.timezone.utc))
+
+            if payload["source"]:
+                embed.title = "See Source"
+                embed.url = payload["source"]
+
+            embed.set_footer(text=f"Rating: {RATING[payload['rating']].title()}")
+            if "file_url" in payload:
+                embed.set_image(url=payload["file_url"])
+                if payload["has_large"]:
+                    embed.description = f"[See the large image.]({payload['large_file_url']})"
+            elif payload["pixiv_id"] and payload["source"]:
+                embed.set_image(url=payload["source"])
+            else:
+                continue
+
+            source.append(embed)
+
+        return source
 
     async def _cache_soundgasm(self, url: re.Match[str], /, *, title: str | None, author: str | None) -> tuple[bytes, str]:
         actual_url = url[0]
@@ -265,8 +328,8 @@ class Lewd(commands.Cog):
         transformer_ = discord.PCMVolumeTransformer(audio_)
         v_client.play(transformer_)
 
-    @commands.is_owner()
     @commands.command()
+    @commands.is_owner()
     async def asmr(self, ctx: Context) -> None:
         assert isinstance(ctx.author, discord.Member)
 
@@ -292,7 +355,7 @@ class Lewd(commands.Cog):
         if ctx.guild is not None:
             await self._play_asmr(url, ctx=ctx, v_client=ctx.guild.voice_client)  # type: ignore # did a dummy break voice
 
-    @commands.command(usage="<flags>+ | subcommand", enabled=False)
+    @commands.command(usage="<flags>+ | subcommand", cooldown_after_parsing=True)
     @commands.cooldown(1, 10, commands.BucketType.user)
     @commands.max_concurrency(1, commands.BucketType.user, wait=False)
     @commands.is_nsfw()
@@ -316,6 +379,7 @@ class Lewd(commands.Cog):
             - Search for the 'apple' AND 'orange' tags, with only 'safe' results, but on Page 2.
             - NOTE: if not enough searches are returned, page 2 will cause an empty response.
         ```
+        Possible ratings are: `general`, `sensitive`, `questionable` and `explicit`.
         """
         aiohttp_params = {}
         aiohttp_params.update({"json": 1})
@@ -335,8 +399,8 @@ class Lewd(commands.Cog):
         id_: int = getattr(ctx.guild, "id", -1)
         current_config = await self.get_booru_config(id_)  # type: ignore # cache is gay
 
-        if real_args.limit:
-            aiohttp_params.update({"limit": int(real_args.limit)})
+        limit = max(min(0, real_args.limit), 100)
+        aiohttp_params.update({"limit": limit})
         if real_args.pid:
             aiohttp_params.update({"pid": real_args.pid})
         if real_args.cid:
@@ -358,7 +422,7 @@ class Lewd(commands.Cog):
                 if not data:
                     ctx.command.reset_cooldown(ctx)
                     raise commands.BadArgument("Got an empty response... bad search?")
-                json_data = json.loads(data)
+                json_data: GelbooruPayload = json.loads(data)
 
             if not json_data:
                 ctx.command.reset_cooldown(ctx)
@@ -370,10 +434,11 @@ class Lewd(commands.Cog):
             pages = RoboPages(source=SimpleListSource(embeds[:30]), ctx=ctx)
             await pages.start()
 
-    @commands.command(usage="<flags>+ | subcommand", enabled=False)
+    @commands.command(usage="<flags>+ | subcommand", cooldown_after_parsing=True)
     @commands.cooldown(1, 10, commands.BucketType.user)
     @commands.max_concurrency(1, commands.BucketType.user, wait=False)
-    @commands.is_nsfw()
+    # @commands.is_nsfw()
+    @commands.is_owner()
     async def danbooru(self, ctx: Context, *, params: str) -> None:
         """Danbooru command. Access danbooru commands.
         This command uses a flag style syntax.
@@ -385,11 +450,12 @@ class Lewd(commands.Cog):
         ```
         !gelbooru ++tags lemon
             - search for the 'lemon' tag.
-            - NOTE: if your tag has a space in it, replace it with '_'page
+            - NOTE: if your tag has a space in it, replace it with '_'.
         !danbooru ++tags melon -rating:explicit
-            - search for the 'melon' tag, removing posts marked as 'explicit`
+            - search for the 'melon' tag, removing posts marked as 'explicit`.
         !danbooru ++tags apple orange rating:safe
             - Search for the 'apple' AND 'orange' tags, with only 'safe' results.
+        Possible tags are: `general`, `safe`, `questionable` and `explicit`.
         ```
         """
         aiohttp_params = {}
@@ -407,17 +473,16 @@ class Lewd(commands.Cog):
         id_: int = getattr(ctx.guild, "id", -1)
         current_config = await self.get_booru_config(id_)  # type: ignore # cache is gay
 
-        if real_args.limit:
-            limit = real_args.limit
-            if not 1 < real_args.limit <= 30:
-                limit = 30
-            aiohttp_params.update({"limit": limit})
-        lowered_tags = [tag.lower() for tag in real_args.tags]
+        limit = max(min(0, real_args.limit), 100)
+        aiohttp_params.update({"limit": limit})
+        lowered_tags = [
+            re.sub(r"rating\:(safe|questionable|explicit)", _reverse_rating_repl, tag.lower()) for tag in real_args.tags
+        ]
         tags = set(lowered_tags)
         common_elems = tags & current_config.blacklist
         if common_elems:
             raise BlacklistedBooru(common_elems)
-        aiohttp_params.update({"tags": " ".join(lowered_tags)})
+        aiohttp_params.update({"tags": " ".join(tags)})
 
         async with ctx.typing():
             async with self.bot.session.get(
@@ -429,7 +494,7 @@ class Lewd(commands.Cog):
                 if not data:
                     ctx.command.reset_cooldown(ctx)
                     raise commands.BadArgument("Got an empty response... bad search?")
-                json_data = json.loads(data)
+                json_data: list[DanbooruPayload] = json.loads(data)
 
             if not json_data:
                 ctx.command.reset_cooldown(ctx)
