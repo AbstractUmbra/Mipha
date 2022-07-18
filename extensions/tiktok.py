@@ -29,7 +29,7 @@ class TiktokCog(commands.Cog):
     async def on_message(self, message: discord.Message):
         if not message.guild:
             return
-        if message.guild.id != 174702278673039360:
+        if message.guild.id not in {174702278673039360, 149998214810959872}:
             return
 
         matches = (
