@@ -437,8 +437,7 @@ class Lewd(commands.Cog):
     @commands.command(usage="<flags>+ | subcommand", cooldown_after_parsing=True)
     @commands.cooldown(1, 10, commands.BucketType.user)
     @commands.max_concurrency(1, commands.BucketType.user, wait=False)
-    # @commands.is_nsfw()
-    @commands.is_owner()
+    @commands.is_nsfw()
     async def danbooru(self, ctx: Context, *, params: str) -> None:
         """Danbooru command. Access danbooru commands.
         This command uses a flag style syntax.
