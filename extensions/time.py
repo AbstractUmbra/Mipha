@@ -135,7 +135,7 @@ class Time(commands.Cog):
         member_timezone = result["tz"]
         tz = await TimezoneConverter().convert(ctx, member_timezone)
         current_time = self._curr_tz_time(tz, ret_datetime=False)
-        embed = discord.Embed(title=f"Time for {member}", description=f"```\n{current_time}\n```")
+        embed = discord.Embed(title=f"Time for {full_member}", description=f"```\n{current_time}\n```")
         embed.set_footer(text=member_timezone)
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         await ctx.send(embed=embed)
