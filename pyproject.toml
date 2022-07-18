@@ -24,6 +24,7 @@ pygit2 = "*"
 yt-dlp = "*"
 typing-extensions = "*"
 parsedatetime = "*"
+python-a2s = {git = "https://github.com/Yepoleb/python-a2s.git"}
 
 [tool.poetry.dev-dependencies]
 black = "*"
