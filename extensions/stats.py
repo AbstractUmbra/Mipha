@@ -1080,14 +1080,9 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
     e.add_field(name="Args", value="\n".join(args_str), inline=False)
     hook = self.get_cog("Stats").webhook
     if file:
-        await hook.send(embed=e, file=file)
+        await hook.send("<@155863164544614402>", embed=e, file=file)
     else:
-        await hook.send(embed=e)
-
-    if self.owner_id:
-        umbra = self.get_user(self.owner_id)
-        if umbra:
-            await umbra.send(embed=e, file=file)
+        await hook.send("<@155863164544614402>", embed=e)
 
 
 old_on_error = commands.Bot.on_error
