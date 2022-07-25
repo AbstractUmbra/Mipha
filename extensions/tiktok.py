@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True})
 
 MOBILE_PATTERN = re.compile(r"(https?://(?:vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*)?")
-DESKTOP_PATTERN = re.compile(r"(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))\?(?:.*)")
+DESKTOP_PATTERN = re.compile(r"(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?")
 INSTAGRAM_PATTERN = re.compile(r"(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/\?.*\=")
 
 
