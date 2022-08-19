@@ -511,6 +511,7 @@ class Lewd(commands.Cog):
 
     @commands.group(invoke_without_command=True, name="lewd", aliases=["booru", "naughty"])
     @checks.has_permissions(manage_messages=True)
+    @commands.is_nsfw()
     async def lewd(self, ctx: Context) -> None:
         """Naughty commands! Please see the subcommands."""
         if not ctx.invoked_subcommand:

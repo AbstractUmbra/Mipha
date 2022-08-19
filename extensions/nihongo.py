@@ -170,9 +170,11 @@ class JishoKanji:
 
         fmt = defaultdict(list)
 
-        for x in raw:  # type: ignore # bs4 types are bad
-            if isinstance(x, bs4.NavigableString):
+        for x in raw:  # type: ignore # typeshed sucks here
+            x: bs4.Tag
+            if isinstance(x, (bs4.NavigableString, str)):
                 continue
+
             if hmm := x.select("h2"):
                 if hmm[0].text == "On reading compounds":
                     fmt["On"] = [item.text.strip() for item in x.select("ul")]
@@ -194,7 +196,7 @@ class JishoKanji:
 
         fmt = []
 
-        for item in raw:  # type: ignore # bs4 types are bad
+        for item in raw:
             if isinstance(item, bs4.element.Tag):
                 text = item.text
                 href = item.get("href")
@@ -493,7 +495,6 @@ class Nihongo(commands.Cog):
         await menu.start()
 
     def _draw_kana(self, text: str) -> BytesIO:
-        """."""
         # font = ImageFont.truetype("static/Hiragino-Sans-GB.ttc", 60)
         text = fill(text, 25, replace_whitespace=False)
         font = ImageFont.truetype("static/W6.ttc", 60)
@@ -649,10 +650,14 @@ class Nihongo(commands.Cog):
         return returns
 
     @commands.command(name="strokeorder", aliases=["so"])
-    async def stroke_order(self, ctx: Context, kanji: str) -> None:
+    async def stroke_order(self, ctx: Context, *, kanji: str) -> None:
         """
         Returns an animation of the stroke order of the provided kana/kanji.
         """
+        if len(kanji) > 5:
+            await ctx.send("fuck off ava, clamped at 5")
+            kanji = kanji[:5]
+
         responses = []
         for char in kanji:
             url = quote(f"https://jisho.org/search/{char}#kanji", safe="/:?&")

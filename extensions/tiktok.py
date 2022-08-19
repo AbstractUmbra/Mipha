@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import pathlib
 import re
@@ -16,14 +17,16 @@ if TYPE_CHECKING:
 
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True})
 
-MOBILE_PATTERN = re.compile(r"(https?://(?:vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*)?")
-DESKTOP_PATTERN = re.compile(r"(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?")
-INSTAGRAM_PATTERN = re.compile(r"(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/\?.*\=")
+MOBILE_PATTERN = re.compile(r"\<?(https?://(?:vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*\>?)?\>?")
+DESKTOP_PATTERN = re.compile(r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?")
+
+INSTAGRAM_PATTERN = re.compile(r"\<?(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/\?.*\=\>?")
 
 
 class TiktokCog(commands.Cog):
     def __init__(self, bot: Kukiko) -> None:
         self.bot: Kukiko = bot
+        self.logger: logging.Logger = logging.getLogger(__name__)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -33,15 +36,14 @@ class TiktokCog(commands.Cog):
             return
 
         matches = (
-            MOBILE_PATTERN.findall(message.content)
-            or DESKTOP_PATTERN.findall(message.content)
-            or INSTAGRAM_PATTERN.findall(message.content)
+            DESKTOP_PATTERN.findall(message.content)
+            or MOBILE_PATTERN.findall(message.content)
+            # or INSTAGRAM_PATTERN.findall(message.content)
         )
-
         if not matches:
             return
 
-        print(f"Processing {len(matches)} detected TikToks...")
+        self.logger.debug("Processing %s detected TikToks...", len(matches))
 
         async with message.channel.typing():
             loop = asyncio.get_running_loop()
@@ -87,7 +89,7 @@ class TiktokCog(commands.Cog):
                 await message.reply(content[:1000], file=file)
                 if message.channel.permissions_for(message.guild.me).manage_messages and any(
                     [
-                        INSTAGRAM_PATTERN.fullmatch(message.content),
+                        # INSTAGRAM_PATTERN.fullmatch(message.content),
                         DESKTOP_PATTERN.fullmatch(message.content),
                         MOBILE_PATTERN.fullmatch(message.content),
                     ]

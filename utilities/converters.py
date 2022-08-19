@@ -141,7 +141,7 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
         async with ctx.bot.session.post(
             "http://127.0.0.1:7731/parse",
             data={
-                "locale": "en_US",  # Todo: locale based on tz?
+                "locale": "en_US",
                 "text": argument,
                 "dims": '["time", "duration"]',
                 "tz": str(timezone),
