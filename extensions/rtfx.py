@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 RTFS = (
     "discord",
     "discord.ext.commands",
+    "discord.app_commands",
     "discord.ext.tasks",
     "discord.ext.menus",
     "asyncpg",
