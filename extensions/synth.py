@@ -3,8 +3,7 @@ import base64
 
 from io import BytesIO
 import io
-from typing import TYPE_CHECKING, Any, ClassVar
-from urllib.parse import quote as _uriquote
+from typing import TYPE_CHECKING, Any
 
 
 import discord
@@ -17,16 +16,6 @@ from utilities.fuzzy import extract
 
 if TYPE_CHECKING:
     from bot import Kukiko
-
-
-class TikTokRoute:
-    BASE: ClassVar[str] = ""
-
-    def __init__(self, path: str, **parameters: Any) -> None:
-        url = self.BASE + path
-        if parameters:
-            url = url.format_map({k: _uriquote(v) if isinstance(v, str) else v for k, v in parameters.items()})
-        self.url = url
 
 
 class SynthCog(commands.Cog, name="Synth"):
@@ -151,7 +140,9 @@ class SynthCog(commands.Cog, name="Synth"):
         if not current:
             return self._tiktok_voice_choices[:20]
 
-        cleaned = extract(current.lower(), choices=[choice.name.lower() for choice in self._tiktok_voice_choices], limit=5, score_cutoff=20)
+        cleaned = extract(
+            current.lower(), choices=[choice.name.lower() for choice in self._tiktok_voice_choices], limit=5, score_cutoff=20
+        )
 
         ret: list[app_commands.Choice[str]] = []
         for item, _ in cleaned:
