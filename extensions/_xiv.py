@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from bot import Kukiko
 
 IRLS_GUILD_ID = 174702278673039360
-FUNHOUSE_ID = 174702278673039360
+FUNHOUSE_ID = 1004336715474944002
 XIV_ROLE_ID = 970754264643293264
 FASHION_REPORT_PATTERN = re.compile(
     r"Fashion Report - Full Details - For Week of (?P<date>[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}) \(Week (?P<week_num>[0-9]{3})\)"
@@ -76,6 +76,12 @@ class XIV(commands.Cog):
         days, seconds = divmod(seconds, 60 * 60 * 24)
         hours, seconds = divmod(seconds, 60 * 60)
         minutes, seconds = divmod(seconds, 60)
+
+        ret = f"{format.title()} in "
+        if days:
+            ret += f"{days} days, "
+
+        ret += f"{hours} hours, {minutes} minutes and {seconds} seconds."
 
         return f"{format.title()} in {days} days, {hours} hours, {minutes} minutes and {seconds} seconds."
 
