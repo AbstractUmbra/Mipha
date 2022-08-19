@@ -572,7 +572,9 @@ class Config(commands.Cog):
         disabled = resolved.get_blocked_commands(channel.id)
 
         if len(disabled) > 15:
-            value = await self.bot.mb_client.post("\n".join(disabled), syntax="txt")
+            value = await self.bot.mb_client.create_paste(
+                content="\n".join(disabled), filename="disabled_things.txt", syntax="txt"
+            )
         else:
             value = "\n".join(disabled) or "None!"
         await ctx.send(f"In {channel.mention} the following commands are disabled:\n{value}")
