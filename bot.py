@@ -56,6 +56,8 @@ class KukikoCommandTree(app_commands.CommandTree):
     ) -> None:
         assert interaction.command is not None  # typechecking # disable assertions
 
+        LOGGER.exception("Exception occurred in the CommandTree:\n%s", error)
+
         e = discord.Embed(title="Command Error", colour=0xA32952)
         e.add_field(name="Command", value=interaction.command.name)
         (exc_type, exc, tb) = type(error), error, error.__traceback__
@@ -85,7 +87,7 @@ class SetupLogging:
         self.max_bytes: int = 32 * 1024
 
     def __enter__(self: Self) -> Self:
-        logging.getLogger("discord").setLevel(logging.INFO)
+        logging.getLogger("discord").setLevel(logging.WARNING)
         logging.getLogger("discord.http").setLevel(logging.WARNING)
         logging.getLogger("hondana.http").setLevel(logging.WARNING)
         logging.getLogger("discord.state").addFilter(RemoveNoise())
@@ -351,7 +353,7 @@ class Kukiko(commands.Bot):
                         f.write(f"{last_log}\n")
 
     async def setup_hook(self) -> None:
-        self.mb_client = mystbin.Client(session=self.session)
+        self.mb_client = mystbin.Client(session=self.session, token=self.config.MYSTBIN_TOKEN)
         self.md_client = hondana.Client(**self.config.MANGADEX_AUTH, session=self.session)
         self.h_client = nhentaio.Client()
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
