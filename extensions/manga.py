@@ -95,11 +95,11 @@ class MangaView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         assert interaction.user is not None
         if self.user.id != interaction.user.id:
-            raise commands.CheckFailure("boo")
+            raise app_commands.CheckFailure("You are not the owner of this interaction.")
         return True
 
-    async def on_error(self, error: Exception, _: discord.ui.Select, interaction: discord.Interaction) -> None:
-        if isinstance(error, commands.CheckFailure):
+    async def on_error(self, interaction: discord.Interaction, error: Exception, _: discord.ui.Item) -> None:
+        if isinstance(error, app_commands.CheckFailure):
             return await interaction.response.send_message("You can't choose someone else's Manga!", ephemeral=True)
         else:
             raise error
