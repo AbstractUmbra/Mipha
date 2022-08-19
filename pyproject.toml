@@ -11,8 +11,8 @@ python = "^3.10"
 discord-ext-menus = {git = "https://github.com/Rapptz/discord-ext-menus", rev = "master"}
 jishaku = {git = "git@github.com:Gorialis/jishaku.git", rev = "master"}
 hondana = {git = "https://github.com/AbstractUmbra/Hondana.git", rev = "main"}
-"mystbin.py" = {git = "git@github.com:AbstractUmbra/mystbin.py.git", rev = "main"}
 nhentaio = {git = "git@github.com:AbstractUmbra/nhentaio.git", rev = "cum"}
+"mystbin.py" = {git = "git@github.com:AbstractUmbra/mystbin.py.git", rev = "main"}
 asyncpg = "*"
 psutil = "*"
 lru_dict = "*"
@@ -25,8 +25,12 @@ yt-dlp = "*"
 typing-extensions = "*"
 parsedatetime = "*"
 python-a2s = {git = "https://github.com/Yepoleb/python-a2s.git"}
+tabulate = "^0.8.10"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
 black = "*"
 guppy3 = "*"
 
@@ -64,5 +68,5 @@ reportUnnecessaryTypeIgnoreComment = "warning"
 
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.2.0b3"]
 build-backend = "poetry.core.masonry.api"
