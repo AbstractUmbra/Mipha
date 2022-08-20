@@ -146,7 +146,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
         ret: list[app_commands.Choice[str]] = []
         for item, _ in cleaned:
-            _x = discord.utils.get(self._tiktok_voice_choices, name=item)
+            _x = discord.utils.get(self._tiktok_voice_choices, name=item.title())
             if _x:
                 ret.append(_x)
 
