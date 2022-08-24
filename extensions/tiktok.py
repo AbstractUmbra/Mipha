@@ -17,8 +17,7 @@ if TYPE_CHECKING:
 
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True})
 
-VM_MOBILE_PATTERN = re.compile(r"\<?(https?://(?:vt|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*\>?)?\>?")
-VT_MOBILE_PATTERN = re.compile(r"\<?(https?://(?:vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*\>?)?\>?")
+MOBILE_PATTERN = re.compile(r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*\>?)?\>?")
 DESKTOP_PATTERN = re.compile(r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?")
 
 INSTAGRAM_PATTERN = re.compile(r"\<?(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/\?.*\=\>?")
@@ -38,8 +37,7 @@ class TiktokCog(commands.Cog):
 
         matches = (
             DESKTOP_PATTERN.findall(message.content)
-            or VM_MOBILE_PATTERN.findall(message.content)
-            or VT_MOBILE_PATTERN.findall(message.content)
+            or MOBILE_PATTERN.findall(message.content)
             # or INSTAGRAM_PATTERN.findall(message.content)
         )
         if not matches:
@@ -93,8 +91,7 @@ class TiktokCog(commands.Cog):
                     [
                         # INSTAGRAM_PATTERN.fullmatch(message.content),
                         DESKTOP_PATTERN.fullmatch(message.content),
-                        VT_MOBILE_PATTERN.fullmatch(message.content),
-                        VM_MOBILE_PATTERN.fullmatch(message.content),
+                        MOBILE_PATTERN.fullmatch(message.content),
                     ]
                 ):
                     await message.delete()
