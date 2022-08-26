@@ -114,15 +114,21 @@ class DLECog(commands.Cog):
     @commands.command(name="wordle")
     @commands.max_concurrency(number=1, per=commands.BucketType.user, wait=False)
     async def wordle_command(self, ctx: Context, word_length: int = 6) -> None:
-        """Launches a game of wordle, with a hidden word of the given lenth."""
+        """Launches a game of wordle, with a hidden word of the given lenth.
+
+        Sending `stop`, `quit` or `cancel` will end the game early.
+        These have been removed from the dictionary of words.
+        """
         answer = self.get_wordle_word(size=word_length)
         game = WordleGame(answer=answer, owner=ctx.author.id)
         await ctx.send(f"Okay, start guessing the word. This game is locked to {ctx.author.mention}!")
 
         def wordle_check(message: discord.Message) -> bool:
             if message.author.id == ctx.author.id and message.channel.id == ctx.channel.id:
-                content = re.sub(pattern=r"\|?\|?\s?(.*)\s?\|?\|?", repl=unspoiler, string=message.content)
-                if len(content) == len(game._answer):
+                if message.content in {"quit", "stop", "cancel"}:
+                    game.over = True
+                    return True
+                if len(message.content) == len(game._answer):
                     return True
 
             return False
