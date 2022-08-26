@@ -123,6 +123,9 @@ class SynthCog(commands.Cog, name="Synth"):
 
         data = await self._get_tiktok_response(engine=engine, text=text)
 
+        if data.get("message") == "Couldn't load speech. Try again.":
+            return await itx.followup.send("Tiktok broke, sorry,", ephemeral=True)
+
         vstr: str = data["data"]["v_str"]
         _padding = len(vstr) % 4
         vstr = vstr + ("=" * _padding)
