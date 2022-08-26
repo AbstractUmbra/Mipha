@@ -46,7 +46,12 @@ class GatewayHandler(logging.Handler):
         super().__init__(logging.INFO)
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return record.name == "discord.gateway" or "Shard ID" in record.msg or "Websocket closed " in record.msg
+        return (
+            record.name == "discord.gateway"
+            or "Shard ID" in record.msg
+            or "Websocket closed " in record.msg
+            or record.name == "hondana.http"
+        )
 
     def emit(self, record: logging.LogRecord) -> None:
         self.cog.add_record(record)
@@ -159,8 +164,8 @@ class Stats(commands.Cog):
         await self.register_command(ctx)
 
     @commands.Cog.listener()
-    async def on_socket_response(self, msg: dict[str, Any]) -> None:
-        self.bot.socket_stats[msg.get("t")] += 1
+    async def on_socket_event_type(self, event_type: str) -> None:
+        self.bot.socket_stats[event_type] += 1
 
     @property
     def webhook(self) -> discord.Webhook:
