@@ -26,6 +26,7 @@ import mystbin
 import nhentaio
 from discord import app_commands
 from discord.ext import commands
+from discord.utils import _ColourFormatter as ColourFormatter, stream_supports_colour
 from typing_extensions import Self
 
 import _bot_config
@@ -44,6 +45,7 @@ jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.NO_DM_TRACEBACK = True
+INTENTS = discord.Intents(_bot_config.INTENTS)
 
 
 class KukikoCommandTree(app_commands.CommandTree):
@@ -82,24 +84,33 @@ class RemoveNoise(logging.Filter):
 
 
 class SetupLogging:
-    def __init__(self) -> None:
+    def __init__(self, *, stream: bool = True) -> None:
         self.log: logging.Logger = logging.getLogger()
-        self.max_bytes: int = 32 * 1024
+        self.max_bytes: int = 32 * 1024 * 1024
+        self.logging_path = pathlib.Path("./logs/")
+        self.logging_path.mkdir(exist_ok=True)
+        self.stream: bool = stream
 
     def __enter__(self: Self) -> Self:
-        logging.getLogger("discord").setLevel(logging.WARNING)
-        logging.getLogger("discord.http").setLevel(logging.WARNING)
-        logging.getLogger("hondana.http").setLevel(logging.WARNING)
+        logging.getLogger("discord").setLevel(logging.INFO)
+        logging.getLogger("discord.http").setLevel(logging.INFO)
+        logging.getLogger("hondana.http").setLevel(logging.INFO)
         logging.getLogger("discord.state").addFilter(RemoveNoise())
 
         self.log.setLevel(logging.INFO)
         handler = RotatingFileHandler(
-            filename="Kukiko.log", encoding="utf-8", mode="w", maxBytes=self.max_bytes, backupCount=5
+            filename=self.logging_path / "Kukiko.log", encoding="utf-8", mode="w", maxBytes=self.max_bytes, backupCount=5
         )
         dt_fmt = "%Y-%m-%d %H:%M:%S"
         fmt = logging.Formatter("[{asctime}] [{levelname:<7}] {name}: {message}", dt_fmt, style="{")
         handler.setFormatter(fmt)
         self.log.addHandler(handler)
+
+        if self.stream:
+            stream_handler = logging.StreamHandler()
+            if stream_supports_colour(stream_handler):
+                stream_handler.setFormatter(ColourFormatter())
+            self.log.addHandler(stream_handler)
 
         return self
 
@@ -127,8 +138,8 @@ class Kukiko(commands.Bot):
 
     __slots__ = (
         "session",
-        "paste",
         "h_client",
+        "mb_client",
         "md_client",
         "start_time",
         "pool",
@@ -149,7 +160,7 @@ class Kukiko(commands.Bot):
             command_prefix=_callable_prefix,
             tree_cls=KukikoCommandTree,
             description="Hello, I'm a fun discord bot for Umbra#0009's personal use.",
-            intents=discord.Intents.all(),
+            intents=INTENTS,
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
@@ -361,12 +372,9 @@ class Kukiko(commands.Bot):
 
 async def main():
     async with Kukiko() as bot:
-        try:
-            pool = await asyncpg.create_pool(
-                dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
-            )
-        except Exception:
-            raise
+        pool = await asyncpg.create_pool(
+            dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
+        )
 
         if pool is None:
             # thanks asyncpg...
