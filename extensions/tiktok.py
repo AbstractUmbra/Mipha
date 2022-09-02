@@ -5,9 +5,11 @@ import logging
 import os
 import pathlib
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
 
 import discord
+from discord import app_commands
 import yt_dlp
 from discord.ext import commands
 
@@ -23,13 +25,111 @@ DESKTOP_PATTERN = re.compile(r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/
 INSTAGRAM_PATTERN = re.compile(r"\<?(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/\?.*\=\>?")
 
 
+class FilesizeLimitExceeded(Exception):
+    def __init__(self, post: bool) -> None:
+        self.post: bool = post
+        super().__init__("The filesize limit was exceeded for this guild.")
+
+
 class TiktokCog(commands.Cog):
     def __init__(self, bot: Kukiko) -> None:
         self.bot: Kukiko = bot
         self.logger: logging.Logger = logging.getLogger(__name__)
+        self.tiktok_context_menu = app_commands.ContextMenu(
+            name="Process TikTok link",
+            callback=self.tiktok_context_menu_callback,
+            guild_ids=[174702278673039360, 149998214810959872],
+        )
+        self.bot.tree.add_command(self.tiktok_context_menu)
+
+    async def cog_unload(self) -> None:
+        self.bot.tree.remove_command(self.tiktok_context_menu.name, type=self.tiktok_context_menu.type)
+
+    async def tiktok_context_menu_callback(self, interaction: discord.Interaction, message: discord.Message) -> None:
+        await interaction.response.defer(thinking=True)
+
+        if match := MOBILE_PATTERN.search(message.content):
+            url = match[1]
+        elif match := DESKTOP_PATTERN.search(message.content):
+            url = match[1]
+        else:
+            await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.")
+            return
+
+        loop = asyncio.get_running_loop()
+
+        info = await self._extract_video_info(url, loop=loop)
+        if not info:
+            await interaction.followup.send("This message could not be parsed. Are you sure it's a valid link?")
+            return
+
+        filesize_limit = (interaction.guild and interaction.guild.filesize_limit) or 8388608
+        try:
+            file, content = self._manipulate_video(info, filesize_limit=filesize_limit, loop=loop)
+        except FilesizeLimitExceeded as error:
+            await interaction.followup.send(content=str(error))
+            return
+
+        await interaction.followup.send(content=content, file=file)
+
+    async def _cleanup_paths(self, *args: pathlib.Path) -> None:
+        await asyncio.sleep(20)
+
+        for path in args:
+            path.unlink(missing_ok=True)
+
+    async def _extract_video_info(self, url: str, *, loop: asyncio.AbstractEventLoop | None = None) -> dict[str, Any] | None:
+        loop = loop or asyncio.get_running_loop()
+
+        info = await loop.run_in_executor(None, ydl.extract_info, url)
+
+        if not info:
+            return
+
+        return info
+
+    def _manipulate_video(
+        self, info: dict[str, Any], *, filesize_limit: int, loop: asyncio.AbstractEventLoop | None = None
+    ) -> tuple[discord.File, str]:
+        loop = loop or asyncio.get_running_loop()
+        file_loc = pathlib.Path(f"buffer/{info['id']}.{info['ext']}")
+        fixed_file_loc = pathlib.Path(f"buffer/{info['id']}_fixed.{info['ext']}")
+
+        if file_loc.stat().st_size > filesize_limit:
+            file_loc.unlink(missing_ok=True)
+            raise FilesizeLimitExceeded(post=False)
+
+        os.system(f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null')
+        if fixed_file_loc.stat().st_size > filesize_limit:
+            file_loc.unlink(missing_ok=True)
+            fixed_file_loc.unlink(missing_ok=True)
+            raise FilesizeLimitExceeded(post=True)
+
+        file = discord.File(str(fixed_file_loc), filename=fixed_file_loc.name)
+        content = f"**Uploader**: {info['uploader']}\n\n" * (bool(info["uploader"]))
+        content += f"**Description**: {info['description']}" * (bool(info["uploader"]))
+
+        loop.create_task(self._cleanup_paths(file_loc, fixed_file_loc))
+
+        return file, content
+
+    def _pull_matches(self, matches: list[re.Match[str]]) -> list[str]:
+        cleaned: list[str] = []
+        for _url in matches:
+            if isinstance(_url, str):
+                exposed_url: str = _url
+            else:
+                exposed_url: str = _url[0]
+
+            if not exposed_url.endswith("/"):
+                exposed_url = exposed_url + "/"
+
+            cleaned.append(exposed_url)
+
+        return cleaned
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def on_message(self, message: discord.Message) -> None:
         if not message.guild:
             return
         if message.guild.id not in {174702278673039360, 149998214810959872}:
@@ -46,42 +146,20 @@ class TiktokCog(commands.Cog):
         self.logger.debug("Processing %s detected TikToks...", len(matches))
 
         async with message.channel.typing():
+            urls = self._pull_matches(matches)
             loop = asyncio.get_running_loop()
-            for idx, _url in enumerate(matches, start=1):
-                if isinstance(_url, str):
-                    exposed_url = _url
-                else:
-                    exposed_url = _url[0]
-
-                if not exposed_url.endswith("/"):
-                    exposed_url = exposed_url + "/"
-
+            _errors: list[int] = []
+            for idx, url in enumerate(urls, start=1):
                 try:
-                    info = await loop.run_in_executor(None, ydl.extract_info, exposed_url)
-                except yt_dlp.DownloadError as error:
-                    if "You need to log in" in str(error):
-                        await message.channel.send("Need to log in.")
-                        return
-                    raise
-
-                file_loc = pathlib.Path(f"buffer/{info['id']}.{info['ext']}")
-                fixed_file_loc = pathlib.Path(f"buffer/{info['id']}_fixed.{info['ext']}")
-
-                stat = file_loc.stat()
-                if stat.st_size > message.guild.filesize_limit:
-                    file_loc.unlink(missing_ok=True)
-                    await message.reply(f"TikTok link #{idx} in your message exceeded the file size limit.")
+                    info = await self._extract_video_info(url, loop=loop)
+                except yt_dlp.DownloadError:
+                    _errors.append(idx)
                     continue
 
-                os.system(f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning')
-                if fixed_file_loc.stat().st_size > message.guild.filesize_limit:
-                    file_loc.unlink(missing_ok=True)
-                    await message.reply(f"TikTok link #{idx} in your message exceeded the file size limit.")
+                if not info:
                     continue
 
-                file = discord.File(str(fixed_file_loc), filename=fixed_file_loc.name)
-                content = f"**Uploader**: {info['uploader']}\n\n" * (bool(info["uploader"]))
-                content += f"**Description**: {info['description']}" * (bool(info["uploader"]))
+                file, content = self._manipulate_video(info, filesize_limit=message.guild.filesize_limit)
 
                 if message.mentions:
                     content = " ".join(m.mention for m in message.mentions) + "\n\n" + content
@@ -89,14 +167,11 @@ class TiktokCog(commands.Cog):
                 await message.reply(content[:1000], file=file)
                 if message.channel.permissions_for(message.guild.me).manage_messages and any(
                     [
-                        # INSTAGRAM_PATTERN.fullmatch(message.content),
                         DESKTOP_PATTERN.fullmatch(message.content),
                         MOBILE_PATTERN.fullmatch(message.content),
                     ]
                 ):
                     await message.delete()
-                file_loc.unlink(missing_ok=True)
-                fixed_file_loc.unlink(missing_ok=True)
 
 
 async def setup(bot: Kukiko) -> None:
