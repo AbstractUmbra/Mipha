@@ -68,5 +68,5 @@ reportUnnecessaryTypeIgnoreComment = "warning"
 
 
 [build-system]
-requires = ["poetry-core>=1.2.0b3"]
+requires = ["poetry-core>=1.1.0"]
 build-backend = "poetry.core.masonry.api"
