@@ -19,6 +19,12 @@ if TYPE_CHECKING:
 
 
 class SynthCog(commands.Cog, name="Synth"):
+    _tiktok_urls: set[str] = {
+        "api16-normal-useast5.us.tiktokv.com",
+        "api16-normal-c-alisg.tiktokv.com",
+        "api19-normal-useast1a.tiktokv.com",
+    }
+
     def __init__(self, bot: Kukiko) -> None:
         self.bot: Kukiko = bot
         self._engine_autocomplete: list[app_commands.Choice[int]] = []
@@ -105,25 +111,27 @@ class SynthCog(commands.Cog, name="Synth"):
 
         return clean
 
-    async def _get_tiktok_response(self, *, engine: str, text: str) -> dict[str, Any]:
+    async def _get_tiktok_response(self, *, engine: str, text: str) -> dict[str, Any] | None:
         parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0"}
 
-        async with self.bot.session.post(
-            "https://api16-normal-useast5.us.tiktokv.com/media/api/text/speech/invoke/", params=parameters
-        ) as response:
-            data = await response.json()
+        for url in self._tiktok_urls:
+            async with self.bot.session.post(f"https://{url}/media/api/text/speech/invoke/", params=parameters) as response:
+                data = await response.json()
 
-        return data
+            if data.get("message") == "Couldn't load speech. Try again.":
+                continue
+            else:
+                return data
 
-    @app_commands.command(
-        name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
-    )
+    # @app_commands.command(
+    #     name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
+    # )
     async def tiktok_callback(self, itx: discord.Interaction, engine: str, text: str) -> None:
         await itx.response.defer(thinking=True)
 
         data = await self._get_tiktok_response(engine=engine, text=text)
 
-        if data.get("message") == "Couldn't load speech. Try again.":
+        if not data:
             return await itx.followup.send("Tiktok broke, sorry,", ephemeral=True)
 
         vstr: str = data["data"]["v_str"]
@@ -138,7 +146,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
         await itx.followup.send(content=f">>> {text}", file=file)
 
-    @tiktok_callback.autocomplete("engine")
+    # @tiktok_callback.autocomplete("engine")
     async def tiktok_engine_autocomplete(self, itx: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
             return self._tiktok_voice_choices[:20]
@@ -165,13 +173,13 @@ class SynthCog(commands.Cog, name="Synth"):
         await itx.followup.send(f"`{kana['kana']}`", file=file)
 
     @synth_callback.autocomplete("engine")
-    async def synth_engine_autocomplete(self, itx: discord.Interaction, current: int) -> list[app_commands.Choice[int]]:
+    async def synth_engine_autocomplete(self, itx: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
         choices = await self._get_engine_choices()
 
         if not current:
             return choices
 
-        cleaned = extract(str(current), choices=[choice.name for choice in choices], limit=5, score_cutoff=20)
+        cleaned = extract(current, choices=[choice.name for choice in choices], limit=5, score_cutoff=20)
 
         ret: list[app_commands.Choice[int]] = []
         for item, _ in cleaned:
