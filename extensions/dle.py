@@ -142,9 +142,14 @@ class DLECog(commands.Cog):
                 )
             except asyncio.TimeoutError:
                 game.over = True
-                await ctx.send(
-                    f"Sorry, you ran out of time to guess for this game. The correct word was || {game._answer} ||."
-                )
+                if game._message:
+                    await game._message.edit(
+                        content=f"Sorry, you ran out of time to guess for this game. The correct word was || {game._answer} ||. Final output:\n{game._current_map}"
+                    )
+                else:
+                    await ctx.send(
+                        f"Sorry, you ran out of time to guess for this game. The correct word was || {game._answer} ||."
+                    )
                 return
             else:
                 try:
@@ -152,7 +157,8 @@ class DLECog(commands.Cog):
                 except GuessesExceeded as error:
                     game.solved = False
                     game.over = True
-                    await ctx.send(f"{error}")
+                    if game._message:
+                        await game._message.edit(content=f"{error}")
                 else:
                     if game.solved:
                         current_guess += "\n\nCongratulations!!"
