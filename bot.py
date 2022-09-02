@@ -347,6 +347,8 @@ class Kukiko(commands.Bot):
             await guild.leave()
 
     async def close(self) -> None:
+        await self.mb_client.close()
+        await self.md_client.close()
         await self.session.close()
         await super().close()
 
