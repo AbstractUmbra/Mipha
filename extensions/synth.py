@@ -21,6 +21,16 @@ if TYPE_CHECKING:
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
+class BadTikTokData(Exception):
+    def __init__(self, data: TikTokSynth, /) -> None:
+        self._data = data
+        super().__init__("TikTok Voice Synth failed.")
+
+    @property
+    def data(self) -> TikTokSynth:
+        return self._data
+
+
 class SynthCog(commands.Cog, name="Synth"):
     _tiktok_urls: set[str] = {
         "api22-normal-c-useast1a.tiktokv.com",
@@ -115,6 +125,10 @@ class SynthCog(commands.Cog, name="Synth"):
 
         return clean
 
+    def _tiktok_data_verification(self, data: TikTokSynth, /) -> None:
+        if data["message"] == "Couldn't load speech. Try again." or data["status_code"] != 0:
+            raise BadTikTokData(data)
+
     async def _get_tiktok_response(self, *, engine: str, text: str) -> TikTokSynth | None:
         parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0", "aid": "1233"}
         headers: dict[str, str] = {
@@ -128,23 +142,27 @@ class SynthCog(commands.Cog, name="Synth"):
             ) as response:
                 data: TikTokSynth = await response.json()
 
-            if data.get("message") == "Couldn't load speech. Try again.":
+            try:
+                self._tiktok_data_verification(data)
+            except BadTikTokData:
                 LOGGER.error(
-                    "TikTok synth error.\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'",
+                    "TikTok synth logging.\nVoice: '%s'\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'",
+                    data["data"]["speaker"],
                     text,
                     data["status_code"],
                     data["status_msg"],
                 )
                 continue
-            else:
-                LOGGER.info(
-                    "TikTok synth logging.\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'\nDuration: %s",
-                    text,
-                    data["status_code"],
-                    data["status_msg"],
-                    data["data"]["duration"],
-                )
-                return data
+
+            LOGGER.info(
+                "TikTok synth logging.\nVoice: '%s'\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'\nDuration: %s",
+                data["data"]["speaker"],
+                text,
+                data["status_code"],
+                data["status_msg"],
+                data["data"]["duration"],
+            )
+            return data
 
     @app_commands.command(
         name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
@@ -155,7 +173,14 @@ class SynthCog(commands.Cog, name="Synth"):
         data = await self._get_tiktok_response(engine=engine, text=text)
 
         if not data:
-            return await itx.followup.send("Tiktok broke, sorry,", ephemeral=True)
+            return await itx.followup.send(
+                "Tiktok broke, sorry. Your input might be too long or it might just be fucked.", ephemeral=True
+            )
+
+        if data["status_code"] != 0:
+            return await itx.followup.send(
+                f"Sorry, your synthetic audio cannot be created due to the following reason: {data['status_msg']!r}."
+            )
 
         vstr: str = data["data"]["v_str"]
         _padding = len(vstr) % 4
@@ -172,10 +197,13 @@ class SynthCog(commands.Cog, name="Synth"):
     @tiktok_callback.autocomplete("engine")
     async def tiktok_engine_autocomplete(self, itx: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
-            return self._tiktok_voice_choices[:20]
+            return self._tiktok_voice_choices[:25]
 
         cleaned = extract(
-            current.lower(), choices=[choice.name.lower() for choice in self._tiktok_voice_choices], limit=5, score_cutoff=20
+            current.lower(),
+            choices=[choice.name.lower() for choice in self._tiktok_voice_choices],
+            limit=10,
+            score_cutoff=20,
         )
 
         ret: list[app_commands.Choice[str]] = []
