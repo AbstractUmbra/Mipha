@@ -1,7 +1,11 @@
 from typing import Any, TypedDict
 
 
-__all__ = ("SpeakersResponse", "KanaResponse")
+__all__ = (
+    "SpeakersResponse",
+    "KanaResponse",
+    "TikTokSynth",
+)
 
 
 class _IDAndName(TypedDict):
@@ -43,3 +47,22 @@ class KanaResponse(TypedDict):
     outputSamplingRate: int
     outputStereo: bool
     kana: str
+
+
+class TikTokSynthData(TypedDict):
+    s_key: str
+    v_str: str
+    duration: str
+    speaker: str
+
+
+class TikTokSynthExtra(TypedDict):
+    log_id: str
+
+
+class TikTokSynth(TypedDict):
+    data: TikTokSynthData
+    extra: TikTokSynthExtra
+    message: str
+    status_code: int
+    status_msg: str

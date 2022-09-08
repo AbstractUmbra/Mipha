@@ -3,6 +3,7 @@ import base64
 
 from io import BytesIO
 import io
+import logging
 from typing import TYPE_CHECKING, Any
 
 
@@ -10,16 +11,19 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities._types.synth import KanaResponse, SpeakersResponse
+from utilities._types.synth import KanaResponse, SpeakersResponse, TikTokSynth
 from utilities.fuzzy import extract
 
 
 if TYPE_CHECKING:
     from bot import Kukiko
 
+LOGGER: logging.Logger = logging.getLogger(__name__)
+
 
 class SynthCog(commands.Cog, name="Synth"):
     _tiktok_urls: set[str] = {
+        "api22-normal-c-useast1a.tiktokv.com",
         "api16-normal-useast5.us.tiktokv.com",
         "api16-normal-c-alisg.tiktokv.com",
         "api19-normal-useast1a.tiktokv.com",
@@ -111,21 +115,40 @@ class SynthCog(commands.Cog, name="Synth"):
 
         return clean
 
-    async def _get_tiktok_response(self, *, engine: str, text: str) -> dict[str, Any] | None:
-        parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0"}
+    async def _get_tiktok_response(self, *, engine: str, text: str) -> TikTokSynth | None:
+        parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0", "aid": "1233"}
+        headers: dict[str, str] = {
+            "User-Agent": "com.zhiliaoapp.musically/2022600030 (Linux; U; Android 7.1.2; es_ES; SM-G988N; Build/NRD90M;tt-ok/3.12.13.1)",
+            "Cookie": "sessionid=57b7d8b3e04228a24cc1e6d25387603a",
+        }
 
         for url in self._tiktok_urls:
-            async with self.bot.session.post(f"https://{url}/media/api/text/speech/invoke/", params=parameters) as response:
-                data = await response.json()
+            async with self.bot.session.post(
+                f"https://{url}/media/api/text/speech/invoke/", params=parameters, headers=headers
+            ) as response:
+                data: TikTokSynth = await response.json()
 
             if data.get("message") == "Couldn't load speech. Try again.":
+                LOGGER.error(
+                    "TikTok synth error.\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'",
+                    text,
+                    data["status_code"],
+                    data["status_msg"],
+                )
                 continue
             else:
+                LOGGER.info(
+                    "TikTok synth logging.\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'\nDuration: %s",
+                    text,
+                    data["status_code"],
+                    data["status_msg"],
+                    data["data"]["duration"],
+                )
                 return data
 
-    # @app_commands.command(
-    #     name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
-    # )
+    @app_commands.command(
+        name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
+    )
     async def tiktok_callback(self, itx: discord.Interaction, engine: str, text: str) -> None:
         await itx.response.defer(thinking=True)
 
@@ -146,7 +169,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
         await itx.followup.send(content=f">>> {text}", file=file)
 
-    # @tiktok_callback.autocomplete("engine")
+    @tiktok_callback.autocomplete("engine")
     async def tiktok_engine_autocomplete(self, itx: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
             return self._tiktok_voice_choices[:20]
