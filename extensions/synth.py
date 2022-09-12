@@ -30,6 +30,13 @@ class BadTikTokData(Exception):
     def data(self) -> TikTokSynth:
         return self._data
 
+    def clean(self) -> dict[str, Any]:
+        data = self._data.copy()
+        if data.get("data"):
+            data["data"].pop("v_str", None)  # type: ignore
+
+        return data  # type: ignore
+
 
 class SynthCog(commands.Cog, name="Synth"):
     _tiktok_urls: set[str] = {
@@ -85,6 +92,14 @@ class SynthCog(commands.Cog, name="Synth"):
             app_commands.Choice(name="Narrator", value="en_male_narration"),
             app_commands.Choice(name="Wacky", value="en_male_funny"),
             app_commands.Choice(name="Peaceful", value="en_female_emotional"),
+            app_commands.Choice(name="Glorious", value="en_female_ht_f08_glorious"),
+            app_commands.Choice(name="It Goes Up", value="en_male_sing_funny_it_goes_up"),
+            app_commands.Choice(name="Chipmunk", value="en_male_m2_xhxs_m03_silly"),
+            app_commands.Choice(name="Dramatic", value="en_female_ht_f08_wonderful_world"),
+            app_commands.Choice(name="Madame Leota", value="en_female_madam_leota"),
+            app_commands.Choice(name="Ghost Host", value="en_male_ghosthost"),
+            app_commands.Choice(name="Pirate", value="en_male_pirate"),
+            app_commands.Choice(name="Serious", value="en_male_cody"),
         ]
 
     async def _get_engine_choices(self) -> list[app_commands.Choice[int]]:
@@ -133,7 +148,7 @@ class SynthCog(commands.Cog, name="Synth"):
         parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0", "aid": "1233"}
         headers: dict[str, str] = {
             "User-Agent": "com.zhiliaoapp.musically/2022600030 (Linux; U; Android 7.1.2; es_ES; SM-G988N; Build/NRD90M;tt-ok/3.12.13.1)",
-            "Cookie": "sessionid=57b7d8b3e04228a24cc1e6d25387603a",
+            "Cookie": f"sessionid={self.bot.config.TIKTOK_SESSION_ID}",
         }
 
         for url in self._tiktok_urls:
@@ -144,13 +159,13 @@ class SynthCog(commands.Cog, name="Synth"):
 
             try:
                 self._tiktok_data_verification(data)
-            except BadTikTokData:
+            except BadTikTokData as error:
                 LOGGER.error(
-                    "TikTok synth logging.\nVoice: '%s'\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'",
-                    data["data"]["speaker"],
+                    "TikTok synth logging.\nMessage: '%s'\nStatus Code: %d\nStatus Message: '%s'\nDict: %s",
                     text,
                     data["status_code"],
                     data["status_msg"],
+                    error.clean(),
                 )
                 continue
 

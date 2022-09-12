@@ -90,8 +90,10 @@ class Admin(commands.Cog):
             return await self.bot.load_extension(module)
         except commands.ExtensionError as err:
             await ctx.send(f"{err.__class__.__name__}: {err}")
-        finally:
-            await ctx.message.add_reaction(ctx.tick(True))
+            await ctx.message.add_reaction(ctx.tick(False))
+            return
+
+        await ctx.message.add_reaction(ctx.tick(True))
 
     @commands.group(invoke_without_command=True)
     async def sql(self, ctx: Context, *, query: str) -> None:

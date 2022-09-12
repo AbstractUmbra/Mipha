@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from extensions.reminders import Reminder
     from extensions.stats import Stats
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("Kukiko")
 jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
@@ -180,7 +180,7 @@ class Kukiko(commands.Bot):
         )
         self.command_stats = Counter()
         self.socket_stats = Counter()
-        self.global_log: logging.Logger = LOGGER
+        self.global_log = logging.getLogger()
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
@@ -202,10 +202,10 @@ class Kukiko(commands.Bot):
         self._previous_websocket_events.append(message)
 
     async def on_ready(self) -> None:
-        print(f"Kukiko got a ready event at {datetime.datetime.now()}")
+        self.global_log.info("Kukiko got a ready event at %s", datetime.datetime.now())
 
     async def on_resume(self) -> None:
-        print(f"Kukiko got a resume event at {datetime.datetime.now()}")
+        self.global_log.info("Kukiko got a resume event at %s", datetime.datetime.now())
 
     async def on_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         assert ctx.command is not None  # type checking - disable assertions
@@ -349,8 +349,9 @@ class Kukiko(commands.Bot):
     async def close(self) -> None:
         await self.mb_client.close()
         await self.md_client.close()
-        await self.session.close()
+        await self.pool.close()
         await super().close()
+        await self.session.close()
 
     async def start(self) -> None:
         try:

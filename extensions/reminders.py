@@ -33,6 +33,7 @@ class DucklingConverter(commands.Converter[datetime.datetime]):
         row = await ctx.bot.pool.fetchval(
             "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
         )
+
         return row
 
     async def convert(self, ctx: Context, argument: str) -> datetime.datetime:

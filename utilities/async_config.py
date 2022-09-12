@@ -61,7 +61,7 @@ class Config(Generic[_T]):
                 ensure_ascii=True,
                 cls=self.encoder,
                 separators=(",", ":"),
-                indent=2,
+                indent=4,
             )
 
         # atomically move the file

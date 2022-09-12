@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from aiohttp import ClientSession
 
     from bot import Kukiko
-    from extensions._stars import StarboardConfig
 
 __all__ = (
     "Context",
@@ -60,13 +59,11 @@ class _ContextDBAcquire:
 class Context(commands.Context["Kukiko"]):
     _db: asyncpg.Connection | asyncpg.Pool | None
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
-    starboard: StarboardConfig
     bot: Kukiko
     command: commands.Command[Any, ..., Any]
 
     __slots__ = (
         "pool",
-        "starboard",
         "_db",
     )
 
