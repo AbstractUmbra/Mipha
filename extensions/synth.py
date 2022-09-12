@@ -4,6 +4,8 @@ import base64
 from io import BytesIO
 import io
 import logging
+import json
+import pathlib
 from typing import TYPE_CHECKING, Any
 
 
@@ -19,6 +21,10 @@ if TYPE_CHECKING:
     from bot import Kukiko
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
+
+_VOICE_PATH = pathlib.Path("configs/tiktok_voices.json")
+with _VOICE_PATH.open("r") as fp:
+    _VOICE_DATA: list[dict[str, str]] = json.load(fp)
 
 
 class BadTikTokData(Exception):
@@ -49,57 +55,8 @@ class SynthCog(commands.Cog, name="Synth"):
     def __init__(self, bot: Kukiko) -> None:
         self.bot: Kukiko = bot
         self._engine_autocomplete: list[app_commands.Choice[int]] = []
-        self._tiktok_voice_choices: list[app_commands.Choice[str]] = [
-            app_commands.Choice(name="Default", value="en_us_001"),
-            app_commands.Choice(name="Ghost Face", value="en_us_ghostface"),
-            app_commands.Choice(name="Chewbacca", value="en_us_chewbacca"),
-            app_commands.Choice(name="C3PO", value="en_us_c3po"),
-            app_commands.Choice(name="Stitch", value="en_us_stitch"),
-            app_commands.Choice(name="Stormtrooper", value="en_us_stormtrooper"),
-            app_commands.Choice(name="Rocket", value="en_us_rocket"),
-            app_commands.Choice(name="Australian Female", value="en_au_001"),
-            app_commands.Choice(name="Austrlian Male 1", value="en_au_002"),
-            app_commands.Choice(name="Australian Male 2", value="en_uk_001"),
-            app_commands.Choice(name="Australian Male 3", value="en_uk_003"),
-            app_commands.Choice(name="American Female 1", value="en_us_001"),
-            app_commands.Choice(name="American Female 2", value="en_us_002"),
-            app_commands.Choice(name="American Male 1", value="en_us_006"),
-            app_commands.Choice(name="American Male 2", value="en_us_007"),
-            app_commands.Choice(name="American Male 3", value="en_us_009"),
-            app_commands.Choice(name="American Male 4", value="en_us_010"),
-            app_commands.Choice(name="French Male 1", value="fr_001"),
-            app_commands.Choice(name="French Male 2", value="fr_002"),
-            app_commands.Choice(name="German Female", value="de_001"),
-            app_commands.Choice(name="German Male", value="de_002"),
-            app_commands.Choice(name="Spanish Male", value="es_002"),
-            app_commands.Choice(name="Spanish (Mexican) Male", value="es_mx_002"),
-            app_commands.Choice(name="Brazilian Female 1", value="br_001"),
-            app_commands.Choice(name="Brazilian Female 2", value="br_003"),
-            app_commands.Choice(name="Brazilian Female 3", value="br_004"),
-            app_commands.Choice(name="Brazilian Male", value="br_005"),
-            app_commands.Choice(name="Indonesian Female", value="id_001"),
-            app_commands.Choice(name="Japanese Female 1", value="jp_001"),
-            app_commands.Choice(name="Japanese Female 2", value="jp_003"),
-            app_commands.Choice(name="Japanese Female 3", value="jp_005"),
-            app_commands.Choice(name="Japanese Male", value="jp_006"),
-            app_commands.Choice(name="Korean Male 1", value="kr_002"),
-            app_commands.Choice(name="Korean Female", value="kr_003"),
-            app_commands.Choice(name="Korean Male 2", value="kr_004"),
-            app_commands.Choice(name="Alto", value="en_female_f08_salut_damour"),
-            app_commands.Choice(name="Tenor", value="en_male_m03_lobby"),
-            app_commands.Choice(name="Warmy Breeze", value="en_female_f08_warmy_breeze"),
-            app_commands.Choice(name="Sunshine Soon", value="en_male_m03_sunshine_soon"),
-            app_commands.Choice(name="Narrator", value="en_male_narration"),
-            app_commands.Choice(name="Wacky", value="en_male_funny"),
-            app_commands.Choice(name="Peaceful", value="en_female_emotional"),
-            app_commands.Choice(name="Glorious", value="en_female_ht_f08_glorious"),
-            app_commands.Choice(name="It Goes Up", value="en_male_sing_funny_it_goes_up"),
-            app_commands.Choice(name="Chipmunk", value="en_male_m2_xhxs_m03_silly"),
-            app_commands.Choice(name="Dramatic", value="en_female_ht_f08_wonderful_world"),
-            app_commands.Choice(name="Madame Leota", value="en_female_madam_leota"),
-            app_commands.Choice(name="Ghost Host", value="en_male_ghosthost"),
-            app_commands.Choice(name="Pirate", value="en_male_pirate"),
-            app_commands.Choice(name="Serious", value="en_male_cody"),
+        self._tiktok_voice_choices: list[app_commands.Choice] = [
+            app_commands.Choice(name=voice["name"], value=voice["value"]) for voice in _VOICE_DATA
         ]
 
     async def _get_engine_choices(self) -> list[app_commands.Choice[int]]:
