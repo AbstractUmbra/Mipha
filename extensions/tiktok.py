@@ -7,10 +7,9 @@ import pathlib
 import re
 from typing import TYPE_CHECKING, Any
 
-
 import discord
-from discord import app_commands
 import yt_dlp
+from discord import app_commands
 from discord.ext import commands
 
 

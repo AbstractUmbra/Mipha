@@ -1,15 +1,23 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 from __future__ import annotations
+
 import asyncio
-from collections import defaultdict
 import pathlib
 import random
 import re
-
+from collections import defaultdict
 from typing import TYPE_CHECKING
-import discord
 
+import discord
 from discord.ext import commands
+
 from utilities.context import Context
+
 
 if TYPE_CHECKING:
     from bot import Kukiko

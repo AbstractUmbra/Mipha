@@ -59,6 +59,7 @@ class HumanTime:
     def __init__(self, argument: str, *, now: datetime.datetime | None = None) -> None:
         now = now or datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
         dt, status = self.calendar.parseDT(argument, sourceTime=now)
+        assert isinstance(status, pdt.pdtContext)
         if not status.hasDateOrTime:
             raise commands.BadArgument('invalid time provided, try e.g. "tomorrow" or "3 days"')
 

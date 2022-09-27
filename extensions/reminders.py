@@ -30,11 +30,9 @@ class DucklingConverter(commands.Converter[datetime.datetime]):
     async def get_tz(self, ctx: Context) -> str | None:
         assert ctx.guild is not None
 
-        row = await ctx.bot.pool.fetchval(
+        return await ctx.bot.pool.fetchval(
             "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
-        )
-
-        return row
+        )  # type: ignore # something is wrong with asyncpg
 
     async def convert(self, ctx: Context, argument: str) -> datetime.datetime:
         params = {"locale": "en_US", "text": argument, "dims": str(["time"])}

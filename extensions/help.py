@@ -88,11 +88,15 @@ class PaginatedHelpCommand(commands.HelpCommand):
 
         await self.format_commands(cog, await self.filter_commands(cog.get_commands(), sort=True), pages=pages)
 
+        if not pages:
+            await self.context.send(f'My "{cog.qualified_name}" cog has no message commands.')
+            return
+
         total = len(pages)
         for i, embed in enumerate(pages, start=1):
             embed.title = f"Page {i}/{total}: {embed.title}"
 
-        pg = RoboPages(SimpleListSource(pages), ctx=self.context)
+        pg = RoboPages(SimpleListSource[discord.Embed](pages), ctx=self.context)
         await pg.start()
 
     async def send_group_help(self, group: commands.Group) -> None:

@@ -16,6 +16,7 @@ from typing import Any, Generic, TypeAlias, TypeVar, overload
 
 ObjectHook: TypeAlias = Callable[[dict[str, Any]], Any]
 _T = TypeVar("_T")
+_defT = TypeVar("_defT")
 
 
 class Config(Generic[_T]):
@@ -34,7 +35,7 @@ class Config(Generic[_T]):
         self.encoder = encoder
         self.loop = asyncio.get_event_loop()
         self.lock = asyncio.Lock()
-        self._db: dict[str, _T | Any] = {}
+        self._db: dict[str, _T] = {}
 
         if load_later:
             self.loop.create_task(self.load())
@@ -76,10 +77,10 @@ class Config(Generic[_T]):
         ...
 
     @overload
-    def get(self, key: Any, default: Any) -> _T | Any:
+    def get(self, key: Any, default: _defT) -> _T | _defT:
         ...
 
-    def get(self, key: Any, default: Any = None) -> _T | Any | None:
+    def get(self, key: Any, default: _defT = None) -> _T | _defT | None:
         """Retrieves a config entry."""
         return self._db.get(str(key), default)
 
@@ -102,5 +103,5 @@ class Config(Generic[_T]):
     def __len__(self) -> int:
         return len(self._db)
 
-    def all(self) -> dict[str, _T | Any]:
+    def all(self) -> dict[str, _T]:
         return self._db

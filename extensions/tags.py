@@ -657,7 +657,7 @@ class Tags(commands.Cog):
             await ctx.send("Could not delete tag. Either it does not exist or you do not have permissions to do so.")
             return
 
-        args.append(deleted[0])
+        args.append(deleted[0])  # type: ignore # something is wrong with asyncpg
         query = f"DELETE FROM tags WHERE id=${len(args)} AND {clause};"
         status = await ctx.db.execute(query, *args)
 
@@ -699,10 +699,10 @@ class Tags(commands.Cog):
 
         if bypass_owner_check:
             clause = "id=$1 AND location_id=$2"
-            args = [deleted[0], ctx.guild.id]
+            args = [deleted[0], ctx.guild.id]  # type: ignore # something is wrong with asyncpg
         else:
             clause = "id=$1 AND location_id=$2 AND owner_id=$3"
-            args = [deleted[0], ctx.guild.id, ctx.author.id]
+            args = [deleted[0], ctx.guild.id, ctx.author.id]  # type: ignore # something is wrong with asyncpg
 
         query = f"DELETE FROM tags WHERE {clause};"
         status = await ctx.db.execute(query, *args)

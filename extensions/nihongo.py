@@ -450,14 +450,8 @@ class Nihongo(commands.Cog):
         menu = RoboPages(SimpleListSource(fixed_embeds), ctx=ctx)
         await menu.start()
 
-    @kanji.command(name="reading")
-    async def reading(self, ctx: Context, character: str):
-        """KanjiApi.dev - Return the reading of a Kanji."""
-        ...
-
     @kanji.error
     @words.error
-    @reading.error
     async def nihongo_error(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
 

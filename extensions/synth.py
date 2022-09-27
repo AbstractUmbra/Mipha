@@ -1,13 +1,12 @@
 from __future__ import annotations
+
 import base64
-
-from io import BytesIO
 import io
-import logging
 import json
+import logging
 import pathlib
+from io import BytesIO
 from typing import TYPE_CHECKING, Any
-
 
 import discord
 from discord import app_commands

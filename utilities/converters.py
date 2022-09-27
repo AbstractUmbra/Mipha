@@ -118,7 +118,7 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
                 "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
             )
             if row:
-                tz = zoneinfo.ZoneInfo(row)
+                tz = zoneinfo.ZoneInfo(row)  # type: ignore # something is wrong with asyncpg
             else:
                 tz = zoneinfo.ZoneInfo("UTC")
 

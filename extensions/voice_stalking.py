@@ -58,7 +58,7 @@ class VoiceStalking(commands.Cog):
         return await ctx.bot.is_owner(ctx.author)
 
     def _is_safe_channel(self, channel: VocalGuildChannel) -> bool:
-        config: VoiceStalkingConfig = self._config.get(channel.guild.id, {})
+        config: VoiceStalkingConfig = self._config.get(channel.guild.id, {})  # type: ignore # dumb
         if not config:
             return False
 
@@ -108,7 +108,7 @@ class VoiceStalking(commands.Cog):
     async def on_voice_state_update(
         self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
     ) -> None:
-        config: VoiceStalkingConfig = self._config.get(member.guild.id, {})
+        config: VoiceStalkingConfig = self._config.get(member.guild.id, {})  # type: ignore # dumb
         if not config:
             return
 

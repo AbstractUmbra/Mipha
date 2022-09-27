@@ -389,7 +389,7 @@ async def main():
 
         with SetupLogging():
             await bot.load_extension("jishaku")
-            for file in sorted(pathlib.Path("extensions").glob("**/[!_]*.py")):
+            for file in pathlib.Path("extensions").glob("**/[!_]*.py"):
                 ext = ".".join(file.parts).removesuffix(".py")
                 try:
                     await bot.load_extension(ext)
