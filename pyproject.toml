@@ -26,6 +26,7 @@ typing-extensions = "*"
 parsedatetime = "*"
 python-a2s = {git = "https://github.com/Yepoleb/python-a2s.git"}
 tabulate = "^0.8.10"
+lxml = "^4.9.1"
 
 [tool.poetry.group.dev]
 optional = true
