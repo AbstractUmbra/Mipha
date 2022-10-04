@@ -16,7 +16,6 @@ nhentaio = {git = "git@github.com:AbstractUmbra/nhentaio.git", rev = "cum"}
 asyncpg = "*"
 psutil = "*"
 lru_dict = "*"
-fuzzywuzzy = "*"
 pykakasi = "*"
 beautifulsoup4 = "*"
 Pillow = "*"

@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
-from fuzzywuzzy import process
 
 from utilities import time
 from utilities.context import Context
+from utilities.fuzzy import extract
 
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 class TimezoneConverter(commands.Converter):
     async def convert(self, ctx: Context, argument: str):
-        query = process.extract(query=argument.lower(), choices=zoneinfo.available_timezones(), limit=5)
+        query = extract(query=argument.lower(), choices=list(zoneinfo.available_timezones()), limit=5)
         if argument.lower() not in {timezone.lower() for timezone in zoneinfo.available_timezones()}:
             matches = "\n".join([f"`{index}.` {match[0]}" for index, match in enumerate(query, start=1)])
             await ctx.send(f"That was not a recognised timezone. Maybe you meant one of these?\n{matches}")
