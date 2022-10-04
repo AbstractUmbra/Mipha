@@ -150,6 +150,15 @@ class ScotrailCog(commands.Cog):
 
         return ret
 
+    @next_train_callback.error
+    async def error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        error = getattr(error, "original", error)
+
+        respond = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
+
+        if isinstance(error, ValueError):
+            await respond(content="Sorry, I think you put in the wrong station details, or I just broke.")
+
 
 async def setup(bot: Kukiko) -> None:
     await bot.add_cog(ScotrailCog(bot), guild=discord.Object(id=174702278673039360))
