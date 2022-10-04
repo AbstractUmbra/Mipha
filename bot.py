@@ -38,7 +38,6 @@ from utilities.prefix import callable_prefix as _callable_prefix
 
 if TYPE_CHECKING:
     from extensions.reminders import Reminder
-    from extensions.stats import Stats
 
 LOGGER = logging.getLogger("Kukiko")
 jishaku.Flags.HIDE = True
@@ -62,15 +61,20 @@ class KukikoCommandTree(app_commands.CommandTree):
 
         e = discord.Embed(title="Command Error", colour=0xA32952)
         e.add_field(name="Command", value=interaction.command.name)
+        e.add_field(name="Author", value=interaction.user, inline=False)
+        channel = interaction.channel
+        guild = interaction.guild
+        location_fmt = f"Channel: {channel.name} ({channel.id})"  # type: ignore
+        if guild:
+            location_fmt += f"\nGuild: {guild.name} ({guild.id})"
+        e.add_field(name="Location", value=location_fmt, inline=True)
         (exc_type, exc, tb) = type(error), error, error.__traceback__
         trace = traceback.format_exception(exc_type, exc, tb)
-        e.add_field(name="Error", value=f"```py\n{trace}\n```")
+        clean = "".join(trace)
+        e.description = f"```py\n{clean}\n```"
         e.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        stats: Stats = self.client.get_cog("Stats")  # type: ignore
-        try:
-            await stats.webhook.send(embed=e)
-        except discord.HTTPException:
-            pass
+        await self.client.logging_webhook.send(embed=e)
+        await self.client.owner.send(embed=e)
 
 
 class RemoveNoise(logging.Filter):
@@ -360,6 +364,7 @@ class Kukiko(commands.Bot):
         await self.md_client.close()
         await self.pool.close()
         await super().close()
+        await asyncio.sleep(2)
         await self.session.close()
 
     async def start(self) -> None:
