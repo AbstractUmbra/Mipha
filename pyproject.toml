@@ -47,9 +47,6 @@ combine_star = true
 
 
 [tool.pyright]
-ignore = ["docs/conf.py"]
-exclude = ["_testing/**.py"]
-include = ["bot.py", "utilities/**/*.py", "extensions/**/*.py"]
 useLibraryCodeForTypes = true
 typeCheckingMode = "basic"
 pythonVersion = "3.10"
@@ -69,5 +66,5 @@ reportUnnecessaryTypeIgnoreComment = "warning"
 
 
 [build-system]
-requires = ["poetry-core>=1.1.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
