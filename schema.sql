@@ -58,11 +58,13 @@ CREATE TABLE IF NOT EXISTS commands (
     used TIMESTAMP WITH TIME ZONE,
     prefix TEXT,
     command TEXT,
+    app_command BOOLEAN NOT NULL DEFAULT FALSE,
     failed BOOLEAN
 ) CREATE INDEX IF NOT EXISTS commands_guild_id_idx ON commands (guild_id);
 CREATE INDEX IF NOT EXISTS commands_author_id_idx ON commands (author_id);
 CREATE INDEX IF NOT EXISTS commands_used_idx ON commands (used);
 CREATE INDEX IF NOT EXISTS commands_command_idx ON commands (command);
+CREATE INDEX IF NOT EXISTS commands_app_command_idx ON commands (app_command);
 CREATE INDEX IF NOT EXISTS commands_failed_idx ON commands (failed);
 CREATE TABLE IF NOT EXISTS tags (
     id SERIAL PRIMARY KEY,

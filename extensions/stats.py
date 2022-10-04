@@ -1,9 +1,3 @@
-"""
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at http://mozilla.org/MPL/2.0/.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -11,64 +5,71 @@ import datetime
 import gc
 import io
 import itertools
-import json
 import logging
 import os
 import re
 import sys
 import textwrap
 import traceback
-from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Optional, Union
+from collections import Counter, defaultdict
+from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
 import asyncpg
 import discord
 import pkg_resources
 import psutil
 import pygit2
-from discord.ext import commands, tasks
+from discord.ext import commands, menus, tasks
+from typing_extensions import Annotated
 
 from utilities import formats, time
-from utilities.context import Context
+from utilities.paginator import FieldPageSource, RoboPages
 
 
 if TYPE_CHECKING:
     from bot import Kukiko
+    from utilities.context import Context
 
 log = logging.getLogger(__name__)
 
 LOGGING_CHANNEL = 309632009427222529
 
 
-class GatewayHandler(logging.Handler):
-    def __init__(self, cog: Stats) -> None:
-        self.cog = cog
+class DataBatchEntry(TypedDict):
+    guild: Optional[int]
+    channel: int
+    author: int
+    used: str
+    prefix: str
+    command: str
+    failed: bool
+    app_command: bool
+
+
+class LoggingHandler(logging.Handler):
+    def __init__(self, cog: Stats):
+        self.cog: Stats = cog
         super().__init__(logging.INFO)
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return (
-            record.name == "discord.gateway"
-            or "Shard ID" in record.msg
-            or "Websocket closed " in record.msg
-            or record.name == "hondana.http"
-        )
+        return record.name in ("discord.gateway", "cogs.splatoon")
 
     def emit(self, record: logging.LogRecord) -> None:
         self.cog.add_record(record)
 
 
-_INVITE_REGEX: re.Pattern[str] = re.compile(r"(?:https?:\/\/)?discord(?:\.gg|\.com|app\.com\/invite)?\/[A-Za-z0-9]+")
+_INVITE_REGEX = re.compile(r"(?:https?:\/\/)?discord(?:\.gg|\.com|app\.com\/invite)?\/[A-Za-z0-9]+")
 
 
-def censor_invite(obj: Any, *, _regex: re.Pattern[str] = _INVITE_REGEX) -> str:
+def censor_invite(obj: Any, *, _regex=_INVITE_REGEX) -> str:
     return _regex.sub("[censored-invite]", str(obj))
 
 
-def hex_value(arg: Union[str, bytes, bytearray]) -> int:
+def hex_value(arg: str) -> int:
     return int(arg, base=16)
 
 
-def object_at(addr: Any) -> Optional[int]:
+def object_at(addr: int) -> Optional[Any]:
     for o in gc.get_objects():
         if id(o) == addr:
             return o
@@ -80,33 +81,32 @@ class Stats(commands.Cog):
 
     def __init__(self, bot: Kukiko):
         self.bot: Kukiko = bot
-        self.process: psutil.Process = psutil.Process()
-        self._batch_lock: asyncio.Lock = asyncio.Lock()
-        self._data_batch: list = []
+        self.process = psutil.Process()
+        self._batch_lock = asyncio.Lock()
+        self._data_batch: list[DataBatchEntry] = []
         self.bulk_insert_loop.add_exception_type(asyncpg.PostgresConnectionError)
         self.bulk_insert_loop.start()
-        self._gateway_queue: asyncio.Queue = asyncio.Queue()
-        self.gateway_worker.start()
+        self._logging_queue = asyncio.Queue()
+        self.logging_worker.start()
 
-        self._resumes: list = []
-        self._identifies = defaultdict(list)
+    @property
+    def display_emoji(self) -> discord.PartialEmoji:
+        return discord.PartialEmoji(name="\N{BAR CHART}")
 
-    def _clear_gateway_data(self):
-        one_week_ago = datetime.datetime.utcnow() - datetime.timedelta(days=7)
-        to_remove = [index for index, dt in enumerate(self._resumes) if dt < one_week_ago]
-        for index in reversed(to_remove):
-            del self._resumes[index]
-
-        for _, dates in self._identifies.items():
-            to_remove = [index for index, dt in enumerate(dates) if dt < one_week_ago]
-            for index in reversed(to_remove):
-                del dates[index]
-
-    async def bulk_insert(self):
-        query = """INSERT INTO commands (guild_id, channel_id, author_id, used, prefix, command, failed)
-                   SELECT x.guild, x.channel, x.author, x.used, x.prefix, x.command, x.failed
+    async def bulk_insert(self) -> None:
+        query = """INSERT INTO commands (guild_id, channel_id, author_id, used, prefix, command, failed, app_command)
+                   SELECT x.guild, x.channel, x.author, x.used, x.prefix, x.command, x.failed, x.app_command
                    FROM jsonb_to_recordset($1::jsonb) AS
-                   x(guild BIGINT, channel BIGINT, author BIGINT, used TIMESTAMP, prefix TEXT, command TEXT, failed BOOLEAN)
+                   x(
+                        guild BIGINT,
+                        channel BIGINT,
+                        author BIGINT,
+                        used TIMESTAMP,
+                        prefix TEXT,
+                        command TEXT,
+                        failed BOOLEAN,
+                        app_command BOOLEAN
+                    )
                 """
 
         if self._data_batch:
@@ -118,7 +118,7 @@ class Stats(commands.Cog):
 
     def cog_unload(self):
         self.bulk_insert_loop.stop()
-        self.gateway_worker.cancel()
+        self.logging_worker.cancel()
 
     @tasks.loop(seconds=10.0)
     async def bulk_insert_loop(self):
@@ -126,16 +126,18 @@ class Stats(commands.Cog):
             await self.bulk_insert()
 
     @tasks.loop(seconds=0.0)
-    async def gateway_worker(self):
-        record = await self._gateway_queue.get()
-        await self.notify_gateway_status(record)
+    async def logging_worker(self):
+        record = await self._logging_queue.get()
+        await self.send_log_record(record)
 
     async def register_command(self, ctx: Context) -> None:
         if ctx.command is None:
             return
 
         command = ctx.command.qualified_name
+        is_app_command = ctx.interaction is not None
         self.bot.command_stats[command] += 1
+        self.bot.command_types_used[is_app_command] += 1
         message = ctx.message
         destination = None
         if ctx.guild is None:
@@ -145,7 +147,12 @@ class Stats(commands.Cog):
             destination = f"#{message.channel} ({message.guild})"
             guild_id = ctx.guild.id
 
-        log.info(f"{message.created_at}: {message.author} in {destination}: {message.content}")
+        if ctx.interaction and ctx.interaction.command:
+            content = f"/{ctx.interaction.command.qualified_name}"
+        else:
+            content = message.content
+
+        log.info(f"{message.created_at}: {message.author} in {destination}: {content}")
         async with self._batch_lock:
             self._data_batch.append(
                 {
@@ -153,81 +160,85 @@ class Stats(commands.Cog):
                     "channel": ctx.channel.id,
                     "author": ctx.author.id,
                     "used": message.created_at.isoformat(),
-                    "prefix": ctx.prefix,
+                    "prefix": ctx.prefix,  # type: ignore
                     "command": command,
                     "failed": ctx.command_failed,
+                    "app_command": is_app_command,
                 }
             )
 
     @commands.Cog.listener()
-    async def on_command_completion(self, ctx: Context) -> None:
+    async def on_command_completion(self, ctx: Context):
         await self.register_command(ctx)
 
     @commands.Cog.listener()
-    async def on_socket_event_type(self, event_type: str) -> None:
+    async def on_interaction(self, interaction: discord.Interaction):
+        command = interaction.command
+        # Check if a command is found and it's not a hybrid command
+        # Hybrid commands are already counted via on_command_completion
+        if (
+            command is not None
+            and interaction.type is discord.InteractionType.application_command
+            and not command.__class__.__name__.startswith("Hybrid")  # Kind of awful, but it'll do
+        ):
+            # This is technically bad, but since we only access Command.qualified_name and it's
+            # available on all types of commands then it's fine
+            ctx = await self.bot.get_context(interaction, cls=Context)
+            ctx.command_failed = interaction.command_failed or ctx.command_failed
+            await self.register_command(ctx)
+
+    @commands.Cog.listener()
+    async def on_socket_event_type(self, event_type: str):
         self.bot.socket_stats[event_type] += 1
 
-    @property
+    @discord.utils.cached_property
     def webhook(self) -> discord.Webhook:
-        wh = self.bot.config.LOGGING_WEBHOOK_URL
-        hook = discord.Webhook.from_url(
-            url=wh,
-            session=self.bot.session,
-        )
+        hook = discord.Webhook.from_url(self.bot.config.LOGGING_WEBHOOK_URL, session=self.bot.session)
         return hook
-
-    async def log_error(self, *, ctx: Optional[Context] = None, extra: Optional[str] = None) -> None:
-        e = discord.Embed(title="Error", colour=0xDD5F53)
-        e.description = f"```py\n{traceback.format_exc()}\n```"
-        e.add_field(name="Extra", value=extra, inline=False)
-        e.timestamp = datetime.datetime.utcnow()
-
-        if ctx is not None:
-            fmt = "{0} (ID: {0.id})"
-            author = fmt.format(ctx.author)
-            channel = fmt.format(ctx.channel)
-            guild = "None" if ctx.guild is None else fmt.format(ctx.guild)
-
-            e.add_field(name="Author", value=author)
-            e.add_field(name="Channel", value=channel)
-            e.add_field(name="Guild", value=guild)
-
-        await self.webhook.send(embed=e)
 
     @commands.command(hidden=True)
     @commands.is_owner()
-    async def commandstats(self, ctx: Context, limit: int = 20) -> None:
+    async def commandstats(self, ctx: Context, limit: int = 12):
         """Shows command stats.
 
         Use a negative number for bottom instead of top.
         This is only for the current session.
         """
         counter = self.bot.command_stats
-        width = len(max(counter, key=len))
+        total = sum(counter.values())
+        slash_commands = self.bot.command_types_used[True]
+
+        delta = discord.utils.utcnow() - self.bot.start_time
+        minutes = delta.total_seconds() / 60
+        cpm = total / minutes
 
         if limit > 0:
             common = counter.most_common(limit)
+            title = f"Top {limit} Commands"
         else:
             common = counter.most_common()[limit:]
+            title = f"Bottom {limit} Commands"
 
-        output = "\n".join(f"{k:<{width}}: {c}" for k, c in common)
+        source = FieldPageSource(common, inline=True, clear_description=False)
+        source.embed.title = title
+        source.embed.description = f"{total} total commands used ({slash_commands} slash command uses) ({cpm:.2f}/minute)"
 
-        await ctx.send(f"```\n{output}\n```")
+        pages = RoboPages(source, ctx=ctx, compact=True)
+        await pages.start()
 
     @commands.command(hidden=True)
-    async def socketstats(self, ctx: Context) -> None:
-        """Show data on the received socketstats since uptime."""
-        delta = datetime.datetime.now(datetime.timezone.utc) - self.bot.start_time
+    async def socketstats(self, ctx: Context):
+        delta = discord.utils.utcnow() - self.bot.start_time
         minutes = delta.total_seconds() / 60
         total = sum(self.bot.socket_stats.values())
         cpm = total / minutes
         await ctx.send(f"{total} socket events observed ({cpm:.2f}/minute):\n{self.bot.socket_stats}")
 
     def get_bot_uptime(self, *, brief: bool = False) -> str:
-        return time.human_timedelta(self.bot.start_time, brief=brief, suffix=False)
+        return time.human_timedelta(self.bot.start_time, accuracy=None, brief=brief, suffix=False)
 
     @commands.command()
-    async def uptime(self, ctx: Context) -> None:
+    async def uptime(self, ctx: Context):
         """Tells you how long the bot has been up for."""
         await ctx.send(f"Uptime: **{self.get_bot_uptime()}**")
 
@@ -235,42 +246,41 @@ class Stats(commands.Cog):
         short, _, _ = commit.message.partition("\n")
         short_sha2 = commit.hex[0:6]
         commit_tz = datetime.timezone(datetime.timedelta(minutes=commit.commit_time_offset))
-        commit_time = datetime.datetime.fromtimestamp(commit.commit_time).replace(tzinfo=commit_tz)
+        commit_time = datetime.datetime.fromtimestamp(commit.commit_time).astimezone(commit_tz)
 
         # [`hash`](url) message (offset)
-        offset = time.format_relative(
-            commit_time.astimezone(datetime.timezone.utc).replace(tzinfo=None),
-        )
+        offset = time.format_relative(commit_time.astimezone(datetime.timezone.utc))
         return f"[`{short_sha2}`](https://github.com/AbstractUmbra/Kukiko/commit/{commit.hex}) {short} ({offset})"
 
-    def get_last_commits(self, count: int = 3) -> str:
+    def get_last_commits(self, count=3):
         repo = pygit2.Repository(".git")
         commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL), count))
         return "\n".join(self.format_commit(c) for c in commits)
 
     @commands.command()
-    async def about(self, ctx: Context) -> None:
+    async def about(self, ctx: Context):
         """Tells you information about the bot itself."""
-        assert self.bot.owner_id
 
         revision = self.get_last_commits()
         embed = discord.Embed(description="Latest Changes:\n" + revision)
-        embed.colour = discord.Colour.dark_purple()
+        embed.title = "Official Bot Server Invite"
+        embed.url = "https://discord.gg/DWEaqMy"
+        embed.colour = discord.Colour.blurple()
 
-        owner = self.bot.get_user(self.bot.owner_id)
-        assert owner is not None
-        embed.set_author(name=str(owner), icon_url=owner.display_avatar.url)
+        embed.set_author(name=str(self.bot.owner), icon_url=self.bot.owner.display_avatar.url)
 
         # statistics
-        total_members: int = 0
-
-        total_unique: int = len(self.bot.users)
+        total_members = 0
+        total_unique = len(self.bot.users)
 
         text = 0
         voice = 0
         guilds = 0
         for guild in self.bot.guilds:
             guilds += 1
+            if guild.unavailable:
+                continue
+
             total_members += guild.member_count or 0
             for channel in guild.channels:
                 if isinstance(channel, discord.TextChannel):
@@ -289,20 +299,17 @@ class Stats(commands.Cog):
         embed.add_field(name="Guilds", value=guilds)
         embed.add_field(name="Commands Run", value=sum(self.bot.command_stats.values()))
         embed.add_field(name="Uptime", value=self.get_bot_uptime(brief=True))
-        embed.set_footer(
-            text=f"Made with discord.py v{version}",
-            icon_url="http://i.imgur.com/5BFecvA.png",
-        )
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        embed.set_footer(text=f"Made with discord.py v{version}", icon_url="http://i.imgur.com/5BFecvA.png")
+        embed.timestamp = discord.utils.utcnow()
         await ctx.send(embed=embed)
 
-    def censor_object(self, obj: Any) -> str:
+    def censor_object(self, obj: str | discord.abc.Snowflake) -> str:
         if not isinstance(obj, str) and obj.id in self.bot._blacklist_data:
             return "[censored]"
         return censor_invite(obj)
 
     async def show_guild_stats(self, ctx: Context) -> None:
-        assert ctx.guild is not None
+        assert ctx.guild
 
         lookup = (
             "\N{FIRST PLACE MEDAL}",
@@ -316,12 +323,15 @@ class Stats(commands.Cog):
 
         # total command uses
         query = "SELECT COUNT(*), MIN(used) FROM commands WHERE guild_id=$1;"
-        count = await ctx.db.fetchrow(query, ctx.guild.id)
-        assert count is not None  # can never be None
+        count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id)  # type: ignore
 
         embed.description = f"{count[0]} commands used."
-        embed.set_footer(text="Tracking command usage since")
-        embed.timestamp = count[1] or datetime.datetime.now(datetime.timezone.utc)
+        if count[1]:
+            timestamp = count[1].replace(tzinfo=datetime.timezone.utc)
+        else:
+            timestamp = discord.utils.utcnow()
+
+        embed.set_footer(text="Tracking command usage since").timestamp = timestamp
 
         query = """SELECT command,
                           COUNT(*) as "uses"
@@ -403,7 +413,7 @@ class Stats(commands.Cog):
         await ctx.send(embed=embed)
 
     async def show_member_stats(self, ctx: Context, member: discord.Member) -> None:
-        assert ctx.guild is not None
+        assert ctx.guild
 
         lookup = (
             "\N{FIRST PLACE MEDAL}",
@@ -418,12 +428,15 @@ class Stats(commands.Cog):
 
         # total command uses
         query = "SELECT COUNT(*), MIN(used) FROM commands WHERE guild_id=$1 AND author_id=$2;"
-        count = await ctx.db.fetchrow(query, ctx.guild.id, member.id)
-        assert count is not None  # can never be None
+        count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)  # type: ignore
 
         embed.description = f"{count[0]} commands used."
-        embed.set_footer(text="First command used")
-        embed.timestamp = count[1] or datetime.datetime.now(datetime.timezone.utc)
+        if count[1]:
+            timestamp = count[1].replace(tzinfo=datetime.timezone.utc)
+        else:
+            timestamp = discord.utils.utcnow()
+
+        embed.set_footer(text="First command used").timestamp = timestamp
 
         query = """SELECT command,
                           COUNT(*) as "uses"
@@ -467,7 +480,7 @@ class Stats(commands.Cog):
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @commands.cooldown(1, 30.0, type=commands.BucketType.member)
-    async def stats(self, ctx: Context, *, member: Optional[discord.Member] = None) -> None:
+    async def stats(self, ctx: Context, *, member: discord.Member | None = None):
         """Tells you command usage stats for the server or a member."""
         async with ctx.typing():
             if member is None:
@@ -475,14 +488,13 @@ class Stats(commands.Cog):
             else:
                 await self.show_member_stats(ctx, member)
 
-    @commands.is_owner()
     @stats.command(name="global")
-    async def stats_global(self, ctx: Context) -> None:
+    @commands.is_owner()
+    async def stats_global(self, ctx: Context):
         """Global all time command statistics."""
 
         query = "SELECT COUNT(*) FROM commands;"
-        total = await ctx.db.fetchrow(query)
-        assert total is not None  # can never be None
+        total: tuple[int] = await ctx.db.fetchrow(query)  # type: ignore
 
         e = discord.Embed(title="Command Stats", colour=discord.Colour.blurple())
         e.description = f"{total[0]} commands used."
@@ -545,7 +557,7 @@ class Stats(commands.Cog):
 
     @stats.command(name="today")
     @commands.is_owner()
-    async def stats_today(self, ctx: Context) -> None:
+    async def stats_today(self, ctx: Context):
         """Global command statistics for the day."""
 
         query = "SELECT failed, COUNT(*) FROM commands WHERE used > (CURRENT_TIMESTAMP - INTERVAL '1 day') GROUP BY failed;"
@@ -625,20 +637,16 @@ class Stats(commands.Cog):
         e.add_field(name="Top Users", value="\n".join(value), inline=False)
         await ctx.send(embed=e)
 
-    async def send_guild_stats(self, e: discord.Embed, guild: discord.Guild) -> None:
-        assert guild.owner is not None
-
+    async def send_guild_stats(self, e: discord.Embed, guild: discord.Guild):
         e.add_field(name="Name", value=guild.name)
         e.add_field(name="ID", value=guild.id)
         e.add_field(name="Shard ID", value=guild.shard_id or "N/A")
-        e.add_field(name="Owner", value=f"{guild.owner} (ID: {guild.owner.id})")
+        e.add_field(name="Owner", value=f"{guild.owner} (ID: {guild.owner_id})")
 
         bots = sum(m.bot for m in guild.members)
-        total = guild.member_count or 0
-        online = sum(m.status is discord.Status.online for m in guild.members)
+        total = guild.member_count or 1
         e.add_field(name="Members", value=str(total))
         e.add_field(name="Bots", value=f"{bots} ({bots/total:.2%})")
-        e.add_field(name="Online", value=f"{online} ({online/total:.2%})")
 
         if guild.icon:
             e.set_thumbnail(url=guild.icon.url)
@@ -650,28 +658,28 @@ class Stats(commands.Cog):
 
     @stats_today.before_invoke
     @stats_global.before_invoke
-    async def before_stats_invoke(self, ctx: Context) -> None:
+    async def before_stats_invoke(self, ctx: Context):
         await ctx.typing()
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild) -> None:
+    async def on_guild_join(self, guild: discord.Guild):
         e = discord.Embed(colour=0x53DDA4, title="New Guild")  # green colour
         await self.send_guild_stats(e, guild)
 
     @commands.Cog.listener()
-    async def on_guild_remove(self, guild: discord.Guild) -> None:
+    async def on_guild_remove(self, guild: discord.Guild):
         e = discord.Embed(colour=0xDD5F53, title="Left Guild")  # red colour
         await self.send_guild_stats(e, guild)
 
     @commands.Cog.listener()
-    async def on_command_error(self, ctx: Context, error: commands.CommandError) -> None:
-        assert ctx.command is not None
-
+    async def on_command_error(self, ctx: Context, error: Exception) -> None:
         await self.register_command(ctx)
-        error = getattr(error, "original", error)
+        if not isinstance(error, (commands.CommandInvokeError, commands.ConversionError)):
+            return
 
-        # if isinstance(error, (discord.Forbidden, discord.LoginFailure, discord.NotFound)):
-        #     return
+        error = error.original
+        if isinstance(error, (discord.Forbidden, discord.NotFound, menus.MenuError)):
+            return
 
         e = discord.Embed(title="Command Error", colour=0xCC3366)
         e.add_field(name="Name", value=ctx.command.qualified_name)
@@ -686,47 +694,32 @@ class Stats(commands.Cog):
 
         exc = "".join(traceback.format_exception(type(error), error, error.__traceback__, chain=False))
         e.description = f"```py\n{exc}\n```"
-        e.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        e.timestamp = discord.utils.utcnow()
         await self.webhook.send(embed=e)
 
-        assert self.bot.owner_id
-        umbra = self.bot.get_user(self.bot.owner_id)
-        assert umbra is not None
-        await umbra.send(embed=e)
-
-    @commands.Cog.listener()
-    async def on_socket_raw_send(self, data: str) -> None:
-        # kind of weird way to check if we're sending
-        # IDENTIFY or RESUME
-        if '"op":2' not in data and '"op":6' not in data:
-            return
-
-        back_to_json = json.loads(data)
-        if back_to_json["op"] == 2:
-            payload = back_to_json["d"]
-            inner_shard = payload.get("shard", [0])
-            self._identifies[inner_shard[0]].append(datetime.datetime.utcnow())
-        else:
-            self._resumes.append(datetime.datetime.utcnow())
-
-        # don't want to permanently grow memory
-        self._clear_gateway_data()
-
     def add_record(self, record: logging.LogRecord) -> None:
-        self._gateway_queue.put_nowait(record)
+        # if self.bot.config.debug:
+        #     return
+        self._logging_queue.put_nowait(record)
 
-    async def notify_gateway_status(self, record: logging.LogRecord) -> None:
+    async def send_log_record(self, record: logging.LogRecord) -> None:
         attributes = {"INFO": "\N{INFORMATION SOURCE}", "WARNING": "\N{WARNING SIGN}"}
 
         emoji = attributes.get(record.levelname, "\N{CROSS MARK}")
         dt = datetime.datetime.utcfromtimestamp(record.created)
-        message = record.getMessage()
-        msg = f"{emoji} `[{dt:%Y-%m-%d %H:%M:%S}] {message}`"
-        await self.webhook.send(msg, username="Gateway", avatar_url="https://i.imgur.com/4PnCKB3.png")
+        msg = textwrap.shorten(f"{emoji} {time.format_dt(dt)} {record.message}", width=1990)
+        if record.name == "discord.gateway":
+            username = "Gateway"
+            avatar_url = "https://i.imgur.com/4PnCKB3.png"
+        else:
+            username = f"{record.name} Logger"
+            avatar_url = discord.utils.MISSING
+
+        await self.webhook.send(msg, username=username, avatar_url=avatar_url)
 
     @commands.command(hidden=True)
     @commands.is_owner()
-    async def bothealth(self, ctx: Context) -> None:
+    async def bothealth(self, ctx: Context):
         """Various bot health monitoring tools."""
 
         # This uses a lot of private methods because there is no
@@ -741,13 +734,13 @@ class Stats(commands.Cog):
 
         # Check the connection pool health.
         pool = self.bot.pool
-        total_waiting = len(pool._queue._getters)  # type: ignore # this exists but asyncpg is bad.
+        total_waiting = len(pool._queue._getters)  # type: ignore
         current_generation = pool._generation
 
         description = [
             f"Total `Pool.acquire` Waiters: {total_waiting}",
             f"Current Pool Generation: {current_generation}",
-            f"Connections In Use: {len(pool._holders) - pool._queue.qsize()}",  # type: ignore # this exists but asyncpg is bad.
+            f"Connections In Use: {len(pool._holders) - pool._queue.qsize()}",  # type: ignore
         ]
 
         questionable_connections = 0
@@ -775,7 +768,6 @@ class Stats(commands.Cog):
             total_warnings += 1
 
         all_tasks = asyncio.all_tasks(loop=self.bot.loop)
-
         event_tasks = [t for t in all_tasks if "Client._run_event" in repr(t) and not t.done()]
 
         cogs_directory = os.path.dirname(__file__)
@@ -784,10 +776,7 @@ class Stats(commands.Cog):
 
         bad_inner_tasks = ", ".join(hex(id(t)) for t in inner_tasks if t.done() and t._exception is not None)
         total_warnings += bool(bad_inner_tasks)
-        embed.add_field(
-            name="Inner Tasks",
-            value=f'Total: {len(inner_tasks)}\nFailed: {bad_inner_tasks or "None"}',
-        )
+        embed.add_field(name="Inner Tasks", value=f'Total: {len(inner_tasks)}\nFailed: {bad_inner_tasks or "None"}')
         embed.add_field(name="Events Waiting", value=f"Total: {len(event_tasks)}", inline=False)
 
         command_waiters = len(self._data_batch)
@@ -796,11 +785,7 @@ class Stats(commands.Cog):
 
         memory_usage = self.process.memory_full_info().uss / 1024**2
         cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
-        embed.add_field(
-            name="Process",
-            value=f"{memory_usage:.2f} MiB\n{cpu_usage:.2f}% CPU",
-            inline=False,
-        )
+        embed.add_field(name="Process", value=f"{memory_usage:.2f} MiB\n{cpu_usage:.2f}% CPU", inline=False)
 
         global_rate_limit = not self.bot.http._global_over.is_set()
         description.append(f"Global Rate Limit: {global_rate_limit}")
@@ -818,21 +803,15 @@ class Stats(commands.Cog):
 
     @commands.command(hidden=True, aliases=["cancel_task"])
     @commands.is_owner()
-    async def debug_task(
-        self,
-        ctx: Context,
-        memory_id: int = commands.param(converter=hex_value),
-    ) -> None:
+    async def debug_task(self, ctx: Context, memory_id: Annotated[int, hex_value]):
         """Debug a task by a memory location."""
         task = object_at(memory_id)
         if task is None or not isinstance(task, asyncio.Task):
-            await ctx.send(f"Could not find Task object at {hex(memory_id)}.")
-            return
+            return await ctx.send(f"Could not find Task object at {hex(memory_id)}.")
 
         if ctx.invoked_with == "cancel_task":
             task.cancel()
-            await ctx.send(f"Cancelled task object {task!r}.")
-            return
+            return await ctx.send(f"Cancelled task object {task!r}.")
 
         paginator = commands.Paginator(prefix="```py")
         fp = io.StringIO()
@@ -846,12 +825,11 @@ class Stats(commands.Cog):
         for page in paginator.pages:
             await ctx.send(page)
 
-    async def tabulate_query(self, ctx: Context, query: str, *args: Any) -> None:
+    async def tabulate_query(self, ctx: Context, query: str, *args: Any):
         records = await ctx.db.fetch(query, *args)
 
         if len(records) == 0:
-            await ctx.send("No results found.")
-            return
+            return await ctx.send("No results found.")
 
         headers = list(records[0].keys())
         table = formats.TabularData()
@@ -868,7 +846,7 @@ class Stats(commands.Cog):
 
     @commands.group(hidden=True, invoke_without_command=True)
     @commands.is_owner()
-    async def command_history(self, ctx: Context) -> None:
+    async def command_history(self, ctx: Context):
         """Command history."""
         query = """SELECT
                         CASE failed
@@ -886,7 +864,7 @@ class Stats(commands.Cog):
 
     @command_history.command(name="for")
     @commands.is_owner()
-    async def command_history_for(self, ctx: Context, days: int = 7, *, command: str) -> None:
+    async def command_history_for(self, ctx: Context, days: Annotated[int, Optional[int]] = 7, *, command: str):
         """Command history for a command."""
 
         query = """SELECT *, t.success + t.failed AS "total"
@@ -907,7 +885,7 @@ class Stats(commands.Cog):
 
     @command_history.command(name="guild", aliases=["server"])
     @commands.is_owner()
-    async def command_history_guild(self, ctx: Context, guild: discord.Guild) -> None:
+    async def command_history_guild(self, ctx: Context, guild_id: int):
         """Command history for a guild."""
 
         query = """SELECT
@@ -923,11 +901,11 @@ class Stats(commands.Cog):
                    ORDER BY used DESC
                    LIMIT 15;
                 """
-        await self.tabulate_query(ctx, query, guild.id)
+        await self.tabulate_query(ctx, query, guild_id)
 
     @command_history.command(name="user", aliases=["member"])
     @commands.is_owner()
-    async def command_history_user(self, ctx, user: discord.User) -> None:
+    async def command_history_user(self, ctx: Context, user_id: int):
         """Command history for a user."""
 
         query = """SELECT
@@ -942,11 +920,11 @@ class Stats(commands.Cog):
                    ORDER BY used DESC
                    LIMIT 20;
                 """
-        await self.tabulate_query(ctx, query, user.id)
+        await self.tabulate_query(ctx, query, user_id)
 
     @command_history.command(name="log")
     @commands.is_owner()
-    async def command_history_log(self, ctx: Context, days: int = 7) -> None:
+    async def command_history_log(self, ctx: Context, days: int = 7):
         """Command history log for the last N days."""
 
         query = """SELECT command, COUNT(*)
@@ -970,7 +948,7 @@ class Stats(commands.Cog):
         render = table.render()
 
         embed = discord.Embed(title="Summary", colour=discord.Colour.green())
-        embed.set_footer(text="Since").timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+        embed.set_footer(text="Since").timestamp = discord.utils.utcnow() - datetime.timedelta(days=days)
 
         top_ten = "\n".join(f"{command}: {uses}" for command, uses in records[:10])
         bottom_ten = "\n".join(f"{command}: {uses}" for command, uses in records[-10:])
@@ -983,23 +961,18 @@ class Stats(commands.Cog):
 
         embed.add_field(name="Unused", value=unused, inline=False)
 
-        await ctx.send(
-            embed=embed,
-            file=discord.File(io.BytesIO(render.encode()), filename="full_results.txt"),
-        )
+        await ctx.send(embed=embed, file=discord.File(io.BytesIO(render.encode()), filename="full_results.txt"))
 
     @command_history.command(name="cog")
     @commands.is_owner()
-    async def command_history_cog(self, ctx: Context, days: Optional[int] = 7, *, cog_name: Optional[str] = None) -> None:
+    async def command_history_cog(self, ctx: Context, days: int = 7, *, cog_name: str | None = None):
         """Command history for a cog or grouped by a cog."""
-        assert days is not None  # this is dpy converter goodness
 
         interval = datetime.timedelta(days=days)
         if cog_name is not None:
             cog = self.bot.get_cog(cog_name)
             if cog is None:
-                await ctx.send(f"Unknown cog: {cog_name}")
-                return
+                return await ctx.send(f"Unknown cog: {cog_name}")
 
             query = """SELECT *, t.success + t.failed AS "total"
                        FROM (
@@ -1041,7 +1014,7 @@ class Stats(commands.Cog):
                 self.failed += record["failed"]
                 self.total += record["total"]
 
-        data: defaultdict[str, Count] = defaultdict(Count)
+        data = defaultdict(Count)
         records = await ctx.db.fetch(query, interval)
         for record in records:
             command = self.bot.get_command(record["command"])
@@ -1052,31 +1025,27 @@ class Stats(commands.Cog):
 
         table = formats.TabularData()
         table.set_columns(["Cog", "Success", "Failed", "Total"])
-        sorted_data = sorted(
-            [(cog, e.success, e.failed, e.total) for cog, e in data.items()],
-            key=lambda t: t[-1],
-            reverse=True,
-        )
+        data = sorted([(cog, e.success, e.failed, e.total) for cog, e in data.items()], key=lambda t: t[-1], reverse=True)
 
-        table.add_rows(sorted_data)
+        table.add_rows(data)
         render = table.render()
         await ctx.send(f"```\n{render}\n```")
 
 
+old_on_error = commands.Bot.on_error
+
+
 async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
     (exc_type, exc, tb) = sys.exc_info()
+    # Silence command errors that somehow get bubbled up far enough here
+    if isinstance(exc, commands.CommandInvokeError):
+        return
 
     e = discord.Embed(title="Event Error", colour=0xA32952)
     e.add_field(name="Event", value=event)
-    trace = traceback.format_exception(exc_type, exc, tb)
-    clean = "".join(trace)
-    if len(clean) >= 4000:
-        bytes_ = io.BytesIO(clean.encode())
-        file = discord.File(bytes_, filename="traceback.py")
-    else:
-        e.description = f"```py\n{clean}\n```"
-        file = None
-    e.timestamp = datetime.datetime.now(datetime.timezone.utc)
+    trace = "".join(traceback.format_exception(exc_type, exc, tb))
+    e.description = f"```py\n{trace}\n```"
+    e.timestamp = discord.utils.utcnow()
 
     args_str = ["```py"]
     for index, arg in enumerate(args):
@@ -1084,24 +1053,30 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
     args_str.append("```")
     e.add_field(name="Args", value="\n".join(args_str), inline=False)
     hook = self.get_cog("Stats").webhook
-    if file:
-        await hook.send("<@155863164544614402>", embed=e, file=file)
-    else:
-        await hook.send("<@155863164544614402>", embed=e)
+    try:
+        await hook.send(embed=e)
+    except:
+        pass
 
 
-old_on_error = commands.Bot.on_error
+async def setup(bot: Kukiko):
+    if not hasattr(bot, "command_stats"):
+        bot.command_stats = Counter()
 
+    if not hasattr(bot, "socket_stats"):
+        bot.socket_stats = Counter()
 
-async def setup(bot: Kukiko) -> None:
+    if not hasattr(bot, "command_types_used"):
+        bot.command_types_used = Counter()
+
     cog = Stats(bot)
     await bot.add_cog(cog)
-    bot._stats_cog_gateway_handler = handler = GatewayHandler(cog)
+    bot._stats_cog_gateway_handler = handler = LoggingHandler(cog)
     logging.getLogger().addHandler(handler)
-    commands.Bot.on_error = on_error
+    commands.AutoShardedBot.on_error = on_error
 
 
-async def teardown(bot: Kukiko) -> None:
+async def teardown(bot: Kukiko):
     commands.Bot.on_error = old_on_error
     logging.getLogger().removeHandler(bot._stats_cog_gateway_handler)
     del bot._stats_cog_gateway_handler
