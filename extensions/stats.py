@@ -23,12 +23,12 @@ from discord.ext import commands, menus, tasks
 from typing_extensions import Annotated
 
 from utilities import formats, time
+from utilities.context import Context
 from utilities.paginator import FieldPageSource, RoboPages
 
 
 if TYPE_CHECKING:
     from bot import Kukiko
-    from utilities.context import Context
 
 log = logging.getLogger(__name__)
 
@@ -696,6 +696,7 @@ class Stats(commands.Cog):
         e.description = f"```py\n{exc}\n```"
         e.timestamp = discord.utils.utcnow()
         await self.webhook.send(embed=e)
+        await self.bot.owner.send(embed=e)
 
     def add_record(self, record: logging.LogRecord) -> None:
         # if self.bot.config.debug:
