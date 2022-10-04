@@ -133,6 +133,8 @@ class Kukiko(commands.Bot):
     start_time: datetime.datetime
     command_stats: Counter[str]
     socket_stats: Counter[Any]
+    command_types_used: Counter[bool]
+    bot_app_info: discord.AppInfo
     _original_help_command: commands.HelpCommand | None  # for help command overriding
     _stats_cog_gateway_handler: logging.Handler
 
@@ -184,6 +186,10 @@ class Kukiko(commands.Bot):
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
+
+    @property
+    def owner(self) -> discord.User:
+        return self.bot_app_info.owner
 
     @property
     def config(self) -> _bot_config:  # type: ignore # this actually can be used a type but I guess it's not correct practice.
@@ -294,8 +300,11 @@ class Kukiko(commands.Bot):
 
         return self.logging_webhook.send(embed=embed, wait=True)
 
+    async def get_context(self, origin: discord.Interaction | discord.Message, /, *, cls=Context) -> Context:
+        return await super().get_context(origin, cls=cls)
+
     async def process_commands(self, message: discord.Message, /) -> None:
-        ctx = await self.get_context(message, cls=Context)
+        ctx = await self.get_context(message)
 
         if ctx.command is None:
             return
@@ -371,6 +380,9 @@ class Kukiko(commands.Bot):
         self.md_client = hondana.Client(**self.config.MANGADEX_AUTH, session=self.session)
         self.h_client = nhentaio.Client()
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
+
+        self.bot_app_info = await self.application_info()
+        self.owner_id = self.bot_app_info.owner.id
 
 
 async def main():
