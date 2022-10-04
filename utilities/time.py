@@ -228,7 +228,7 @@ def human_timedelta(
     dt: datetime.datetime,
     *,
     source: datetime.datetime | None = None,
-    accuracy: int = 3,
+    accuracy: int | None = 3,
     brief: bool = False,
     suffix: bool = True,
 ) -> str:

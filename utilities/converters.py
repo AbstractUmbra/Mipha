@@ -226,4 +226,4 @@ class WhenAndWhatConverter(commands.Converter[tuple[datetime.datetime, str]]):
             if what.startswith(prefix):
                 what = what[len(prefix) :]
 
-        return (when, what)
+        return (when, what or "…")
