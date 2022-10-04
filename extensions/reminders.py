@@ -454,7 +454,7 @@ class Reminder(commands.Cog):
             view = ReminderView(url=url, timer=timer, cog=self, author_id=author_id)
 
         try:
-            msg = await channel.send(msg, allowed_mentions=discord.AllowedMentions(users=True))  # type: ignore # can't make this a non-messageable lol
+            msg = await channel.send(msg, allowed_mentions=discord.AllowedMentions(users=True), view=view)  # type: ignore # can't make this a non-messageable lol
         except discord.HTTPException:
             return
         else:
