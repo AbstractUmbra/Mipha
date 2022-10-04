@@ -163,7 +163,9 @@ class TiktokCog(commands.Cog):
                 if message.mentions:
                     content = " ".join(m.mention for m in message.mentions) + "\n\n" + content
 
-                await message.reply(content[:1000], file=file)
+                content = content[:1000] + f"\nRequested by: {message.author} | Replying to: {message.jump_url}"
+
+                await message.channel.send(content, file=file)
                 if message.channel.permissions_for(message.guild.me).manage_messages and any(
                     [
                         DESKTOP_PATTERN.fullmatch(message.content),
