@@ -26,6 +26,71 @@ if TYPE_CHECKING:
     from bot import Kukiko
 
 
+class SnoozeModal(discord.ui.Modal, title="Snooze"):
+    duration = discord.ui.TextInput["ReminderView"](
+        label="Duration", placeholder="10 minutes", default="10 minutes", min_length=2
+    )
+
+    def __init__(self, parent: ReminderView, cog: Reminder, timer: Timer) -> None:
+        super().__init__()
+        self.parent: ReminderView = parent
+        self.timer: Timer = timer
+        self.cog: Reminder = cog
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            when = time.FutureTime(str(self.duration)).dt
+        except Exception:
+            await interaction.response.send_message(
+                'Duration could not be parsed, sorry. Try something like "5 minutes" or "1 hour"', ephemeral=True
+            )
+            return
+
+        self.parent.snooze.disabled = True
+        await interaction.response.edit_message(view=self.parent)
+
+        refreshed = await self.cog.create_timer(
+            when, self.timer.event, *self.timer.args, **self.timer.kwargs, created=interaction.created_at
+        )
+        author_id, _, message = self.timer.args
+        delta = time.human_timedelta(when, source=refreshed.created_at)
+        await interaction.followup.send(
+            f"Alright <@{author_id}>, I've snoozed your reminder for {delta}: {message}", ephemeral=True
+        )
+
+
+class SnoozeButton(discord.ui.Button["ReminderView"]):
+    def __init__(self, cog: Reminder, timer: Timer) -> None:
+        super().__init__(label="Snooze", style=discord.ButtonStyle.blurple)
+        self.timer: Timer = timer
+        self.cog: Reminder = cog
+
+    async def callback(self, interaction: discord.Interaction) -> Any:
+        assert self.view is not None
+        await interaction.response.send_modal(SnoozeModal(self.view, self.cog, self.timer))
+
+
+class ReminderView(discord.ui.View):
+    message: discord.Message
+
+    def __init__(self, *, url: str, timer: Timer, cog: Reminder, author_id: int) -> None:
+        super().__init__(timeout=300)
+        self.author_id: int = author_id
+        self.snooze = SnoozeButton(cog, timer)
+        self.add_item(discord.ui.Button(url=url, label="Go to original message"))
+        self.add_item(self.snooze)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This snooze button is not for you, sorry!", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self) -> None:
+        self.snooze.disabled = True
+        await self.message.edit(view=self)
+
+
 class DucklingConverter(commands.Converter[datetime.datetime]):
     async def get_tz(self, ctx: Context) -> str | None:
         assert ctx.guild is not None
@@ -183,7 +248,7 @@ class Reminder(commands.Cog):
         event_name = f"{timer.event}_timer_complete"
         self.bot.dispatch(event_name, timer)
 
-    async def create_timer(self, when: datetime.datetime, event: str, *args: Any, **kwargs: Any) -> Timer:
+    async def create_timer(self, when: datetime.datetime, event: str, /, *args: Any, **kwargs: Any) -> Timer:
         r"""Creates a timer.
 
         Parameters
@@ -197,9 +262,6 @@ class Reminder(commands.Cog):
             Arguments to pass to the event
         \*\*kwargs
             Keyword arguments to pass to the event
-        connection: asyncpg.Connection
-            Special keyword-only argument to use a specific connection
-            for the DB request.
         created: datetime.datetime
             Special keyword-only argument to use as the creation time.
             Should make the timedeltas a bit more consistent.
@@ -212,10 +274,7 @@ class Reminder(commands.Cog):
         --------
         :class:`Timer`
         """
-        try:
-            connection: asyncpg.Connection | asyncpg.Pool = kwargs.pop("connection")
-        except KeyError:
-            connection = self.bot.pool
+        pool = self.bot.pool
 
         try:
             now: datetime.datetime = kwargs.pop("created")
@@ -234,7 +293,7 @@ class Reminder(commands.Cog):
                    RETURNING id;
                 """
 
-        row: asyncpg.Record = await connection.fetchrow(query, event, {"args": args, "kwargs": kwargs}, when, now)
+        row: asyncpg.Record = await pool.fetchrow(query, event, {"args": args, "kwargs": kwargs}, when, now)
         timer.id = row[0]
 
         # only set the data check if it can be waited on
@@ -276,7 +335,6 @@ class Reminder(commands.Cog):
             ctx.author.id,
             ctx.channel.id,
             parsed_what,
-            connection=ctx.db,
             created=ctx.message.created_at,
             message_id=ctx.message.id,
         )
@@ -389,14 +447,19 @@ class Reminder(commands.Cog):
         guild_id = channel.guild.id if isinstance(channel, (discord.TextChannel, discord.Thread)) else "@me"
         message_id = timer.kwargs.get("message_id")
         msg = f"<@{author_id}>, {timer.human_delta}: {message}"
+        view = discord.utils.MISSING
 
         if message_id:
-            msg = f"{msg}\n\n<https://discordapp.com/channels/{guild_id}/{channel.id}/{message_id}>"
+            url = f"https://discordapp.com/channels/{guild_id}/{channel.id}/{message_id}"
+            view = ReminderView(url=url, timer=timer, cog=self, author_id=author_id)
 
         try:
-            await channel.send(msg, allowed_mentions=discord.AllowedMentions(users=True))  # type: ignore # can't make this a non-messageable lol
+            msg = await channel.send(msg, allowed_mentions=discord.AllowedMentions(users=True))  # type: ignore # can't make this a non-messageable lol
         except discord.HTTPException:
             return
+        else:
+            if view is not discord.utils.MISSING:
+                view.message = msg
 
 
 async def setup(bot: Kukiko) -> None:
