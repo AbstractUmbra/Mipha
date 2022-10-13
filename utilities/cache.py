@@ -12,7 +12,7 @@ import inspect
 import time
 from collections.abc import Awaitable, Callable, Coroutine, MutableMapping
 from functools import wraps
-from typing import Any, Literal, ParamSpec, Protocol, TypeVar, overload
+from typing import Any, Concatenate, Literal, ParamSpec, Protocol, TypeVar, overload
 
 from lru import LRU
 
@@ -20,8 +20,25 @@ from lru import LRU
 P = ParamSpec("P")
 K = TypeVar("K")
 V = TypeVar("V")
-T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
+
+T = TypeVar("T")
+
+
+class locker:
+    def __init__(self, *, lock: asyncio.Lock | None = None) -> None:
+        self.lock: asyncio.Lock | None = lock
+
+    def __call__(
+        self, func: Callable[Concatenate[K, P], Coroutine[Any, Any, T]]
+    ) -> Callable[Concatenate[K, P], Coroutine[Any, Any, T]]:
+        @wraps(func)
+        async def decorator(item: K, *args: P.args, **kwargs: P.kwargs) -> T:
+            self.lock = self.lock or asyncio.Lock()
+            async with self.lock:
+                return await func(item, *args, **kwargs)
+
+        return decorator
 
 
 def _wrap_and_store_coroutine(cache: dict[K, V] | ExpiringCache | LRU, key: K, coro: Awaitable[V]) -> Awaitable[V]:
