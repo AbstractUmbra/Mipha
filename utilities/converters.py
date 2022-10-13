@@ -9,7 +9,9 @@ import re
 import zoneinfo
 from typing import Any, Literal, Sequence, Type, TypedDict
 
+import discord
 import yarl
+from discord import app_commands
 from discord.ext import commands
 from typing_extensions import NotRequired, Self
 
@@ -114,11 +116,11 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
         if ctx.guild is None:
             tz = zoneinfo.ZoneInfo("UTC")
         else:
-            row = await ctx.bot.pool.fetchval(
+            row: str | None = await ctx.bot.pool.fetchval(
                 "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
             )
             if row:
-                tz = zoneinfo.ZoneInfo(row)  # type: ignore # something is wrong with asyncpg
+                tz = zoneinfo.ZoneInfo(row)
             else:
                 tz = zoneinfo.ZoneInfo("UTC")
 
@@ -136,7 +138,7 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
     ) -> list[tuple[datetime.datetime, int, int]]:
         now = now or datetime.datetime.now(datetime.timezone.utc)
 
-        times = []
+        times: list[tuple[datetime.datetime, int, int]] = []
 
         async with ctx.bot.session.post(
             "http://127.0.0.1:7731/parse",
@@ -227,3 +229,82 @@ class WhenAndWhatConverter(commands.Converter[tuple[datetime.datetime, str]]):
                 what = what[len(prefix) :]
 
         return (when, what or "…")
+
+
+class WhenAndWhatTransformer(app_commands.Transformer):
+    @staticmethod
+    async def get_timezone(interaction: discord.Interaction) -> zoneinfo.ZoneInfo | None:
+        if interaction.guild is None:
+            tz = zoneinfo.ZoneInfo("UTC")
+        else:
+            row: str | None = await interaction.client.pool.fetchval(  # type: ignore
+                "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);",
+                interaction.user.id,
+                interaction.guild.id,
+            )
+            if row:
+                tz = zoneinfo.ZoneInfo(row)
+            else:
+                tz = zoneinfo.ZoneInfo("UTC")
+
+        return tz
+
+    @classmethod
+    async def parse(
+        cls,
+        argument: str,
+        /,
+        *,
+        interaction: discord.Interaction,
+        timezone: datetime.tzinfo | None = datetime.timezone.utc,
+        now: datetime.datetime | None = None,
+    ) -> list[tuple[datetime.datetime, int, int]]:
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+
+        times: list[tuple[datetime.datetime, int, int]] = []
+
+        async with interaction.client.session.post(  # type: ignore
+            "http://127.0.0.1:7731/parse",
+            data={
+                "locale": "en_US",
+                "text": argument,
+                "dims": '["time", "duration"]',
+                "tz": str(timezone),
+            },
+        ) as response:
+            data: list[DucklingResponse] = await response.json()
+
+            for time in data:
+                if time["dim"] == "time" and "value" in time["value"]:
+                    times.append(
+                        (
+                            datetime.datetime.fromisoformat(time["value"]["value"]),
+                            time["start"],
+                            time["end"],
+                        )
+                    )
+                elif time["dim"] == "duration":
+                    times.append(
+                        (
+                            datetime.datetime.now(datetime.timezone.utc)
+                            + datetime.timedelta(seconds=time["value"]["normalized"]["value"]),
+                            time["start"],
+                            time["end"],
+                        )
+                    )
+
+        return times
+
+    @classmethod
+    async def transform(cls, interaction: discord.Interaction, value: str) -> datetime.datetime:
+        timezone = await cls.get_timezone(interaction)
+        now = interaction.created_at.astimezone(tz=timezone)
+
+        parsed_times = await cls.parse(value, interaction=interaction, timezone=timezone, now=now)
+
+        if len(parsed_times) == 0:
+            raise commands.BadArgument("Could not parse time.")
+        elif len(parsed_times) > 1:
+            ...  # TODO: Raise on too many?
+
+        return parsed_times[0][0]
