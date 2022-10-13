@@ -119,6 +119,10 @@ class ScotrailCog(commands.Cog):
         async with self.bot.session.get(f"https://scotrail.co.uk/cache/nre/next-trains/{from_}/{to}") as resp:
             data = await resp.text()
 
+        if data == "No services between these stations have been found.":
+            await interaction.followup.send("There are no services between these stations found.")
+            return
+
         soup = bs4.BeautifulSoup(data, "lxml")
         route = Route(soup)
 
