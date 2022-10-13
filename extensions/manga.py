@@ -70,7 +70,7 @@ class MangaView(discord.ui.View):
         self.select.options = options
 
     @discord.ui.select(min_values=1, max_values=1, options=[])
-    async def select(self, interaction: discord.Interaction, item) -> None:
+    async def select(self, interaction: discord.Interaction, item: discord.ui.Select["MangaView"]) -> None:
         assert interaction.user is not None
         assert interaction.channel is not None
         assert not isinstance(interaction.channel, discord.PartialMessageable)
@@ -83,7 +83,7 @@ class MangaView(discord.ui.View):
         await interaction.response.edit_message(content=None, embed=embed, view=self)
 
     @discord.ui.button(label="Follow?", disabled=True)
-    async def follow(self, interaction: discord.Interaction, _) -> None:
+    async def follow(self, interaction: discord.Interaction, _: discord.ui.Button["MangaView"]) -> None:
         assert interaction.user is not None
         if not await self.bot.is_owner(interaction.user):
             raise commands.CheckFailure("You can't follow manga unless you're Umbra.")
@@ -98,11 +98,13 @@ class MangaView(discord.ui.View):
             raise app_commands.CheckFailure("You are not the owner of this interaction.")
         return True
 
-    async def on_error(self, interaction: discord.Interaction, error: Exception, _: discord.ui.Item) -> None:
+    async def on_error(
+        self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError, _: discord.ui.Item["MangaView"]
+    ) -> None:
         if isinstance(error, app_commands.CheckFailure):
             return await interaction.response.send_message("You can't choose someone else's Manga!", ephemeral=True)
         else:
-            raise error
+            await self.bot.tree.on_error(interaction, error)
 
 
 class MangaCog(commands.Cog, name="Manga"):
