@@ -39,10 +39,22 @@ class TiktokCog(commands.Cog):
             callback=self.tiktok_context_menu_callback,
             guild_ids=[174702278673039360, 149998214810959872],
         )
+        self.tiktok_context_menu.error(self.tiktok_context_menu_error)
         self.bot.tree.add_command(self.tiktok_context_menu)
 
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.tiktok_context_menu.name, type=self.tiktok_context_menu.type)
+
+    async def tiktok_context_menu_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        send = (
+            interaction.response.send_message
+            if (not interaction.is_expired() or not interaction.response.is_done())
+            else interaction.followup.send
+        )
+
+        error = getattr(error, "original", error)
+
+        await send("Sorry but something broke. <@155863164544614402> knows and will fix it.")
 
     async def tiktok_context_menu_callback(self, interaction: discord.Interaction, message: discord.Message) -> None:
         await interaction.response.defer(thinking=True)
@@ -51,6 +63,8 @@ class TiktokCog(commands.Cog):
             url = match[1]
         elif match := DESKTOP_PATTERN.search(message.content):
             url = match[1]
+        # elif match := INSTAGRAM_PATTERN.search(message.content):
+        #     url = match[0]
         else:
             await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.")
             return
@@ -158,7 +172,11 @@ class TiktokCog(commands.Cog):
                 if not info:
                     continue
 
-                file, content = self._manipulate_video(info, filesize_limit=message.guild.filesize_limit)
+                try:
+                    file, content = self._manipulate_video(info, filesize_limit=message.guild.filesize_limit)
+                except FilesizeLimitExceeded:
+                    await message.channel.send("The file size limit for this guild was exceeded.")
+                    return
 
                 if message.mentions:
                     content = " ".join(m.mention for m in message.mentions) + "\n\n" + content
@@ -170,6 +188,7 @@ class TiktokCog(commands.Cog):
                     [
                         DESKTOP_PATTERN.fullmatch(message.content),
                         MOBILE_PATTERN.fullmatch(message.content),
+                        # INSTAGRAM_PATTERN.fullmatch(message.content),
                     ]
                 ):
                     await message.delete()
