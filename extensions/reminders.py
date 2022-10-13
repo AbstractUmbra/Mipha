@@ -18,7 +18,7 @@ from typing_extensions import Self
 
 from utilities import formats, time
 from utilities.context import Context
-from utilities.converters import WhenAndWhatConverter
+from utilities.converters import WhenAndWhatConverter, WhenAndWhatTransformer
 from utilities.db import MaybeAcquire
 
 
@@ -39,7 +39,7 @@ class SnoozeModal(discord.ui.Modal, title="Snooze"):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         try:
-            when = time.FutureTime(str(self.duration)).dt
+            when = await WhenAndWhatTransformer.transform(interaction, self.duration.value)
         except Exception:
             await interaction.response.send_message(
                 'Duration could not be parsed, sorry. Try something like "5 minutes" or "1 hour"', ephemeral=True
@@ -89,26 +89,6 @@ class ReminderView(discord.ui.View):
     async def on_timeout(self) -> None:
         self.snooze.disabled = True
         await self.message.edit(view=self)
-
-
-class DucklingConverter(commands.Converter[datetime.datetime]):
-    async def get_tz(self, ctx: Context) -> str | None:
-        assert ctx.guild is not None
-
-        return await ctx.bot.pool.fetchval(
-            "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
-        )  # type: ignore # something is wrong with asyncpg
-
-    async def convert(self, ctx: Context, argument: str) -> datetime.datetime:
-        params = {"locale": "en_US", "text": argument, "dims": str(["time"])}
-        tz = await self.get_tz(ctx)
-        if tz is not None:
-            params["tz"] = tz
-
-        async with ctx.bot.session.post("http://127.0.0.1:7731/parse", data=params) as response:
-            data = await response.json()
-
-        return datetime.datetime.fromisoformat(data[0]["value"]["values"][0]["value"])
 
 
 class Timer:
