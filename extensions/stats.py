@@ -708,7 +708,13 @@ class Stats(commands.Cog):
 
         emoji = attributes.get(record.levelname, "\N{CROSS MARK}")
         dt = datetime.datetime.utcfromtimestamp(record.created)
-        msg = textwrap.shorten(f"{emoji} {time.format_dt(dt)} {record.message}", width=1990)
+
+        if "heartbeat blocked" in record.message:
+            message = formats.to_codeblock(record.message, language="py", escape_md=False)
+        else:
+            message = record.message
+
+        msg = textwrap.shorten(f"{emoji} {time.format_dt(dt)}\n{message}", width=1990)
         if record.name == "discord.gateway":
             username = "Gateway"
             avatar_url = "https://i.imgur.com/4PnCKB3.png"
