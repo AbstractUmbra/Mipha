@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import pathlib
 import re
 from typing import TYPE_CHECKING, Any
@@ -11,6 +10,7 @@ import discord
 import yt_dlp
 from discord import app_commands
 from discord.ext import commands
+from jishaku.shell import ShellReader
 
 
 if TYPE_CHECKING:
@@ -78,7 +78,7 @@ class TiktokCog(commands.Cog):
 
         filesize_limit = (interaction.guild and interaction.guild.filesize_limit) or 8388608
         try:
-            file, content = self._manipulate_video(info, filesize_limit=filesize_limit, loop=loop)
+            file, content = await self._manipulate_video(info, filesize_limit=filesize_limit, loop=loop)
         except FilesizeLimitExceeded as error:
             await interaction.followup.send(content=str(error))
             return
@@ -101,7 +101,7 @@ class TiktokCog(commands.Cog):
 
         return info
 
-    def _manipulate_video(
+    async def _manipulate_video(
         self, info: dict[str, Any], *, filesize_limit: int, loop: asyncio.AbstractEventLoop | None = None
     ) -> tuple[discord.File, str]:
         loop = loop or asyncio.get_running_loop()
@@ -112,7 +112,12 @@ class TiktokCog(commands.Cog):
             file_loc.unlink(missing_ok=True)
             raise FilesizeLimitExceeded(post=False)
 
-        os.system(f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null')
+        with ShellReader(
+            f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null'
+        ) as reader:
+            async for line in reader:
+                self.logger.debug(line)
+
         if fixed_file_loc.stat().st_size > filesize_limit:
             file_loc.unlink(missing_ok=True)
             fixed_file_loc.unlink(missing_ok=True)
@@ -173,7 +178,7 @@ class TiktokCog(commands.Cog):
                     continue
 
                 try:
-                    file, content = self._manipulate_video(info, filesize_limit=message.guild.filesize_limit)
+                    file, content = await self._manipulate_video(info, filesize_limit=message.guild.filesize_limit)
                 except FilesizeLimitExceeded:
                     await message.channel.send("The file size limit for this guild was exceeded.")
                     return
