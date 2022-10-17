@@ -6,9 +6,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generator, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 
 import asyncpg
 import discord
@@ -18,42 +17,92 @@ from .ui import ConfirmationView
 
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from aiohttp import ClientSession
+    from asyncpg import Connection
 
     from bot import Kukiko
 
-__all__ = (
-    "Context",
-    "Interaction",
-)
+
+__all__ = ("Context",)
 
 T = TypeVar("T")
 
 
-class Interaction(discord.Interaction):
-    client: Kukiko
+# For typing purposes, `Context.db` returns a Protocol type
+# that allows us to properly type the return values via narrowing
+# Right now, asyncpg is untyped so this is better than the current status quo
+# To actually receive the regular Pool type `Context.pool` can be used instead.
 
 
-class _ContextDBAcquire:
-    __slots__ = (
-        "ctx",
-        "timeout",
-    )
+class ConnectionContextManager(Protocol):
+    async def __aenter__(self) -> Connection:
+        ...
 
-    def __init__(self, ctx: Context, *, timeout: float | None) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        ...
+
+
+class DatabaseProtocol(Protocol):
+    async def execute(self, query: str, *args: Any, timeout: float | None = None) -> str:
+        ...
+
+    async def fetch(self, query: str, *args: Any, timeout: float | None = None) -> list[Any]:
+        ...
+
+    async def fetchrow(self, query: str, *args: Any, timeout: float | None = None) -> Any | None:
+        ...
+
+    def acquire(self, *, timeout: float | None = None) -> ConnectionContextManager:
+        ...
+
+    def release(self, connection: Connection) -> None:
+        ...
+
+
+class DisambiguatorView(discord.ui.View, Generic[T]):
+    message: discord.Message
+    selected: T
+
+    def __init__(self, ctx: Context, data: list[T], entry: Callable[[T], Any]):
+        super().__init__()
         self.ctx: Context = ctx
-        self.timeout: float | None = timeout
+        self.data: list[T] = data
 
-    def __await__(self) -> Generator[Any, None, asyncpg.Connection | asyncpg.Pool]:
-        return self.ctx._acquire(timeout=self.timeout).__await__()
+        options = []
+        for i, x in enumerate(data):
+            opt = entry(x)
+            if not isinstance(opt, discord.SelectOption):
+                opt = discord.SelectOption(label=str(opt))
+            opt.value = str(i)
+            options.append(opt)
 
-    async def __aenter__(self) -> asyncpg.Pool | asyncpg.Connection:
-        await self.ctx._acquire(timeout=self.timeout)
-        assert isinstance(self.ctx.db, asyncpg.Connection)
-        return self.ctx.db
+        select = discord.ui.Select(options=options)
 
-    async def __aexit__(self, *_) -> None:
-        await self.ctx.release()
+        select.callback = self.on_select_submit
+        self.select = select
+        self.add_item(select)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("This select menu is not meant for you, sorry.", ephemeral=True)
+            return False
+        return True
+
+    async def on_select_submit(self, interaction: discord.Interaction):
+        index = int(self.select.values[0])
+        self.selected = self.data[index]
+        await interaction.response.defer()
+        if not self.message.flags.ephemeral:
+            await self.message.delete()
+
+        self.stop()
 
 
 class Context(commands.Context["Kukiko"]):
@@ -70,18 +119,17 @@ class Context(commands.Context["Kukiko"]):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.pool = self.bot.pool
-        self._db: asyncpg.Connection | asyncpg.Pool | None = None
 
     def __repr__(self) -> str:
         return "<Context>"
 
     @property
-    def db(self) -> asyncpg.Connection | asyncpg.Pool:
-        return self._db if self._db else self.pool
-
-    @property
     def session(self) -> ClientSession:
         return self.bot.session
+
+    @property
+    def db(self) -> DatabaseProtocol:
+        return self.pool  # type: ignore
 
     @discord.utils.cached_property
     def replied_reference(self) -> discord.MessageReference | None:
@@ -89,38 +137,22 @@ class Context(commands.Context["Kukiko"]):
         if ref and isinstance(ref.resolved, discord.Message):
             return ref.resolved.to_reference()
 
-    async def disambiguate(self, matches: list[T], entry: Callable[[T], Any]) -> T:
+    async def disambiguate(self, matches: list[T], entry: Callable[[T], Any], *, ephemeral: bool = False) -> T:
         if len(matches) == 0:
             raise ValueError("No results found.")
 
         if len(matches) == 1:
             return matches[0]
 
-        await self.send("There are too many matches... Which one did you mean? **Only say the number**.")
-        await self.send("\n".join(f"{index}: {entry(item)}" for index, item in enumerate(matches, 1)))
+        if len(matches) > 25:
+            raise ValueError("Too many results... sorry.")
 
-        def check(m):
-            return m.content.isdigit() and m.author.id == self.author.id and m.channel.id == self.channel.id
-
-        await self.release()
-
-        # only give them 3 tries.
-        try:
-            for i in range(3):
-                try:
-                    message = await self.bot.wait_for("message", check=check, timeout=30.0)
-                except asyncio.TimeoutError:
-                    raise ValueError("Took too long. Goodbye.")
-
-                index = int(message.content)
-                try:
-                    return matches[index - 1]
-                except Exception:
-                    await self.send(f"Please give me a valid number. {2 - i} tries remaining...")
-
-            raise ValueError("Too many tries. Goodbye.")
-        finally:
-            await self.acquire()
+        view = DisambiguatorView(self, matches, entry)
+        view.message = await self.send(
+            "There are too many matches... Which one did you mean?", view=view, ephemeral=ephemeral
+        )
+        await view.wait()
+        return view.selected
 
     async def prompt(
         self,
@@ -128,11 +160,9 @@ class Context(commands.Context["Kukiko"]):
         *,
         timeout: float = 60.0,
         delete_after: bool = True,
-        reacquire: bool = True,
         author_id: int | None = None,
     ) -> bool | None:
         """An interactive reaction confirmation dialog.
-
         Parameters
         -----------
         message: str
@@ -141,13 +171,9 @@ class Context(commands.Context["Kukiko"]):
             How long to wait before returning.
         delete_after: bool
             Whether to delete the confirmation message after we're done.
-        reacquire: bool
-            Whether to release the database connection and then acquire it
-            again when we're done.
         author_id: Optional[int]
             The member who should respond to the prompt. Defaults to the author of the
             Context's message.
-
         Returns
         --------
         Optional[bool]
@@ -160,11 +186,9 @@ class Context(commands.Context["Kukiko"]):
         view = ConfirmationView(
             timeout=timeout,
             delete_after=delete_after,
-            reacquire=reacquire,
-            ctx=self,
             author_id=author_id,
         )
-        view.message = await self.send(message, view=view)
+        view.message = await self.send(message, view=view, ephemeral=delete_after)
         await view.wait()
         return view.value
 
@@ -178,17 +202,3 @@ class Context(commands.Context["Kukiko"]):
         if label is not None:
             return f"{emoji}: {label}"
         return emoji
-
-    async def _acquire(self, *, timeout: float | None = None) -> asyncpg.Connection | asyncpg.Pool:
-        if self._db is None:
-            self._db = await self.pool.acquire(timeout=timeout)
-
-        return self._db
-
-    def acquire(self) -> _ContextDBAcquire:
-        return _ContextDBAcquire(self, timeout=None)
-
-    async def release(self) -> None:
-        if self._db is not None:
-            await self.pool.release(self._db)
-            self._db = None

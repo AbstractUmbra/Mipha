@@ -89,7 +89,7 @@ class ScotrailCog(commands.Cog):
 
         self._choices: list[app_commands.Choice[str]] = []
 
-    async def _get_stations(self) -> ...:
+    async def _get_stations(self) -> None:
         async with self.bot.session.get(
             "https://www.scotrail.co.uk/cache/trainline_stations/trainline?_=1530115581789"
         ) as resp:

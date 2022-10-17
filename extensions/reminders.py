@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class SnoozeModal(discord.ui.Modal, title="Snooze"):
-    duration = discord.ui.TextInput["ReminderView"](
+    duration: discord.ui.TextInput[ReminderView] = discord.ui.TextInput["ReminderView"](
         label="Duration", placeholder="10 minutes", default="10 minutes", min_length=2
     )
 

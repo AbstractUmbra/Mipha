@@ -816,7 +816,6 @@ class Mod(commands.Cog):
 
         confirm = await ctx.prompt(
             f"This will ban **{plural(total_members):member}**. Are you sure?",
-            reacquire=False,
         )
         if not confirm:
             return await ctx.send("Aborting.")
@@ -1643,7 +1642,7 @@ class Mod(commands.Cog):
 
         delta = discord.utils.format_dt(duration.dt, style="F")
         warning = f"Are you sure you want to be muted until {delta}?\n**Do not ask the moderators to undo this!**"
-        confirm = await ctx.prompt(warning, reacquire=False)
+        confirm = await ctx.prompt(warning)
         if not confirm:
             return await ctx.send("Aborting", delete_after=5.0)
 

@@ -275,8 +275,8 @@ class Config(commands.Cog):
     ) -> None:
         assert ctx.guild is not None
 
-        async with ctx.acquire():
-            async with ctx.db.transaction():  # type: ignore # this does exist but asyncpg is bad
+        async with ctx.db.acquire() as con:
+            async with con.transaction():
                 query = """
                         SELECT entity_id
                         FROM plonks
@@ -290,7 +290,7 @@ class Config(commands.Cog):
                 to_insert = [(guild_id, e.id) for e in entries if e.id not in current_plonks]
 
                 # do a bulk COPY
-                await ctx.db.copy_records_to_table("plonks", columns=("guild_id", "entity_id"), records=to_insert)
+                await con.copy_records_to_table("plonks", columns=("guild_id", "entity_id"), records=to_insert)
 
                 # invalidate the cache for this guild
                 self.is_plonked.invalidate_containing(f"{ctx.guild.id!r}:")
@@ -352,7 +352,6 @@ class Config(commands.Cog):
             return
 
         entries = [LazyEntity(guild, r[0]) for r in records]
-        await ctx.release()
 
         try:
             page = SimplePages(entries=entries, ctx=ctx, per_page=20)
@@ -469,7 +468,7 @@ class Config(commands.Cog):
         assert ctx.guild is not None
 
         try:
-            await self.command_toggle(ctx.db, ctx.guild.id, ctx.channel.id, command, whitelist=False)
+            await self.command_toggle(ctx.pool, ctx.guild.id, ctx.channel.id, command, whitelist=False)
         except RuntimeError as err:
             await ctx.send(str(err))
         else:
@@ -481,7 +480,7 @@ class Config(commands.Cog):
         assert ctx.guild is not None
 
         try:
-            await self.command_toggle(ctx.db, ctx.guild.id, ctx.channel.id, command, whitelist=True)
+            await self.command_toggle(ctx.pool, ctx.guild.id, ctx.channel.id, command, whitelist=True)
         except RuntimeError as err:
             await ctx.send(str(err))
         else:
@@ -493,7 +492,7 @@ class Config(commands.Cog):
         assert ctx.guild is not None
 
         try:
-            await self.command_toggle(ctx.db, ctx.guild.id, None, command, whitelist=False)
+            await self.command_toggle(ctx.pool, ctx.guild.id, None, command, whitelist=False)
         except RuntimeError as err:
             await ctx.send(str(err))
         else:
@@ -505,7 +504,7 @@ class Config(commands.Cog):
         assert ctx.guild is not None
 
         try:
-            await self.command_toggle(ctx.db, ctx.guild.id, None, command, whitelist=True)
+            await self.command_toggle(ctx.pool, ctx.guild.id, None, command, whitelist=True)
         except RuntimeError as err:
             await ctx.send(str(err))
         else:
@@ -526,7 +525,7 @@ class Config(commands.Cog):
         channel_id = channel.id if channel else None
         human_friendly = channel.mention if channel else "the server"
         try:
-            await self.command_toggle(ctx.db, ctx.guild.id, channel_id, command, whitelist=True)
+            await self.command_toggle(ctx.pool, ctx.guild.id, channel_id, command, whitelist=True)
         except RuntimeError as err:
             await ctx.send(str(err))
         else:
@@ -547,18 +546,11 @@ class Config(commands.Cog):
         channel_id = channel.id if channel else None
         human_friendly = channel.mention if channel else "the server"
         try:
-            await self.command_toggle(ctx.db, ctx.guild.id, channel_id, command, whitelist=False)
+            await self.command_toggle(ctx.pool, ctx.guild.id, channel_id, command, whitelist=False)
         except RuntimeError as err:
             await ctx.send(str(err))
         else:
             await ctx.send(f"Command successfully disabled for {human_friendly}.")
-
-    @server.before_invoke
-    @channel.before_invoke
-    @config_enable.before_invoke
-    @config_disable.before_invoke
-    async def open_database_before_working(self, ctx: Context) -> None:
-        await ctx.acquire()
 
     @config.command(name="disabled")
     @checks.is_mod()

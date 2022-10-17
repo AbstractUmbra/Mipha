@@ -300,6 +300,18 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         timezone = await cls.get_timezone(interaction)
         now = interaction.created_at.astimezone(tz=timezone)
 
+        # Strip some common stuff
+        for prefix in ("me to ", "me in ", "me at ", "me that "):
+            if value.startswith(prefix):
+                value = value[len(prefix) :]
+                break
+
+        for suffix in ("from now",):
+            if value.endswith(suffix):
+                value = value[: -len(suffix)]
+
+        value = value.strip()
+
         parsed_times = await cls.parse(value, interaction=interaction, timezone=timezone, now=now)
 
         if len(parsed_times) == 0:
@@ -307,4 +319,18 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         elif len(parsed_times) > 1:
             ...  # TODO: Raise on too many?
 
-        return parsed_times[0][0]
+        when, begin, end = parsed_times[0]
+
+        if begin != 0 and end != len(value):
+            raise ValueError("Could not distinguish time from argument.")
+
+        if begin == 0:
+            what = value[end + 1 :].lstrip(" ,.!:;")
+        else:
+            what = value[:begin].strip()
+
+        for prefix in ("to ",):
+            if what.startswith(prefix):
+                what = what[len(prefix) :]
+
+        return when

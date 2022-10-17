@@ -159,7 +159,6 @@ class Time(commands.Cog):
                 """
         confirm = await ctx.prompt(
             "This will make your timezone public in this guild, confirm?",
-            reacquire=False,
         )
 
         if not confirm:

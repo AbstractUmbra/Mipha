@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS profiles (
     user_id BIGINT PRIMARY KEY,
     nnid TEXT,
     fc_3ds TEXT,
-    fc_switch TEXT
+    fc_switch TEXT,
+    extra JSONB DEFAULT ('{}'::jsonb) NOT NULL
 );
 CREATE TABLE IF NOT EXISTS reminders (
     id SERIAL PRIMARY KEY,

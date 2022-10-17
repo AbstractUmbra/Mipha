@@ -6,23 +6,15 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import discord
 
 
-if TYPE_CHECKING:
-    from .context import Context
-
-
 class ConfirmationView(discord.ui.View):
-    def __init__(self, *, timeout: float, author_id: int, reacquire: bool, ctx: Context, delete_after: bool) -> None:
+    def __init__(self, *, timeout: float, author_id: int, delete_after: bool) -> None:
         super().__init__(timeout=timeout)
         self.value: bool | None = None
         self.delete_after: bool = delete_after
         self.author_id: int = author_id
-        self.ctx: Context = ctx
-        self.reacquire: bool = reacquire
         self.message: discord.Message | None = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -33,23 +25,32 @@ class ConfirmationView(discord.ui.View):
             return False
 
     async def on_timeout(self) -> None:
-        if self.reacquire:
-            await self.ctx.acquire()
         if self.delete_after and self.message:
-            await self.message.delete()
+            if not self.message.flags.ephemeral:
+                await self.message.delete()
+            else:
+                await self.message.edit(view=None, content="This is safe to dismiss now.")
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.value = True
         await interaction.response.defer()
-        if self.delete_after:
-            await interaction.delete_original_response()
+        if self.delete_after and self.message:
+            if not self.message.flags.ephemeral:
+                await interaction.delete_original_response()
+            else:
+                await interaction.edit_original_response(view=None, content="This is safe to dismiss now.")
+
         self.stop()
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.value = False
         await interaction.response.defer()
-        if self.delete_after:
-            await interaction.delete_original_response()
+        if self.delete_after and self.message:
+            if not self.message.flags.ephemeral:
+                await interaction.delete_original_response()
+            else:
+                await interaction.edit_original_response(view=None, content="This is safe to dismiss now.")
+
         self.stop()

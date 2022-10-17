@@ -213,12 +213,12 @@ class Tags(commands.Cog):
         # since I'm checking for the exception type and acting on it, I need
         # to use the manual transaction blocks
 
-        async with ctx.acquire():
-            tr = ctx.db.transaction()  # type: ignore # this exists but asyncpg is bad.
+        async with ctx.db.acquire() as con:
+            tr = con.transaction()
             await tr.start()
 
             try:
-                await ctx.db.execute(query, name, content, ctx.author.id, ctx.guild.id)
+                await con.execute(query, name, content, ctx.author.id, ctx.guild.id)
             except asyncpg.UniqueViolationError:
                 await tr.rollback()
                 await ctx.send("This tag already exists.")
@@ -362,9 +362,6 @@ class Tags(commands.Cog):
         def check(msg):
             return msg.author == ctx.author and ctx.channel == msg.channel
 
-        # release the connection back to the pool to wait for our user
-        await ctx.release()
-
         try:
             name = await self.bot.wait_for("message", timeout=30.0, check=check)
         except asyncio.TimeoutError:
@@ -385,30 +382,25 @@ class Tags(commands.Cog):
             )
             return
 
-        # reacquire our connection since we need the query
-        await ctx.acquire()
-
         # it's technically kind of expensive to do two queries like this
         # i.e. one to check if it exists and then another that does the insert
         # while also checking if it exists due to the constraints,
         # however for UX reasons I might as well do it.
 
-        query = """SELECT 1 FROM tags WHERE location_id=$1 AND LOWER(name)=$2;"""
-        row = await ctx.db.fetchrow(query, ctx.guild.id, name.lower())
-        if row is not None:
-            await ctx.send(
-                "Sorry. A tag with that name already exists. " f'Redo the command "{ctx.prefix}tag make" to retry.'
-            )
-            return
+        async with ctx.db.acquire() as con:
+            query = """SELECT 1 FROM tags WHERE location_id=$1 AND LOWER(name)=$2;"""
+            row = await con.fetchrow(query, ctx.guild.id, name.lower())
+            if row is not None:
+                await ctx.send(
+                    "Sorry. A tag with that name already exists. " f'Redo the command "{ctx.prefix}tag make" to retry.'
+                )
+                return
 
         self.add_in_progress_tag(ctx.guild.id, name)
         await ctx.send(
             f"Neat. So the name is {name}. What about the tag's content? "
             f"**You can type {ctx.prefix}abort to abort the tag make process.**"
         )
-
-        # release while we wait for response
-        await ctx.release()
 
         try:
             msg = await self.bot.wait_for("message", check=check, timeout=300.0)
@@ -657,7 +649,7 @@ class Tags(commands.Cog):
             await ctx.send("Could not delete tag. Either it does not exist or you do not have permissions to do so.")
             return
 
-        args.append(deleted[0])  # type: ignore # something is wrong with asyncpg
+        args.append(deleted[0])
         query = f"DELETE FROM tags WHERE id=${len(args)} AND {clause};"
         status = await ctx.db.execute(query, *args)
 
@@ -699,10 +691,10 @@ class Tags(commands.Cog):
 
         if bypass_owner_check:
             clause = "id=$1 AND location_id=$2"
-            args = [deleted[0], ctx.guild.id]  # type: ignore # something is wrong with asyncpg
+            args = [deleted[0], ctx.guild.id]
         else:
             clause = "id=$1 AND location_id=$2 AND owner_id=$3"
-            args = [deleted[0], ctx.guild.id, ctx.author.id]  # type: ignore # something is wrong with asyncpg
+            args = [deleted[0], ctx.guild.id, ctx.author.id]
 
         query = f"DELETE FROM tags WHERE {clause};"
         status = await ctx.db.execute(query, *args)
@@ -828,7 +820,6 @@ class Tags(commands.Cog):
                 """
 
         rows = await ctx.db.fetch(query, ctx.guild.id, fmt_member.id)
-        await ctx.release()
 
         if rows:
             p = TagPages(entries=rows, ctx=ctx)
@@ -911,7 +902,6 @@ class Tags(commands.Cog):
                 """
 
         rows = await ctx.db.fetch(query, ctx.guild.id)
-        await ctx.release()
 
         if rows:
             # PSQL orders this oddly for some reason
@@ -976,7 +966,6 @@ class Tags(commands.Cog):
 
         if results:
             p = TagPages(entries=results, per_page=20, ctx=ctx)
-            await ctx.release()
             await p.start()
         else:
             await ctx.send("No tags found.")
@@ -1009,13 +998,13 @@ class Tags(commands.Cog):
             await ctx.send("Tag owner is still in server.")
             return
 
-        async with ctx.acquire():
-            async with ctx.db.transaction():  # type: ignore # this exists asyncpg just sucks
+        async with ctx.db.acquire() as con:
+            async with con.transaction():
                 if not alias:
                     query = "UPDATE tags SET owner_id=$1 WHERE id=$2;"
-                    await ctx.db.execute(query, ctx.author.id, row[0])
+                    await con.execute(query, ctx.author.id, row[0])
                 query = "UPDATE tag_lookup SET owner_id=$1 WHERE tag_id=$2;"
-                await ctx.db.execute(query, ctx.author.id, row[0])
+                await con.execute(query, ctx.author.id, row[0])
 
             await ctx.send("Successfully transferred tag ownership to you.")
 
@@ -1039,12 +1028,12 @@ class Tags(commands.Cog):
             await ctx.send(f'A tag with the name of "{tag}" does not exist or is not owned by you.')
             return
 
-        async with ctx.acquire():
-            async with ctx.db.transaction():  # type: ignore # this exists asyncpg just sucks
+        async with ctx.db.acquire() as con:
+            async with con.transaction():
                 query = "UPDATE tags SET owner_id=$1 WHERE id=$2;"
-                await ctx.db.execute(query, member.id, row[0])
+                await con.execute(query, member.id, row[0])
                 query = "UPDATE tag_lookup SET owner_id=$1 WHERE tag_id=$2;"
-                await ctx.db.execute(query, member.id, row[0])
+                await con.execute(query, member.id, row[0])
 
         await ctx.send(f"Successfully transferred tag ownership to {member}.")
 

@@ -336,10 +336,7 @@ class Kukiko(commands.Bot):
         else:
             self._spammer_count.pop(message.author.id, None)
 
-        try:
-            await self.invoke(ctx)
-        finally:
-            await ctx.release()
+        await self.invoke(ctx)
 
     async def on_message(self, message: discord.Message, /) -> None:
         if message.author.bot:
