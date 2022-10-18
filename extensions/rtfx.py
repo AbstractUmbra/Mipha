@@ -79,7 +79,7 @@ class SourceConverter(commands.Converter[str]):
 
         module = sys.modules[top_level]
 
-        if len(args) == 1:
+        if not args:
             return inspect.getsource(module)
 
         current = top_level
@@ -317,8 +317,10 @@ class RTFX(commands.Cog):
 
         new_target = dedent(target)
 
-        fmt = to_codeblock(new_target, language="py", escape_md=False)
-        await ctx.send(fmt)
+        if len(new_target) < 4000:
+            new_target = to_codeblock(new_target, language="py", escape_md=False)
+
+        await ctx.send(new_target, mystbin_syntax="py")
 
     @rtfs.error
     async def rtfs_error(self, ctx: Context, error: commands.CommandError) -> None:

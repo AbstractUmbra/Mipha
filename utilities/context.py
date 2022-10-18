@@ -224,12 +224,13 @@ class Context(commands.Context["Kukiko"]):
         suppress_embeds: bool = False,
         ephemeral: bool = False,
         mystbin: bool = False,
+        mystbin_syntax: str = "txt",
     ) -> discord.Message:
         content = str(content) if content is not None else None
         if (mystbin and content) or (content and len(content) >= 4000):
             password = secrets.token_urlsafe(10)
             paste = await self.bot.mb_client.create_paste(
-                filename="output.txt",
+                filename=f"output.{mystbin_syntax}",
                 content=content,
                 password=password,
                 expires=(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)),
