@@ -15,13 +15,15 @@ import re
 import sys
 import zlib
 from textwrap import dedent
-from typing import TYPE_CHECKING, Callable, Generator
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import asyncpg  # type: ignore # rtfs
 import discord
 import hondana  # type: ignore # rtfs
 import jishaku  # type: ignore # rtfs
 import mystbin  # type: ignore # rtfs
+from discord import app_commands, ui  # type: ignore # rtfs
 from discord.ext import commands, menus, tasks  # type: ignore # rtfs
 from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
@@ -37,9 +39,15 @@ if TYPE_CHECKING:
 RTFS = (
     "discord",
     "discord.ext.commands",
+    "commands",
     "discord.app_commands",
+    "app_commands",
     "discord.ext.tasks",
+    "tasks",
     "discord.ext.menus",
+    "menus",
+    "discord.ui",
+    "ui",
     "asyncpg",
     "hondana",
     "mystbin",
@@ -64,9 +72,7 @@ class BadSource(commands.CommandError):
 class SourceConverter(commands.Converter[str]):
     async def convert(self, ctx: Context, argument: str) -> str | None:
         args = argument.split(".")
-        top_level = args[0]
-        if top_level in ("commands", "menus", "tasks"):
-            top_level = f"discord.ext.{top_level}"
+        top_level = args.pop(0)
 
         if top_level not in RTFS:
             raise BadSource(f"`{top_level}` is not an allowed sourceable module.")
@@ -76,17 +82,25 @@ class SourceConverter(commands.Converter[str]):
         if len(args) == 1:
             return inspect.getsource(module)
 
-        for item in args[1:]:
+        current = top_level
+
+        recur: ModuleType | Callable[[Any], Any] | property | None = None
+
+        for item in args:
             if item == "":
                 raise BadSource("Don't even try.")
 
-            recur = inspect.getattr_static(module, item, None)
+            if recur:
+                recur = inspect.getattr_static(recur, item, None)
+            else:
+                recur = inspect.getattr_static(module, item, None)
+            current += f".{item}"
 
             if recur is None:
-                raise BadSource(f"{argument} is not a valid module path.")
+                raise BadSource(f"{current} is not a valid module path.")
 
-        if isinstance(recur, property):  # type: ignore # unreachable
-            recur: Callable[..., None] = recur.fget
+        if isinstance(recur, property):
+            recur = recur.fget
 
         return inspect.getsource(recur)  # type: ignore # unreachable
 
@@ -310,8 +324,8 @@ class RTFX(commands.Cog):
     async def rtfs_error(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
 
-        if isinstance(error, TypeError):
-            await ctx.send("Not a valid source-able type or path.")
+        if isinstance(error, (TypeError, BadSource)):
+            await ctx.send(f"Not a valid source-able type or path:-\n\n{error}")
 
     @commands.command(name="pyright", aliases=["pr"])
     async def _pyright(
