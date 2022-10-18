@@ -6,8 +6,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
+import datetime
+import secrets
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Protocol, Sequence, TypeVar
 
 import asyncpg
 import discord
@@ -202,3 +204,53 @@ class Context(commands.Context["Kukiko"]):
         if label is not None:
             return f"{emoji}: {label}"
         return emoji
+
+    async def send(
+        self,
+        content: str | None = None,
+        *,
+        tts: bool = False,
+        embed: discord.Embed | None = None,
+        embeds: Sequence[discord.Embed] | None = None,
+        file: discord.File | None = None,
+        files: Sequence[discord.File] | None = None,
+        stickers: Sequence[discord.GuildSticker | discord.StickerItem] | None = None,
+        delete_after: float | None = None,
+        nonce: str | int | None = None,
+        allowed_mentions: discord.AllowedMentions | None = None,
+        reference: discord.Message | discord.MessageReference | discord.PartialMessage | None = None,
+        mention_author: bool | None = None,
+        view: discord.ui.View | None = None,
+        suppress_embeds: bool = False,
+        ephemeral: bool = False,
+        mystbin: bool = False,
+    ) -> discord.Message:
+        content = str(content) if content is not None else None
+        if (mystbin and content) or (content and len(content) >= 4000):
+            password = secrets.token_urlsafe(10)
+            paste = await self.bot.mb_client.create_paste(
+                filename="output.txt",
+                content=content,
+                password=password,
+                expires=(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)),
+            )
+            assert paste.expires
+            content = f"Sorry, the output was too large but I posted it to mystb.in for you here: https://mystb.in/{paste.id}\n\nThe password is `{password}` and it expires at {discord.utils.format_dt(paste.expires)}"
+
+        return await super().send(
+            content=content,
+            tts=tts,
+            embed=embed,
+            embeds=embeds,
+            file=file,
+            files=files,
+            stickers=stickers,
+            delete_after=delete_after,
+            nonce=nonce,
+            allowed_mentions=allowed_mentions,
+            reference=reference,
+            mention_author=mention_author,
+            view=view,
+            suppress_embeds=suppress_embeds,
+            ephemeral=ephemeral,
+        )
