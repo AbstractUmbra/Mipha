@@ -46,11 +46,7 @@ class TiktokCog(commands.Cog):
         self.bot.tree.remove_command(self.tiktok_context_menu.name, type=self.tiktok_context_menu.type)
 
     async def tiktok_context_menu_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
-        send = (
-            interaction.response.send_message
-            if (not interaction.is_expired() or not interaction.response.is_done())
-            else interaction.followup.send
-        )
+        send = interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
 
         error = getattr(error, "original", error)
 
@@ -66,14 +62,16 @@ class TiktokCog(commands.Cog):
         # elif match := INSTAGRAM_PATTERN.search(message.content):
         #     url = match[0]
         else:
-            await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.")
+            await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.", ephemeral=True)
             return
 
         loop = asyncio.get_running_loop()
 
         info = await self._extract_video_info(url, loop=loop)
         if not info:
-            await interaction.followup.send("This message could not be parsed. Are you sure it's a valid link?")
+            await interaction.followup.send(
+                "This message could not be parsed. Are you sure it's a valid link?", ephemeral=True
+            )
             return
 
         filesize_limit = (interaction.guild and interaction.guild.filesize_limit) or 8388608
