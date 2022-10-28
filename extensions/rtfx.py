@@ -73,6 +73,8 @@ class SourceConverter(commands.Converter[str]):
     async def convert(self, ctx: Context, argument: str) -> str | None:
         args = argument.split(".")
         top_level = args.pop(0)
+        if top_level in ("app_commands",):
+            top_level = f"discord.{top_level}"
 
         if top_level not in RTFS:
             raise BadSource(f"`{top_level}` is not an allowed sourceable module.")
@@ -317,7 +319,7 @@ class RTFX(commands.Cog):
 
         new_target = dedent(target)
 
-        if len(new_target) < 4000:
+        if len(new_target) < 2000:
             new_target = to_codeblock(new_target, language="py", escape_md=False)
 
         await ctx.send(new_target, mystbin_syntax="py")
