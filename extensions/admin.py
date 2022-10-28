@@ -163,6 +163,13 @@ class Admin(commands.Cog):
     async def sync(
         self, ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Literal["~", "*", "^"]] = None
     ) -> None:
+        """
+        Pass guild ids or pass a sync specification:-
+
+        `~` -> Current guild.
+        `*` -> Copies global to current guild.
+        `^` -> Clears all guild commands.
+        """
         assert ctx.guild is not None
 
         if not guilds:
@@ -183,16 +190,16 @@ class Admin(commands.Cog):
             )
             return
 
-        fmt = 0
+        ret = 0
         for guild in guilds:
             try:
                 await ctx.bot.tree.sync(guild=guild)
             except discord.HTTPException:
                 pass
             else:
-                fmt += 1
+                ret += 1
 
-        await ctx.send(f"Synced the tree to {formats.plural(fmt):guild}.")
+        await ctx.send(f"Synced the tree to {formats.plural(ret):guild}.")
 
 
 async def setup(bot: Kukiko):
