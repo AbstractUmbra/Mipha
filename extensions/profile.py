@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import discord
 from discord import app_commands
@@ -84,53 +84,6 @@ def valid_nnid(argument: str) -> str:
     return arg
 
 
-_rank = re.compile(r"^(?P<rank>[AaBbCcSsXx][\+-]?)\s*(?P<number>[0-9]{0,4})$")
-
-
-class SplatoonRank:
-    mode: str
-    rank: str
-    number: str
-
-    def __init__(self, argument: str, *, _rank=_rank):
-        m = _rank.match(argument.strip('"'))
-        if m is None:
-            raise commands.BadArgument("Could not figure out mode or rank.")
-
-        rank = m.group("rank").upper()
-        if rank == "S-":
-            rank = "S"
-
-        number = m.group("number")
-        if number:
-            value = int(number)
-            if value and rank not in ("S+", "X"):
-                raise commands.BadArgument("Only S+ or X can input numbers.")
-            if rank == "S+" and value > 50:
-                raise commands.BadArgument("S+50 is the current cap.")
-
-        self.mode = "All"
-        self.rank = rank
-        self.number = number
-
-    def to_dict(self) -> dict[str, Any]:
-        return {self.mode: {"rank": self.rank, "number": self.number}}
-
-    @classmethod
-    async def transform(cls, interaction: discord.Interaction, value: str) -> Any:
-        return cls(value)
-
-
-def valid_squad(argument: str) -> str:
-    arg = argument.strip('"')
-    if len(arg) > 100:
-        raise commands.BadArgument("Squad name way too long. Keep it less than 100 characters.")
-
-    if arg.startswith("http"):
-        arg = f"<{arg}>"
-    return arg
-
-
 _friend_code = re.compile(r"^(?:(?:SW|3DS)[- _]?)?(?P<one>[0-9]{4})[- _]?(?P<two>[0-9]{4})[- _]?(?P<three>[0-9]{4})$")
 
 
@@ -143,32 +96,12 @@ def valid_fc(argument: str, *, _fc=_friend_code) -> str:
     return "{one}-{two}-{three}".format(**m.groupdict())
 
 
-class SplatoonWeapon(commands.Converter):
-    async def convert(self, ctx: Context, argument: str):
-        cog: Optional[Splatoon] = ctx.bot.get_cog("Splatoon")  # type: ignore
-        if cog is None:
-            raise commands.BadArgument("Splatoon related commands seemingly disabled.")
-
-        query = argument.strip('"')
-        if len(query) < 4:
-            raise commands.BadArgument("Weapon name to query must be over 4 characters long.")
-
-        weapons = cog.get_weapons_named(query)
-
-        try:
-            weapon = await ctx.disambiguate(weapons, lambda w: w.to_select_option(), ephemeral=True)
-        except ValueError:
-            raise commands.BadArgument(
-                f"Could not find a weapon named {discord.utils.escape_mentions(argument)!r}"
-            ) from None
-        else:
-            return weapon
-
-
 class ProfileCreateModal(discord.ui.Modal, title="Create Profile"):
     switch = discord.ui.TextInput(label="Switch Friend Code", placeholder="1234-5678-9012")
+    three_ds = discord.ui.TextInput(label="3DS Friend Code", placeholder="1234-5678-9012")
+    wii_u = discord.ui.TextInput(label="Wii U Friend Code", placeholder="1234-5678-9012")
 
-    def __init__(self, cog: Profile, ctx: Context):
+    def __init__(self, cog: Profile, ctx: Context) -> None:
         super().__init__()
         self.cog: Profile = cog
         self.ctx: Context = ctx
@@ -176,26 +109,29 @@ class ProfileCreateModal(discord.ui.Modal, title="Create Profile"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
 
-        fc_switch: str
         extra = {}
         try:
             fc_switch = valid_fc(str(self.switch.value))
+            fc_wii_u = valid_nnid(str(self.wii_u.value))
+            fc_three_ds = valid_fc(str(self.three_ds.value))
 
         except commands.BadArgument as e:
             await interaction.followup.send(f"Sorry, an error happened while setting up your profile:\n{e}", ephemeral=True)
             return
 
         query = """
-            INSERT INTO profiles (id, fc_switch, extra)
-            VALUES ($1, $2, $3::jsonb)
+            INSERT INTO profiles (id, fc_switch, fc_3ds, nnid, extra)
+            VALUES ($1, $2, $3, $4, $5::jsonb)
             ON CONFLICT (id)
             DO UPDATE
-            SET fc_switch = EXCLUDED.fc_switch,
+            SET fc_switch = profiles.fc_switch || EXCLUDED.fc_switch,
+                fc_3ds =  profiles.fc_3ds || EXCLUDED.fc_3ds,
+                nnid = profiles.nnid || EXCLUDED.nnid,
                 extra = profiles.extra || EXCLUDED.extra;
         """
 
         try:
-            await self.ctx.db.execute(query, self.ctx.author.id, fc_switch, extra)
+            await self.ctx.db.execute(query, self.ctx.author.id, fc_switch, fc_three_ds, fc_wii_u, extra)
         except Exception as e:
             await interaction.followup.send(f"Sorry, an error happened while setting up your profile:\n{e}", ephemeral=True)
         else:
@@ -203,7 +139,7 @@ class ProfileCreateModal(discord.ui.Modal, title="Create Profile"):
 
 
 class PromptProfileCreationView(discord.ui.View):
-    def __init__(self, cog: Profile, ctx: Context):
+    def __init__(self, cog: Profile, ctx: Context) -> None:
         super().__init__()
         self.cog: Profile = cog
         self.ctx: Context = ctx
@@ -220,9 +156,9 @@ class PromptProfileCreationView(discord.ui.View):
 
 
 class Profile(commands.Cog):
-    """Manage your Splatoon profile"""
+    """Manage your Nintendo profiles."""
 
-    def __init__(self, bot: Kukiko):
+    def __init__(self, bot: Kukiko) -> None:
         self.bot: Kukiko = bot
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError):
@@ -371,7 +307,7 @@ class Profile(commands.Cog):
     @profile.command()
     @app_commands.describe(query="The search query, must be at least 3 characters")
     async def search(self, ctx: Context, *, query: str):
-        """Searches profiles via either friend code, NNID, or Squad.
+        """Searches profiles via either friend code or NNID.
 
         The query must be at least 3 characters long.
 
