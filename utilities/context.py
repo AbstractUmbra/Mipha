@@ -11,7 +11,6 @@ import secrets
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic, Protocol, Sequence, TypeVar
 
-import asyncpg
 import discord
 from discord.ext import commands
 
@@ -61,6 +60,9 @@ class DatabaseProtocol(Protocol):
     async def fetchrow(self, query: str, *args: Any, timeout: float | None = None) -> Any | None:
         ...
 
+    async def fetchval(self, query: str, *args: Any, timeout: float | None = None) -> Any | None:
+        ...
+
     def acquire(self, *, timeout: float | None = None) -> ConnectionContextManager:
         ...
 
@@ -85,7 +87,7 @@ class DisambiguatorView(discord.ui.View, Generic[T]):
             opt.value = str(i)
             options.append(opt)
 
-        select = discord.ui.Select(options=options)
+        select = discord.ui.Select["DisambiguatorView"](options=options)
 
         select.callback = self.on_select_submit
         self.select = select
@@ -108,15 +110,11 @@ class DisambiguatorView(discord.ui.View, Generic[T]):
 
 
 class Context(commands.Context["Kukiko"]):
-    _db: asyncpg.Connection | asyncpg.Pool | None
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
     bot: Kukiko
     command: commands.Command[Any, ..., Any]
 
-    __slots__ = (
-        "pool",
-        "_db",
-    )
+    __slots__ = ("pool",)
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -227,7 +225,7 @@ class Context(commands.Context["Kukiko"]):
         mystbin_syntax: str = "txt",
     ) -> discord.Message:
         content = str(content) if content is not None else None
-        if (mystbin and content) or (content and len(content) >= 4000):
+        if (mystbin and content) or (content and len(content) >= 2000):
             password = secrets.token_urlsafe(10)
             paste = await self.bot.mb_client.create_paste(
                 filename=f"output.{mystbin_syntax}",
