@@ -25,7 +25,7 @@ from discord.ext import commands, tasks
 from utilities import cache, checks, time
 from utilities.context import Context
 from utilities.converters import DatetimeConverter, WhenAndWhatConverter
-from utilities.formats import format_dt, plural
+from utilities.formats import plural
 
 
 if TYPE_CHECKING:
@@ -433,7 +433,7 @@ class Mod(commands.Cog):
         e.timestamp = now
         e.set_author(name=str(member), icon_url=member.avatar.url)
         e.add_field(name="ID", value=member.id)
-        e.add_field(name="Joined", value=format_dt(member.joined_at, "F"))
+        e.add_field(name="Joined", value=discord.utils.format_dt(member.joined_at, "F"))
         e.add_field(name="Created", value=time.format_relative(member.created_at), inline=False)
 
         if config.broadcast_channel:
@@ -1139,7 +1139,7 @@ class Mod(commands.Cog):
         if reminder is None:
             return await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
 
-        until = f"until {format_dt(duration, 'F')}"
+        until = f"until {discord.utils.format_dt(duration, 'F')}"
 
         reason = safe_reason_append(reason, until)
         await ctx.guild.ban(member, reason=reason)

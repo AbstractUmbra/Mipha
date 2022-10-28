@@ -5,7 +5,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import codecs
-import datetime
 import json
 import re
 import sys
@@ -106,12 +105,6 @@ class TabularData:
 
         to_draw.append(sep)
         return "\n".join(to_draw)
-
-
-def format_dt(dt: datetime.datetime, style: str | None = None) -> str:
-    if style is None:
-        return f"<t:{int(dt.timestamp())}>"
-    return f"<t:{int(dt.timestamp())}:{style}>"
 
 
 def to_codeblock(

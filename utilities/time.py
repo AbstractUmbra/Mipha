@@ -12,9 +12,10 @@ import re
 import parsedatetime as pdt
 from dateutil.relativedelta import relativedelta
 from discord.ext import commands
+from discord.utils import format_dt
 
 from .context import Context
-from .formats import format_dt, human_join, plural
+from .formats import human_join, plural
 
 
 # Monkey patch mins and secs into the units
