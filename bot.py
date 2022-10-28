@@ -386,22 +386,26 @@ class Kukiko(commands.Bot):
 
 
 async def main():
-    async with Kukiko() as bot:
-        pool = await asyncpg.create_pool(
-            dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
-        )
-
+    async with Kukiko() as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
+        dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
+    ) as pool:
         if pool is None:
             # thanks asyncpg...
             raise RuntimeError("Could not connect to database.")
         bot.pool = pool
 
-        session = aiohttp.ClientSession()
         bot.session = session
 
         with SetupLogging():
             await bot.load_extension("jishaku")
-            for file in pathlib.Path("extensions").glob("**/[!_]*.py"):
+            for file in pathlib.Path("extensions").iterdir():
+                if file.name.startswith("_"):
+                    continue
+                if file.is_dir():
+                    try:
+                        await bot.load_extension(str(file))
+                    finally:
+                        continue
                 ext = ".".join(file.parts).removesuffix(".py")
                 try:
                     await bot.load_extension(ext)
