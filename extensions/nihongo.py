@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import datetime
+import logging
 import random
 import time
 from collections import defaultdict
@@ -21,7 +23,7 @@ import aiohttp
 import bs4
 import discord
 import pykakasi
-from discord.ext import commands
+from discord.ext import commands, tasks
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from utilities.context import Context
@@ -67,6 +69,8 @@ JLPT_LOOKUP = MemeDict(
         ("n5", "ｎ５", "5", "５"): JLPT_N5,
     }
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _create_kakasi() -> pykakasi.kakasi:
@@ -398,6 +402,10 @@ class Nihongo(commands.Cog):
     def __init__(self, bot: Kukiko):
         self.bot = bot
         self.converter = _create_kakasi()
+        self.nihongo_reminders.start()
+
+    def cog_unload(self) -> None:
+        self.nihongo_reminders.cancel()
 
     @commands.command()
     async def romaji(self, ctx: Context, *, text: commands.clean_content):
@@ -664,6 +672,34 @@ class Nihongo(commands.Cog):
         source = SimpleListSource(embeds)
         menu = RoboPages(source=source, ctx=ctx)
         await menu.start()
+
+    @tasks.loop(hours=24)
+    async def nihongo_reminders(self) -> None:
+        message = "Hey <@155863164544614402>, you need to study Japanese now."
+        dm_channel = self.bot.owner.dm_channel or await self.bot.owner.create_dm()
+        await dm_channel.send(message, allowed_mentions=discord.AllowedMentions(users=True))
+
+        target_date = datetime.datetime(
+            year=2023, month=8, day=25, hour=9, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc
+        )
+        now = datetime.datetime.now(datetime.timezone.utc)
+        delta = target_date - now
+
+        await self.bot.change_presence(activity=discord.Game(name=f"{delta.days} until my owner's holiday!!"))
+
+    @nihongo_reminders.before_loop
+    async def before_nihongo_reminder(self) -> None:
+        await self.bot.wait_until_ready()
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if now.hour > 18:
+            LOGGER.info("After 6pm, sleeping until tomorrow.")
+            sleep_until = now + datetime.timedelta(days=1)
+            sleep_until = sleep_until.replace(hour=18, minute=0, second=0, microsecond=0)
+        else:
+            sleep_until = now.replace(hour=18, minute=0, second=0, microsecond=0)
+
+        await discord.utils.sleep_until(sleep_until)
 
 
 async def setup(bot: Kukiko) -> None:
