@@ -6,15 +6,19 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import datetime
 import inspect
 import json
 import os
+import traceback
 import unicodedata
 from collections import Counter
 from typing import TYPE_CHECKING
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from utilities import checks, formats, time
@@ -38,15 +42,82 @@ class Prefix(commands.Converter):
         return argument
 
 
+_current = contextvars.ContextVar[discord.Interaction]("_current")
+
+
+class PatchedContext(Context):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.first_interaction_sent: bool = False
+
+    async def send(self, content: str | None = None, /, **kwargs) -> discord.Message | None:
+        if not self.first_interaction_sent:
+            self.first_interaction_sent = True
+
+            kwargs.pop("allowed_mentions", None)
+
+            return await _current.get().response.send_message(content=content, ephemeral=False, **kwargs)
+        else:
+            return await super().send(content=content, **kwargs)
+
+    @contextlib.asynccontextmanager
+    async def typing(self):
+        yield
+
+
 class Meta(commands.Cog):
     """Commands for utilities related to Discord or the Bot itself."""
 
     def __init__(self, bot: Kukiko) -> None:
         self.bot = bot
+        self.interpret_as_command_ctx_menu = app_commands.ContextMenu(
+            name="Interpret as Command", callback=self.interpret_as_command_callback
+        )
+        self.bot.tree.add_command(self.interpret_as_command_ctx_menu)
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         if isinstance(error, commands.BadArgument):
             await ctx.send(str(error))
+
+    def cog_unload(self) -> None:
+        self.bot.tree.remove_command(self.interpret_as_command_ctx_menu.name, type=self.interpret_as_command_ctx_menu.type)
+
+    async def interpret_as_command_callback(self, interaction: discord.Interaction, message: discord.Message, /) -> None:
+        if message.author.bot:
+            return await interaction.response.send_message(
+                "Sorry I won't invoke commands based on a bot's messages.", ephemeral=True
+            )
+
+        if interaction.user.id != message.author.id:
+            return await interaction.response.send_message(content="Sorry, this is not your message.", ephemeral=True)
+
+        context = await self.bot.get_context(message, cls=PatchedContext)
+
+        if not context.valid:
+            return await interaction.response.send_message(
+                content="Sorry this doesn't look like a command for me.", ephemeral=True
+            )
+
+        _current.set(interaction)
+        ticks = "`" * 3
+
+        try:
+            await context.command.invoke(context)
+        except (
+            commands.UserInputError,
+            commands.CheckFailure,
+            commands.DisabledCommand,
+            commands.CommandOnCooldown,
+            commands.MaxConcurrencyReached,
+        ) as err:
+            await interaction.response.send_message(content=f"{type(err).__name__}: {err}")
+        except Exception as err:
+            info = "".join(traceback.format_exception(type(err), err, err.__traceback__, 2))
+            await interaction.response.send_message(content=f"Some exception occurred, sorry:-\n{ticks}py\n{info}\n{ticks}")
+            raise
+
+        if not context.first_interaction_sent:
+            await interaction.response.send_message(content="Command finished with no output.", ephemeral=True)
 
     @commands.command()
     async def ping(self, ctx: Context) -> None:
