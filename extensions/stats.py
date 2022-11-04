@@ -1080,7 +1080,7 @@ async def setup(bot: Kukiko):
     await bot.add_cog(cog)
     bot._stats_cog_gateway_handler = handler = LoggingHandler(cog)
     logging.getLogger().addHandler(handler)
-    commands.AutoShardedBot.on_error = on_error
+    commands.Bot.on_error = on_error
 
 
 async def teardown(bot: Kukiko):
