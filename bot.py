@@ -15,7 +15,7 @@ import sys
 import traceback
 from collections import Counter, deque
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, overload
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, TypeVar, overload
 
 import aiohttp
 import asyncpg
@@ -45,6 +45,8 @@ jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.NO_DM_TRACEBACK = True
 INTENTS = discord.Intents(_bot_config.INTENTS)
+
+CtxT = TypeVar("CtxT", bound=Context)
 
 
 class KukikoCommandTree(app_commands.CommandTree):
@@ -304,8 +306,8 @@ class Kukiko(commands.Bot):
 
         return self.logging_webhook.send(embed=embed, wait=True)
 
-    async def get_context(self, origin: discord.Interaction | discord.Message, /, *, cls=Context) -> Context:
-        return await super().get_context(origin, cls=cls)
+    async def get_context(self, origin: discord.Interaction | discord.Message, /, *, cls: type[CtxT] = Context) -> CtxT:
+        return await super().get_context(origin, cls=cls)  # type: ignore # yeah I'm not too sure
 
     async def process_commands(self, message: discord.Message, /) -> None:
         ctx = await self.get_context(message)
@@ -360,7 +362,6 @@ class Kukiko(commands.Bot):
         await self.md_client.logout()
         await self.pool.close()
         await super().close()
-        await self.session.close()
 
     async def start(self) -> None:
         try:
@@ -398,14 +399,9 @@ async def main():
 
         with SetupLogging():
             await bot.load_extension("jishaku")
-            for file in pathlib.Path("extensions").iterdir():
+            for file in pathlib.Path("extensions").glob("**/[!_]*.py"):
                 if file.name.startswith("_"):
                     continue
-                if file.is_dir():
-                    try:
-                        await bot.load_extension(str(file))
-                    finally:
-                        continue
                 ext = ".".join(file.parts).removesuffix(".py")
                 try:
                     await bot.load_extension(ext)
