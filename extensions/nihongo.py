@@ -31,6 +31,7 @@ from utilities.converters import MemeDict
 from utilities.formats import plural, to_codeblock
 from utilities.nihongo import JishoWord, KanjiDevKanji, KanjiDevWords
 from utilities.paginator import RoboPages, SimpleListSource
+from utilities.time import human_timedelta
 
 
 if TYPE_CHECKING:
@@ -402,10 +403,12 @@ class Nihongo(commands.Cog):
     def __init__(self, bot: Kukiko):
         self.bot = bot
         self.converter = _create_kakasi()
-        self.nihongo_reminders.start()
+        self.nihongo_study_reminders.start()
+        self.nihon_travel_reminders.start()
 
     def cog_unload(self) -> None:
-        self.nihongo_reminders.cancel()
+        self.nihongo_study_reminders.cancel()
+        self.nihon_travel_reminders.cancel()
 
     @commands.command()
     async def romaji(self, ctx: Context, *, text: commands.clean_content):
@@ -674,20 +677,26 @@ class Nihongo(commands.Cog):
         await menu.start()
 
     @tasks.loop(hours=24)
-    async def nihongo_reminders(self) -> None:
+    async def nihongo_study_reminders(self) -> None:
         message = "Hey <@155863164544614402>, you need to study Japanese now."
         dm_channel = self.bot.owner.dm_channel or await self.bot.owner.create_dm()
         await dm_channel.send(message, allowed_mentions=discord.AllowedMentions(users=True))
 
+    @tasks.loop(hours=1)
+    async def nihon_travel_reminders(self) -> None:
         target_date = datetime.datetime(
             year=2023, month=8, day=25, hour=9, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc
         )
-        now = datetime.datetime.now(datetime.timezone.utc)
-        delta = target_date - now
 
-        await self.bot.change_presence(activity=discord.Game(name=f"{delta.days} until my owner's holiday!!"))
+        hf_time = human_timedelta(target_date, accuracy=5)
 
-    @nihongo_reminders.before_loop
+        await self.bot.change_presence(activity=discord.Game(name=f"{hf_time} until my owner's holiday!!"))
+
+    @nihon_travel_reminders.before_loop
+    async def before_travel_reminder(self) -> None:
+        await self.bot.wait_until_ready()
+
+    @nihongo_study_reminders.before_loop
     async def before_nihongo_reminder(self) -> None:
         await self.bot.wait_until_ready()
 
