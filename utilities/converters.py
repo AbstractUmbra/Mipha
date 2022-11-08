@@ -67,7 +67,7 @@ class RedditMediaURL:
         except Exception:
             raise commands.BadArgument("Not a valid URL.")
 
-        headers = {"User-Agent": "Discord:Kukiko:v1.0 (by /u/AbstractUmbra)"}
+        headers = {"User-Agent": "Discord:mipha:v1.0 (by /u/AbstractUmbra)"}
         await ctx.typing()
         if url.host == "v.redd.it":
             # have to do a request to fetch the 'main' URL.

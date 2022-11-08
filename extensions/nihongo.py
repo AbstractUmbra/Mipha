@@ -37,7 +37,7 @@ from utilities.time import human_timedelta
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from bot import Kukiko
+    from bot import Mipha
     from utilities._types.nihongo import (
         JishoWordsResponse,
         KanjiDevKanjiPayload,
@@ -400,7 +400,7 @@ class KanjiEmbed(discord.Embed):
 class Nihongo(commands.Cog):
     """The description for Nihongo goes here."""
 
-    def __init__(self, bot: Kukiko):
+    def __init__(self, bot: Mipha):
         self.bot = bot
         self.converter = _create_kakasi()
         self.nihongo_study_reminders.start()
@@ -711,5 +711,5 @@ class Nihongo(commands.Cog):
         await discord.utils.sleep_until(sleep_until)
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Nihongo(bot))

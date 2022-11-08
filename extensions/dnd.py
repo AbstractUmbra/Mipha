@@ -18,7 +18,7 @@ from utilities.formats import to_codeblock
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 DICE_RE = re.compile(r"(?P<rolls>[0-9]+)d(?P<die>[0-9]+)(?P<mod>[\+\-][0-9]+)?")
 
@@ -65,8 +65,8 @@ class DiceRoll(commands.Converter[Roll]):
 
 
 class DnD(commands.GroupCog, name="dnd"):
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
         self._classes: list[str] | None = None
         super().__init__()
 
@@ -130,5 +130,5 @@ class DnD(commands.GroupCog, name="dnd"):
             return
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(DnD(bot))

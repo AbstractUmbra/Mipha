@@ -1,7 +1,7 @@
-# Kukiko
+# Mipha
 
-Kukiko is a private and personal use Discord bot.
-Kukiko started as a fork of [R. Danny](https://github.com/Rapptz/RoboDanny) which I have now modified greatly.
+Mipha is a private and personal use Discord bot.
+Mipha started as a fork of [R. Danny](https://github.com/Rapptz/RoboDanny) which I have now modified greatly.
 
 This is also my testing bot for the latest release of [discord.py](https://github.com/Rapptz/discord.py).
 

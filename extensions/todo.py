@@ -18,7 +18,7 @@ from utilities.paginator import RoboPages, SimpleListSource
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 
 class Todo(commands.Cog):
@@ -26,7 +26,7 @@ class Todo(commands.Cog):
     A cog for 'todo' management and information.
     """
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
 
     def _gen_todos(self, records: list[asyncpg.Record]) -> list[discord.Embed]:

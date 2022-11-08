@@ -1,8 +1,8 @@
 {
     "apps": [
         {
-            "name": "Kukiko",
-            "cwd": "/home/penumbra/projects/personal/kukiko/",
+            "name": "Mipha",
+            "cwd": "/home/penumbra/projects/personal/mipha/",
             "script": "bot.py",
             "autorestart": true,
             "max_restart": 5,

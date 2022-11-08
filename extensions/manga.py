@@ -24,7 +24,7 @@ from utilities.paginator import MangaDexEmbed
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 
 LOG = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ LOG = logging.getLogger(__name__)
 
 class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hondana.Author]):
     def lookup(
-        self, bot: Kukiko, item: str
+        self, bot: Mipha, item: str
     ) -> Callable[[str], Coroutine[None, None, hondana.Manga | hondana.Chapter | hondana.Author]] | None:
         table = {
             "title": bot.md_client.get_manga,
@@ -56,9 +56,9 @@ class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hon
 
 
 class MangaView(discord.ui.View):
-    def __init__(self, user: discord.abc.Snowflake, bot: Kukiko, manga: list[hondana.Manga], /) -> None:
+    def __init__(self, user: discord.abc.Snowflake, bot: Mipha, manga: list[hondana.Manga], /) -> None:
         self.user: discord.abc.Snowflake = user
-        self.bot: Kukiko = bot
+        self.bot: Mipha = bot
         self.manga_id: str | None = None
         options: list[discord.SelectOption] = []
         for idx, mango in enumerate(manga, start=1):
@@ -112,7 +112,7 @@ class MangaCog(commands.Cog, name="Manga"):
     Cog to assist with Mangadex related things.
     """
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.webhook = discord.Webhook.from_url(bot.config.MANGADEX_WEBHOOK, session=bot.session)
         self.get_personal_feed.add_exception_type(hondana.APIException)
@@ -302,5 +302,5 @@ class MangaCog(commands.Cog, name="Manga"):
         self.get_personal_feed.cancel()
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(MangaCog(bot))

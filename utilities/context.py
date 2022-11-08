@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from aiohttp import ClientSession
     from asyncpg import Connection
 
-    from bot import Kukiko
+    from bot import Mipha
 
 
 __all__ = ("Context",)
@@ -109,9 +109,9 @@ class DisambiguatorView(discord.ui.View, Generic[T]):
         self.stop()
 
 
-class Context(commands.Context["Kukiko"]):
+class Context(commands.Context["Mipha"]):
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
-    bot: Kukiko
+    bot: Mipha
     command: commands.Command[Any, ..., Any]
 
     __slots__ = ("pool",)

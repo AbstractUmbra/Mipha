@@ -20,7 +20,7 @@ from utilities.fuzzy import extract
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 
 class TimezoneConverter(commands.Converter):
@@ -51,8 +51,8 @@ class TimezoneConverter(commands.Converter):
 class Time(commands.Cog):
     """Time cog for fun time stuff."""
 
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild) -> None:

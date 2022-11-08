@@ -29,7 +29,7 @@ from utilities.formats import plural
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
     from extensions.reminders import Reminder
 
 log = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class ModConfig:
     )
 
     @classmethod
-    async def from_record(cls, record, bot: Kukiko):
+    async def from_record(cls, record, bot: Mipha):
         self = cls()
 
         # the basic configuration
@@ -264,7 +264,7 @@ def can_mute():
 class Mod(commands.Cog):
     """Moderation related commands."""
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
 
         # guild_id: SpamChecker
@@ -1667,5 +1667,5 @@ class Mod(commands.Cog):
             return await ctx.author.ban(reason="Suicide.", delete_message_days=0)
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Mod(bot))

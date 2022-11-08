@@ -39,7 +39,7 @@ from utilities.prefix import callable_prefix as _callable_prefix
 if TYPE_CHECKING:
     from extensions.reminders import Reminder
 
-LOGGER = logging.getLogger("Kukiko")
+LOGGER = logging.getLogger("bot.mipha")
 jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
@@ -49,8 +49,8 @@ INTENTS = discord.Intents(_bot_config.INTENTS)
 CtxT = TypeVar("CtxT", bound=Context)
 
 
-class KukikoCommandTree(app_commands.CommandTree):
-    client: Kukiko
+class MiphaCommandTree(app_commands.CommandTree):
+    client: Mipha
 
     async def on_error(
         self,
@@ -105,7 +105,7 @@ class SetupLogging:
 
         self.log.setLevel(logging.INFO)
         handler = RotatingFileHandler(
-            filename=self.logging_path / "Kukiko.log", encoding="utf-8", mode="w", maxBytes=self.max_bytes, backupCount=5
+            filename=self.logging_path / "Mipha.log", encoding="utf-8", mode="w", maxBytes=self.max_bytes, backupCount=5
         )
         dt_fmt = "%Y-%m-%d %H:%M:%S"
         fmt = logging.Formatter("[{asctime}] [{levelname:<7}] {name}: {message}", dt_fmt, style="{")
@@ -127,8 +127,8 @@ class SetupLogging:
             self.log.removeHandler(hdlr)
 
 
-class Kukiko(commands.Bot):
-    """Kukiko's bot class."""
+class Mipha(commands.Bot):
+    """Mipha's bot class."""
 
     pool: asyncpg.Pool
     user: discord.ClientUser
@@ -166,7 +166,7 @@ class Kukiko(commands.Bot):
     def __init__(self):
         super().__init__(
             command_prefix=_callable_prefix,
-            tree_cls=KukikoCommandTree,
+            tree_cls=MiphaCommandTree,
             description="Hello, I'm a fun discord bot for Umbra#0009's personal use.",
             intents=INTENTS,
             allowed_mentions=discord.AllowedMentions.none(),
@@ -188,7 +188,7 @@ class Kukiko(commands.Bot):
         )
         self.command_stats = Counter()
         self.socket_stats = Counter()
-        self.global_log = logging.getLogger()
+        self.global_log = LOGGER
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
@@ -214,10 +214,10 @@ class Kukiko(commands.Bot):
         self._previous_websocket_events.append(message)
 
     async def on_ready(self) -> None:
-        self.global_log.info("Kukiko got a ready event at %s", datetime.datetime.now())
+        self.global_log.info("%s got a ready event at %s", self.user.name, datetime.datetime.now())
 
     async def on_resume(self) -> None:
-        self.global_log.info("Kukiko got a resume event at %s", datetime.datetime.now())
+        self.global_log.info("%s got a resume event at %s", self.user.name, datetime.datetime.now())
 
     async def on_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         assert ctx.command is not None  # type checking - disable assertions
@@ -246,7 +246,7 @@ class Kukiko(commands.Bot):
         self,
         guild: discord.abc.Snowflake,
         *,
-        local_: Callable[[Kukiko, discord.Message], list[str]] = _callable_prefix,
+        local_: Callable[[Mipha, discord.Message], list[str]] = _callable_prefix,
         raw: bool = False,
     ) -> list[str]:
         if raw:
@@ -387,7 +387,7 @@ class Kukiko(commands.Bot):
 
 
 async def main():
-    async with Kukiko() as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
+    async with Mipha() as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
         dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
     ) as pool:
         if pool is None:
@@ -399,14 +399,21 @@ async def main():
 
         with SetupLogging():
             await bot.load_extension("jishaku")
-            for file in pathlib.Path("extensions").glob("**/[!_]*.py"):
-                if file.name.startswith("_"):
-                    continue
+            path = pathlib.Path("extensions")
+            for file in path.rglob("[!ext_]*.py"):
                 ext = ".".join(file.parts).removesuffix(".py")
                 try:
                     await bot.load_extension(ext)
                 except Exception as error:
                     LOGGER.exception("Failed to load extension: %s\n\n%s", ext, error)
+            for directory in path.rglob("ext-*"):
+                if not directory.is_dir():
+                    return
+                module = ".".join(directory.parts)
+                try:
+                    await bot.load_extension(module)
+                except Exception as error:
+                    LOGGER.exception("Failed to load module extension: %s\n\n%s", module, error)
 
             await bot.start()
 

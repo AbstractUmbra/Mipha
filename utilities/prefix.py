@@ -13,10 +13,10 @@ from discord.ext import commands
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 
-def callable_prefix(bot: Kukiko, message: Message, /) -> list[str]:
+def callable_prefix(bot: Mipha, message: Message, /) -> list[str]:
     if message.guild is None:
         return commands.when_mentioned_or("hey babe ")(bot, message)
 

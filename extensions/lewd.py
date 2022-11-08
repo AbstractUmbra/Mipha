@@ -30,7 +30,7 @@ from utilities.paginator import NHentaiEmbed, RoboPages, SimpleListSource
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
     from utilities.context import Context
 
 SIX_DIGITS = re.compile(r"\{(\d{1,6})\}")
@@ -95,9 +95,9 @@ class BooruConfig:
         "auto_six_digits",
     )
 
-    def __init__(self, *, guild_id: int, bot: Kukiko, record: _LewdTableData | None = None):
+    def __init__(self, *, guild_id: int, bot: Mipha, record: _LewdTableData | None = None):
         self.guild_id: int = guild_id
-        self.bot: Kukiko = bot
+        self.bot: Mipha = bot
         self.record: _LewdTableData | None = record
 
         if record:
@@ -151,8 +151,8 @@ class DanbooruEntry:
 
 
 class Lewd(commands.Cog):
-    def __init__(self, bot: Kukiko, /) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha, /) -> None:
+        self.bot: Mipha = bot
         self.gelbooru_config = BooruData(
             aiohttp.BasicAuth(bot.config.GELBOORU_AUTH["user_id"], bot.config.DANBOORU_AUTH["api_key"]),
             "https://gelbooru.com/index.php?page=dapi&s=post&q=index",
@@ -686,5 +686,5 @@ class Lewd(commands.Cog):
             await channel.send(fmt, embed=embed)
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Lewd(bot))

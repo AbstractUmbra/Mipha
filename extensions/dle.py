@@ -20,7 +20,7 @@ from utilities.context import Context
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 EMOJI: dict[bool | None, str] = {
     True: "\U0001f7e9",
@@ -113,8 +113,8 @@ def unspoiler(match: re.Match[str]) -> str:
 
 
 class DLECog(commands.Cog):
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
 
     def get_wordle_word(self, *, size: int) -> str:
         return random.choice(CLEAN_WORDS[size])
@@ -177,5 +177,5 @@ class DLECog(commands.Cog):
                         game._message = await ctx.send(current_guess)
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(DLECog(bot))

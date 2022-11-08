@@ -28,7 +28,7 @@ from utilities.paginator import FieldPageSource, RoboPages
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 log = logging.getLogger(__name__)
 
@@ -79,8 +79,8 @@ def object_at(addr: int) -> Optional[Any]:
 class Stats(commands.Cog):
     """Bot usage statistics."""
 
-    def __init__(self, bot: Kukiko):
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha):
+        self.bot: Mipha = bot
         self.process = psutil.Process()
         self._batch_lock = asyncio.Lock()
         self._data_batch: list[DataBatchEntry] = []
@@ -250,7 +250,7 @@ class Stats(commands.Cog):
 
         # [`hash`](url) message (offset)
         offset = time.format_relative(commit_time.astimezone(datetime.timezone.utc))
-        return f"[`{short_sha2}`](https://github.com/AbstractUmbra/Kukiko/commit/{commit.hex}) {short} ({offset})"
+        return f"[`{short_sha2}`](https://github.com/AbstractUmbra/mipha/commit/{commit.hex}) {short} ({offset})"
 
     def get_last_commits(self, count=3):
         repo = pygit2.Repository(".git")
@@ -1066,7 +1066,7 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
         pass
 
 
-async def setup(bot: Kukiko):
+async def setup(bot: Mipha):
     if not hasattr(bot, "command_stats"):
         bot.command_stats = Counter()
 
@@ -1083,7 +1083,7 @@ async def setup(bot: Kukiko):
     commands.Bot.on_error = on_error
 
 
-async def teardown(bot: Kukiko):
+async def teardown(bot: Mipha):
     commands.Bot.on_error = old_on_error
     logging.getLogger().removeHandler(bot._stats_cog_gateway_handler)
     del bot._stats_cog_gateway_handler

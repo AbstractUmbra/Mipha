@@ -34,7 +34,7 @@ from utilities.formats import to_codeblock
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 RTFS = (
     "discord",
@@ -73,7 +73,10 @@ class SourceConverter(commands.Converter[str]):
     async def convert(self, ctx: Context, argument: str) -> str | None:
         args = argument.split(".")
         top_level = args.pop(0)
-        if top_level in ("app_commands",):
+        if top_level in (
+            "app_commands",
+            "ui",
+        ):
             top_level = f"discord.{top_level}"
 
         if top_level not in RTFS:
@@ -143,7 +146,7 @@ class SphinxObjectFileReader:
 
 
 class RTFX(commands.Cog):
-    def __init__(self, bot: Kukiko):
+    def __init__(self, bot: Mipha):
         self.bot = bot
 
     def parse_object_inv(self, stream: SphinxObjectFileReader, url: str) -> dict[str, str]:

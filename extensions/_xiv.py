@@ -21,7 +21,7 @@ from utilities.time import ordinal
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 IRLS_GUILD_ID = 174702278673039360
 FUNHOUSE_ID = 1004336715474944002
@@ -55,8 +55,8 @@ class XIV(commands.Cog):
         tzinfo=datetime.timezone.utc,
     )
 
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
         self.daily_reset.start()
         self.weekly_reset.start()
         self.fashion_report_loop.start()
@@ -92,7 +92,7 @@ class XIV(commands.Cog):
         return f"{format.title()} in {days} days, {hours} hours, {minutes} minutes and {seconds} seconds."
 
     async def get_kaiyoko_submissions(self) -> TopLevelListingResponse:
-        headers = {"User-Agent": "Kukiko Discord Bot (by /u/AbstractUmbra)"}
+        headers = {"User-Agent": "Mipha Discord Bot (by /u/AbstractUmbra)"}
         async with self.bot.session.get("https://reddit.com/user/kaiyoko/submitted.json", headers=headers) as resp:
             data: TopLevelListingResponse = await resp.json()
 
@@ -238,5 +238,5 @@ class XIV(commands.Cog):
         await channel.send(fmt, allowed_mentions=discord.AllowedMentions(roles=True))
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(XIV(bot))

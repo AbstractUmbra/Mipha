@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "kukiko"
+name = "Mipha"
 version = "2.0.0"
 description = "A fun and lightweight Discord bot for personal use."
 authors = ["Alex Nørgaard <Umbra@AbstractUmbra.dev>"]

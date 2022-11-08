@@ -23,7 +23,7 @@ from utilities.db import MaybeAcquire
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 
 class SnoozeModal(discord.ui.Modal, title="Snooze"):
@@ -156,8 +156,8 @@ class Timer:
 class Reminder(commands.Cog):
     """Reminders to do something."""
 
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
         self._have_data = asyncio.Event()
         self._current_timer: Timer | None = None
         self._task = bot.loop.create_task(self.dispatch_timers())
@@ -442,5 +442,5 @@ class Reminder(commands.Cog):
                 view.message = msg
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Reminder(bot))

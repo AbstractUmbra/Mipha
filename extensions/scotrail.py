@@ -14,7 +14,7 @@ from utilities import formats, fuzzy
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
     from utilities._types.scotrail import ScotrailData
 
 
@@ -81,8 +81,8 @@ class Route:
 
 
 class ScotrailCog(commands.Cog):
-    def __init__(self, bot: Kukiko, /) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha, /) -> None:
+        self.bot: Mipha = bot
         self._station_path: Path = Path("configs/scotrail/stations.json")
         with self._station_path.open("r") as fp:
             self._station_data: ScotrailData = json.load(fp)
@@ -164,5 +164,5 @@ class ScotrailCog(commands.Cog):
             await respond(content="Sorry, I think you put in the wrong station details, or I just broke.")
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(ScotrailCog(bot), guild=discord.Object(id=174702278673039360))

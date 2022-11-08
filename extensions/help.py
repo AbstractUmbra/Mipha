@@ -16,7 +16,7 @@ from utilities.paginator import RoboPages, SimpleListSource
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 
 class PaginatedHelpCommand(commands.HelpCommand):
@@ -129,10 +129,10 @@ class PaginatedHelpCommand(commands.HelpCommand):
 
 class Help(commands.Cog):
     """
-    Kukiko's help command!
+    mipha's help command!
     """
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.bot._original_help_command = bot.help_command
         self.bot.help_command = PaginatedHelpCommand()
@@ -143,5 +143,5 @@ class Help(commands.Cog):
         self.bot.help_command = self.bot._original_help_command
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Help(bot))

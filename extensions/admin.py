@@ -22,13 +22,13 @@ from utilities.context import Context
 if TYPE_CHECKING:
     from asyncpg import Record
 
-    from bot import Kukiko
+    from bot import Mipha
 
 
 class Admin(commands.Cog):
     """Admin-only commands that make the bot dynamic."""
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
 
     def cleanup_code(self, content: str) -> str:
@@ -202,6 +202,6 @@ class Admin(commands.Cog):
         await ctx.send(f"Synced the tree to {formats.plural(ret):guild}.")
 
 
-async def setup(bot: Kukiko):
+async def setup(bot: Mipha):
     """Cog entrypoint."""
     await bot.add_cog(Admin(bot))

@@ -14,7 +14,7 @@ from utilities.context import Context
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
     VocalGuildChannel = discord.VoiceChannel | discord.StageChannel
 
@@ -50,8 +50,8 @@ NORMALIZE_STATE: dict[VoiceStateType, str] = {
 
 
 class VoiceStalking(commands.Cog):
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
         self._config: Config[VoiceStalkingConfig] = Config(pathlib.Path("configs/voice_stalking.json"))
 
     async def cog_check(self, ctx: Context) -> bool:
@@ -160,5 +160,5 @@ class VoiceStalking(commands.Cog):
         await self._config.put(ctx.guild.id, config)  # type: ignore # guarded by decorator
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(VoiceStalking(bot))

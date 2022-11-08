@@ -405,7 +405,7 @@ class NHentaiEmbed(discord.Embed):
         return self
 
 
-class KukikoModal(discord.ui.Modal):
+class MiphaModal(discord.ui.Modal):
     async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         e = discord.Embed(title="IRLs Modal Error", colour=0xA32952)
         e.add_field(name="Modal", value=self.__class__.__name__, inline=False)

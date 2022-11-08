@@ -28,7 +28,7 @@ from utilities.formats import plural
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 ABT_REG = re.compile(r"~([a-zA-Z]+)~")
 MESSAGE_LINK_RE = re.compile(
@@ -72,7 +72,7 @@ AL_BHED_CHARACTER_MAP = {
 class Fun(commands.Cog):
     """Some fun stuff, not fleshed out yet."""
 
-    def __init__(self, bot: Kukiko):
+    def __init__(self, bot: Mipha):
         self.bot = bot
         self.lock = asyncio.Lock()
         self.message_deletes = 0
@@ -346,5 +346,5 @@ class Fun(commands.Cog):
             await m.move_to(None)
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Fun(bot))

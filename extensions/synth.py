@@ -17,7 +17,7 @@ from utilities.fuzzy import extract
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -51,8 +51,8 @@ class SynthCog(commands.Cog, name="Synth"):
         "api19-normal-useast1a.tiktokv.com",
     }
 
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
         self._engine_autocomplete: list[app_commands.Choice[int]] = []
         self._tiktok_voice_choices: list[app_commands.Choice] = [
             app_commands.Choice(name=voice["name"], value=voice["value"]) for voice in _VOICE_DATA
@@ -212,5 +212,5 @@ class SynthCog(commands.Cog, name="Synth"):
         return ret
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(SynthCog(bot))

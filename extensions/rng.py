@@ -17,7 +17,7 @@ from utilities.formats import plural
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
     from .tags import Tags
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 class RNG(commands.Cog):
     """Utilities that provide pseudo-RNG."""
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
 
     @commands.group()
@@ -111,5 +111,5 @@ class RNG(commands.Cog):
         await ctx.send("\n".join(builder))
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(RNG(bot))

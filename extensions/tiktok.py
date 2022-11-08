@@ -14,9 +14,10 @@ from jishaku.shell import ShellReader
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
-ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True})
+LOGGER: logging.Logger = logging.getLogger(__name__)
+ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
 
 MOBILE_PATTERN = re.compile(r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*\>?)?\>?")
 DESKTOP_PATTERN = re.compile(r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?")
@@ -31,9 +32,8 @@ class FilesizeLimitExceeded(Exception):
 
 
 class TiktokCog(commands.Cog):
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
-        self.logger: logging.Logger = logging.getLogger(__name__)
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
         self.tiktok_context_menu = app_commands.ContextMenu(
             name="Process TikTok link",
             callback=self.tiktok_context_menu_callback,
@@ -111,10 +111,10 @@ class TiktokCog(commands.Cog):
             raise FilesizeLimitExceeded(post=False)
 
         with ShellReader(
-            f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null'
+            f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null', timeout=300
         ) as reader:
             async for line in reader:
-                self.logger.debug(line)
+                LOGGER.debug(line)
 
         if fixed_file_loc.stat().st_size > filesize_limit:
             file_loc.unlink(missing_ok=True)
@@ -159,7 +159,7 @@ class TiktokCog(commands.Cog):
         if not matches:
             return
 
-        self.logger.debug("Processing %s detected TikToks...", len(matches))
+        LOGGER.debug("Processing %s detected TikToks...", len(matches))
 
         async with message.channel.typing():
             urls = self._pull_matches(matches)
@@ -180,6 +180,9 @@ class TiktokCog(commands.Cog):
                 except FilesizeLimitExceeded:
                     await message.channel.send("The file size limit for this guild was exceeded.")
                     return
+                except asyncio.TimeoutError:
+                    await message.channel.send(f"{message.author}'s video took too long to process, so I gave up.")
+                    return
 
                 if message.mentions:
                     content = " ".join(m.mention for m in message.mentions) + "\n\n" + content
@@ -197,5 +200,5 @@ class TiktokCog(commands.Cog):
                     await message.delete()
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(TiktokCog(bot))

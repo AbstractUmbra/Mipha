@@ -27,7 +27,7 @@ from utilities.context import Context
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 GuildChannel = discord.TextChannel | discord.VoiceChannel | discord.StageChannel | discord.CategoryChannel | discord.Thread
 
@@ -68,7 +68,7 @@ class PatchedContext(Context):
 class Meta(commands.Cog):
     """Commands for utilities related to Discord or the Bot itself."""
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.interpret_as_command_ctx_menu = app_commands.ContextMenu(
             name="Interpret as Command", callback=self.interpret_as_command_callback
@@ -249,7 +249,7 @@ class Meta(commands.Cog):
         periods, e.g. tag.create for the create subcommand of the tag command
         or by spaces.
         """
-        source_url = "https://github.com/AbstractUmbra/Kukiko"
+        source_url = "https://github.com/AbstractUmbra/mipha"
         branch = "main"
         if command is None:
             await ctx.send(source_url)
@@ -567,5 +567,5 @@ class Meta(commands.Cog):
         await v_client.disconnect(force=True)
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Meta(bot))

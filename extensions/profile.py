@@ -12,7 +12,7 @@ from utilities.formats import plural
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
     from utilities.context import Context
 
 
@@ -158,8 +158,8 @@ class PromptProfileCreationView(discord.ui.View):
 class Profile(commands.Cog):
     """Manage your Nintendo profiles."""
 
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError):
         if isinstance(error, commands.BadArgument):
@@ -353,5 +353,5 @@ class Profile(commands.Cog):
         await ctx.send(embed=e)
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Profile(bot))

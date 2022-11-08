@@ -21,7 +21,7 @@ from utilities.paginator import SimplePages
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 
 class LazyEntity:
@@ -182,8 +182,8 @@ class Config(commands.Cog):
     for your server or block certain channels or members.
     """
 
-    def __init__(self, bot: Kukiko) -> None:
-        self.bot: Kukiko = bot
+    def __init__(self, bot: Mipha) -> None:
+        self.bot: Mipha = bot
 
     @cache.cache(strategy=cache.Strategy.lru, maxsize=1024, ignore_kwargs=True)
     async def is_plonked(
@@ -587,5 +587,5 @@ class Config(commands.Cog):
         await ctx.send(ctx.tick(True))
 
 
-async def setup(bot: Kukiko):
+async def setup(bot: Mipha):
     await bot.add_cog(Config(bot))

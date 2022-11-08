@@ -23,7 +23,7 @@ from utilities.paginator import SimplePages
 
 
 if TYPE_CHECKING:
-    from bot import Kukiko
+    from bot import Mipha
 
 T = TypeVar("T")
 
@@ -115,7 +115,7 @@ class TagMember(commands.Converter[FakeUser | discord.Member]):
 class Tags(commands.Cog):
     """Commands to fetch something by a tag name"""
 
-    def __init__(self, bot: Kukiko) -> None:
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
 
         self._reserved_tags_being_made = {}
@@ -1043,5 +1043,5 @@ class Tags(commands.Cog):
         pass
 
 
-async def setup(bot: Kukiko) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Tags(bot))
