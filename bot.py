@@ -400,10 +400,15 @@ async def main():
         with SetupLogging():
             await bot.load_extension("jishaku")
             path = pathlib.Path("extensions")
-            for file in path.rglob("[!ext_]*.py"):
+            for file in path.rglob("[!_]*.py"):
+                if (file.is_dir() and file.name.startswith("ext-")) or (
+                    file.parent.is_dir() and file.parent.name.startswith("ext-")
+                ):
+                    continue
                 ext = ".".join(file.parts).removesuffix(".py")
                 try:
                     await bot.load_extension(ext)
+                    LOGGER.info("Loaded extension: %s", ext)
                 except Exception as error:
                     LOGGER.exception("Failed to load extension: %s\n\n%s", ext, error)
             for directory in path.rglob("ext-*"):
@@ -412,6 +417,7 @@ async def main():
                 module = ".".join(directory.parts)
                 try:
                     await bot.load_extension(module)
+                    LOGGER.info("Loaded module extension: %s", module)
                 except Exception as error:
                     LOGGER.exception("Failed to load module extension: %s\n\n%s", module, error)
 
