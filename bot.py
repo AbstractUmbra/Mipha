@@ -422,7 +422,8 @@ class Mipha(commands.Bot):
         try:
             await super().start(token=self.config.TOKEN, reconnect=True)
         finally:
-            with open("prev_events.log", "w+", encoding="utf-8") as f:
+            path = pathlib.Path("logs/prev_events.log")
+            with path.open("w+", encoding="utf-8") as f:
                 for event in self._previous_websocket_events:
                     try:
                         last_log = json.dumps(event, ensure_ascii=True, indent=2)
@@ -448,6 +449,7 @@ async def main() -> None:
         if pool is None:
             # thanks asyncpg...
             raise RuntimeError("Could not connect to database.")
+
         bot.pool = pool
 
         bot.session = session
