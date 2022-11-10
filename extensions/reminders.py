@@ -13,12 +13,13 @@ from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 import asyncpg
 import discord
+from discord import app_commands
 from discord.ext import commands
 from typing_extensions import Self
 
 from utilities import formats, time
 from utilities.context import Context
-from utilities.converters import WhenAndWhatConverter, WhenAndWhatTransformer
+from utilities.converters import BadDatetimeTransform, DatetimeTransformer, WhenAndWhatConverter, WhenAndWhatTransformer
 from utilities.db import MaybeAcquire
 
 
@@ -130,9 +131,9 @@ class Timer:
         }
         return cls(record=pseudo)
 
-    def __eq__(self, other: Timer) -> bool:
+    def __eq__(self, other: object) -> bool:
         try:
-            return self.id == other.id
+            return self.id == other.id  # type: ignore
         except AttributeError:
             return False
 
@@ -166,8 +167,6 @@ class Reminder(commands.Cog):
         self._task.cancel()
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
-        assert ctx.command is not None
-
         if isinstance(error, commands.BadArgument):
             await ctx.send(str(error))
         if isinstance(error, commands.TooManyArguments):
@@ -288,7 +287,7 @@ class Reminder(commands.Cog):
 
         return timer
 
-    @commands.group(aliases=["timer", "remind"], usage="<when>", invoke_without_command=True)
+    @commands.hybrid_group(aliases=["timer", "remind", "remindme"], usage="<when>")
     async def reminder(
         self,
         ctx: Context,
@@ -324,6 +323,33 @@ class Reminder(commands.Cog):
             mention_author=False,
         )
 
+    @reminder.app_command.command(name="set")
+    @app_commands.describe(when="When to be reminded of something.", text="What to be reminded of.")
+    async def reminder_set(
+        self,
+        interaction: discord.Interaction,
+        when: app_commands.Transform[datetime.datetime, DatetimeTransformer],
+        text: str = "…",
+    ) -> None:
+        """Sets a reminder to remind you of something at a specific time."""
+
+        timer = await self.create_timer(
+            when,
+            "reminder",
+            interaction.user.id,
+            interaction.channel_id,
+            text,
+            created=interaction.created_at,
+            message_id=None,
+        )
+        delta = time.human_timedelta(when, source=timer.created_at)
+        await interaction.response.send_message(f"Alright {interaction.user.mention}, in {delta}: {text}")
+
+    @reminder_set.error
+    async def reminder_set_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, BadDatetimeTransform):
+            await interaction.response.send_message(str(error), ephemeral=True)
+
     @reminder.command(name="list", ignore_extra=False)
     async def reminder_list(self, ctx: Context) -> None:
         """Shows the 10 latest currently running reminders."""
@@ -341,17 +367,17 @@ class Reminder(commands.Cog):
             await ctx.send("No currently running reminders.")
             return
 
-        e = discord.Embed(colour=discord.Colour.blurple(), title="Reminders")
+        e = discord.Embed(colour=discord.Colour.random(), title="Reminders")
 
         if len(records) == 10:
             e.set_footer(text="Only showing up to 10 reminders.")
         else:
-            e.set_footer(text=f'{len(records)} reminder{"s" if len(records) > 1 else ""}')
+            e.set_footer(text=f"{formats.plural(len(records)):record}")
 
-        for _id, expires, message in records:
+        for id_, expires, message in records:
             shorten = textwrap.shorten(message, width=512)
             e.add_field(
-                name=f"{_id}: {time.format_relative(expires)}",
+                name=f"{id_}: {time.format_relative(expires)}",
                 value=shorten,
                 inline=False,
             )

@@ -18,6 +18,16 @@ from typing_extensions import NotRequired, Self
 from utilities.context import Context
 
 
+__all__ = (
+    "RedditMediaURL",
+    "WhenAndWhatConverter",
+    "DatetimeConverter",
+    "WhenAndWhatTransformer",
+    "DatetimeTransformer",
+    "BadDatetimeTransform",
+)
+
+
 class DucklingNormalised(TypedDict):
     unit: Literal["second"]
     value: int
@@ -231,6 +241,89 @@ class WhenAndWhatConverter(commands.Converter[tuple[datetime.datetime, str]]):
         return (when, what or "…")
 
 
+class BadDatetimeTransform(app_commands.AppCommandError):
+    pass
+
+
+class DatetimeTransformer(app_commands.Transformer):
+    @staticmethod
+    async def get_timezone(interaction: discord.Interaction) -> zoneinfo.ZoneInfo | None:
+        if interaction.guild is None:
+            tz = zoneinfo.ZoneInfo("UTC")
+        else:
+            row: str | None = await interaction.client.pool.fetchval(  # type: ignore # typevar defaults, sad
+                "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);",
+                interaction.user.id,
+                interaction.guild.id,
+            )
+            if row:
+                tz = zoneinfo.ZoneInfo(row)
+            else:
+                tz = zoneinfo.ZoneInfo("UTC")
+
+        return tz
+
+    @classmethod
+    async def parse(
+        cls,
+        argument: str,
+        /,
+        *,
+        interaction: discord.Interaction,
+        timezone: datetime.tzinfo | None = datetime.timezone.utc,
+        now: datetime.datetime | None = None,
+    ) -> list[tuple[datetime.datetime, int, int]]:
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+
+        times: list[tuple[datetime.datetime, int, int]] = []
+
+        async with interaction.client.session.post(  # type: ignore # typevar defaults, sad
+            "http://127.0.0.1:7731/parse",
+            data={
+                "locale": "en_US",
+                "text": argument,
+                "dims": '["time", "duration"]',
+                "tz": str(timezone),
+            },
+        ) as response:
+            data: list[DucklingResponse] = await response.json()
+
+            for time in data:
+                if time["dim"] == "time" and "value" in time["value"]:
+                    times.append(
+                        (
+                            datetime.datetime.fromisoformat(time["value"]["value"]),
+                            time["start"],
+                            time["end"],
+                        )
+                    )
+                elif time["dim"] == "duration":
+                    times.append(
+                        (
+                            datetime.datetime.now(datetime.timezone.utc)
+                            + datetime.timedelta(seconds=time["value"]["normalized"]["value"]),
+                            time["start"],
+                            time["end"],
+                        )
+                    )
+
+        return times
+
+    @classmethod
+    async def transform(cls, interaction: discord.Interaction, argument: str) -> datetime.datetime:
+        timezone = await cls.get_timezone(interaction)
+        now = interaction.created_at.astimezone(tz=timezone)
+
+        parsed_times = await cls.parse(argument, interaction=interaction, timezone=timezone, now=now)
+
+        if len(parsed_times) == 0:
+            raise BadDatetimeTransform("Could not parse time.")
+        elif len(parsed_times) > 1:
+            ...  # TODO: Raise on too many?
+
+        return parsed_times[0][0]
+
+
 class WhenAndWhatTransformer(app_commands.Transformer):
     @staticmethod
     async def get_timezone(interaction: discord.Interaction) -> zoneinfo.ZoneInfo | None:
@@ -315,14 +408,14 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         parsed_times = await cls.parse(value, interaction=interaction, timezone=timezone, now=now)
 
         if len(parsed_times) == 0:
-            raise commands.BadArgument("Could not parse time.")
+            raise BadDatetimeTransform("Could not parse time.")
         elif len(parsed_times) > 1:
             ...  # TODO: Raise on too many?
 
         when, begin, end = parsed_times[0]
 
         if begin != 0 and end != len(value):
-            raise ValueError("Could not distinguish time from argument.")
+            raise BadDatetimeTransform("Could not distinguish time from argument.")
 
         if begin == 0:
             what = value[end + 1 :].lstrip(" ,.!:;")
