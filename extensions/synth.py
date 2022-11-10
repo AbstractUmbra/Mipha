@@ -209,7 +209,7 @@ class SynthCog(commands.Cog, name="Synth"):
             if _x:
                 ret.append(_x)
 
-        return ret
+        return ret[:25]
 
 
 async def setup(bot: Mipha) -> None:
