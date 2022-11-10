@@ -530,14 +530,11 @@ class Mod(commands.Cog):
         self._automod_migration_view = MigrateJoinLogView(self)
         bot.add_view(self._automod_migration_view)
 
-    @property
-    def display_emoji(self) -> discord.PartialEmoji:
-        return discord.PartialEmoji(name="DiscordCertifiedModerator", id=847961544124923945)
-
     def __repr__(self) -> str:
         return "<cogs.Mod>"
 
     async def cog_load(self) -> None:
+        await self.bot.wait_until_ready()
         self._avatar: bytes = await self.bot.user.display_avatar.read()
 
     def cog_unload(self) -> None:

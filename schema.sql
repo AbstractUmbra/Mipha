@@ -8,10 +8,13 @@ CREATE TABLE IF NOT EXISTS lewd_config (
 );
 CREATE TABLE IF NOT EXISTS guild_mod_config (
     id BIGINT PRIMARY KEY,
-    raid_mode SMALLINT,
+    automod_flags SMALLINT NOT NULL DEFAULT 0,
     broadcast_channel BIGINT,
     mention_count SMALLINT,
-    safe_mention_channel_ids BIGINT []
+    safe_automod_entity_ids BIGINT ARRAY,
+    mute_role_id BIGINT,
+    muted_members BIGINT ARRAY,
+    broadcast_webhook_url TEXT
 );
 CREATE TABLE IF NOT EXISTS profiles (
     user_id BIGINT PRIMARY KEY,
