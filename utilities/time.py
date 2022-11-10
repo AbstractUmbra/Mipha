@@ -39,7 +39,7 @@ class ShortTime:
         re.VERBOSE,
     )
 
-    def __init__(self, argument: str, *, now: datetime.datetime | None = None):
+    def __init__(self, argument: str, *, now: datetime.datetime | None = None) -> None:
         match = self.compiled.fullmatch(argument)
         if match is None or not match.group(0):
             raise commands.BadArgument("invalid time provided")

@@ -1,65 +1,39 @@
-"""
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at http://mozilla.org/MPL/2.0/.
-"""
-
 from __future__ import annotations
 
 import asyncio
 import enum
-import inspect
 import time
-from collections.abc import Awaitable, Callable, Coroutine, MutableMapping
 from functools import wraps
-from typing import Any, Concatenate, Literal, ParamSpec, Protocol, TypeVar, overload
+from typing import Any, Callable, Coroutine, MutableMapping, Protocol, TypeVar
 
 from lru import LRU
 
 
-P = ParamSpec("P")
-K = TypeVar("K")
-V = TypeVar("V")
-T_co = TypeVar("T_co", covariant=True)
+R = TypeVar("R")
 
-T = TypeVar("T")
+# Can't use ParamSpec due to https://github.com/python/typing/discussions/946
+class CacheProtocol(Protocol[R]):
+    cache: MutableMapping[str, asyncio.Task[R]]
 
+    def __call__(self, *args: Any, **kwds: Any) -> asyncio.Task[R]:
+        ...
 
-class locker:
-    def __init__(self, *, lock: asyncio.Lock | None = None) -> None:
-        self.lock: asyncio.Lock | None = lock
+    def get_key(self, *args: Any, **kwargs: Any) -> str:
+        ...
 
-    def __call__(
-        self, func: Callable[Concatenate[K, P], Coroutine[Any, Any, T]]
-    ) -> Callable[Concatenate[K, P], Coroutine[Any, Any, T]]:
-        @wraps(func)
-        async def decorator(item: K, *args: P.args, **kwargs: P.kwargs) -> T:
-            self.lock = self.lock or asyncio.Lock()
-            async with self.lock:
-                return await func(item, *args, **kwargs)
+    def invalidate(self, *args: Any, **kwargs: Any) -> bool:
+        ...
 
-        return decorator
+    def invalidate_containing(self, key: str) -> None:
+        ...
+
+    def get_stats(self) -> tuple[int, int]:
+        ...
 
 
-def _wrap_and_store_coroutine(cache: dict[K, V] | ExpiringCache | LRU, key: K, coro: Awaitable[V]) -> Awaitable[V]:
-    async def func() -> V:
-        value = await coro
-        cache[key] = value
-        return value
-
-    return func()
-
-
-def _wrap_new_coroutine(value: T) -> Awaitable[T]:
-    async def new_coroutine() -> T:
-        return value
-
-    return new_coroutine()
-
-
-class ExpiringCache(dict[K, tuple[V, float]]):
+class ExpiringCache(dict):
     def __init__(self, seconds: float) -> None:
-        self.__ttl = seconds
+        self.__ttl: float = seconds
         super().__init__()
 
     def __verify_cache_integrity(self) -> None:
@@ -69,15 +43,15 @@ class ExpiringCache(dict[K, tuple[V, float]]):
         for k in to_remove:
             del self[k]
 
-    def __contains__(self, key: object) -> bool:
+    def __contains__(self, key: str) -> bool:
         self.__verify_cache_integrity()
         return super().__contains__(key)
 
-    def __getitem__(self, key: K) -> tuple[V, float]:
+    def __getitem__(self, key: str) -> Any:
         self.__verify_cache_integrity()
         return super().__getitem__(key)
 
-    def __setitem__(self, key: K, value: V) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         super().__setitem__(key, (value, time.monotonic()))
 
 
@@ -87,105 +61,23 @@ class Strategy(enum.Enum):
     timed = 3
 
 
-class _Cache(Protocol[P, T]):
-    cache: MutableMapping[str, T]
-
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
-        ...
-
-    def invalidate(self, *args: Any, **kwargs: Any) -> bool:
-        ...
-
-    def invalidate_containing(self, key: Any) -> None:
-        ...
-
-    def get_key(self, *args: P.args, **kwargs: P.kwargs) -> str:
-        ...
-
-    def get_stats(self) -> tuple[int, int]:
-        ...
-
-
-class _ExpiringCache(_Cache[P, T], Protocol[P, T]):
-    cache: MutableMapping[str, tuple[T, float]]
-
-
-class _BaseCacheDecorator(Protocol):
-    @overload
-    def __call__(self, __func: Callable[P, Coroutine[Any, Any, T]]) -> _Cache[P, Awaitable[T]]:
-        ...
-
-    @overload
-    def __call__(self, __func: Callable[P, T]) -> _Cache[P, T]:
-        ...
-
-
-class _ExpiringCacheDecorator(Protocol):
-    @overload
-    def __call__(self, __func: Callable[P, Coroutine[Any, Any, T]]) -> _ExpiringCache[P, Awaitable[T]]:
-        ...
-
-    @overload
-    def __call__(self, __func: Callable[P, T]) -> _ExpiringCache[P, T]:
-        ...
-
-
-@overload
-def cache(
-    maxsize: int = ...,
-    strategy: Literal[Strategy.lru, Strategy.raw] = ...,
-    ignore_kwargs: bool = ...,
-) -> _BaseCacheDecorator:
-    ...
-
-
-@overload
-def cache(
-    maxsize: int = ...,
-    strategy: Literal[Strategy.timed] = ...,
-    ignore_kwargs: bool = ...,
-) -> _ExpiringCacheDecorator:
-    ...
-
-
-@overload
-def cache(
-    maxsize: int = ...,
-    strategy: Strategy = ...,
-    ignore_kwargs: bool = ...,
-) -> _BaseCacheDecorator | _ExpiringCacheDecorator:
-    ...
-
-
 def cache(
     maxsize: int = 128,
     strategy: Strategy = Strategy.lru,
     ignore_kwargs: bool = False,
-) -> _BaseCacheDecorator | _ExpiringCacheDecorator:
-    @overload
-    def decorator(func: Callable[P, T]) -> _Cache[P, T] | _ExpiringCache[P, T]:
-        ...
-
-    @overload
-    def decorator(func: Callable[P, Coroutine[Any, Any, T]]) -> _Cache[P, Awaitable[T]] | _ExpiringCache[P, Awaitable[T]]:
-        ...
-
-    def decorator(
-        func: Callable[P, T] | Callable[P, Coroutine[Any, Any, T]]
-    ) -> _Cache[P, T] | _Cache[P, Awaitable[T]] | _ExpiringCache[P, T] | _ExpiringCache[P, Awaitable[T]]:
+) -> Callable[[Callable[..., Coroutine[Any, Any, R]]], CacheProtocol[R]]:
+    def decorator(func: Callable[..., Coroutine[Any, Any, R]]) -> CacheProtocol[R]:
         if strategy is Strategy.lru:
             _internal_cache = LRU(maxsize)
             _stats = _internal_cache.get_stats
-
         elif strategy is Strategy.raw:
             _internal_cache = {}
             _stats = lambda: (0, 0)
-
         elif strategy is Strategy.timed:
             _internal_cache = ExpiringCache(maxsize)
             _stats = lambda: (0, 0)
 
-        def _make_key(args: tuple[Any, ...], kwargs: dict[Any, Any]) -> str:
+        def _make_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
             # this is a bit of a cluster fuck
             # we do care what 'self' parameter is when we __repr__ it
             def _true_repr(o) -> str:
@@ -193,7 +85,7 @@ def cache(
                     return f"<{o.__class__.__module__}.{o.__class__.__name__}>"
                 return repr(o)
 
-            key: list[str] = [f"{func.__module__}.{func.__name__}"]
+            key = [f"{func.__module__}.{func.__name__}"]
             key.extend(_true_repr(o) for o in args)
             if not ignore_kwargs:
                 for k, v in kwargs.items():
@@ -201,7 +93,7 @@ def cache(
                     # I want to pass asyncpg.Connection objects to the parameters
                     # however, they use default __repr__ and I do not care what
                     # connection is passed in, so I needed a bypass.
-                    if k == "connection":
+                    if k == "connection" or k == "pool":
                         continue
 
                     key.append(_true_repr(k))
@@ -210,24 +102,17 @@ def cache(
             return ":".join(key)
 
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T | Awaitable[T] | tuple[T, float] | Awaitable[tuple[T, float]]:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             key = _make_key(args, kwargs)
             try:
-                value = _internal_cache[key]
+                task = _internal_cache[key]
             except KeyError:
-                value = func(*args, **kwargs)
-
-                if inspect.isawaitable(value):
-                    return _wrap_and_store_coroutine(_internal_cache, key, value)
-
-                _internal_cache[key] = value
-                return value
+                _internal_cache[key] = task = asyncio.create_task(func(*args, **kwargs))
+                return task
             else:
-                if asyncio.iscoroutinefunction(func):
-                    return _wrap_new_coroutine(value)
-                return value
+                return task
 
-        def _invalidate(*args: P.args, **kwargs: P.kwargs) -> bool:
+        def _invalidate(*args: Any, **kwargs: Any) -> bool:
             try:
                 del _internal_cache[_make_key(args, kwargs)]
             except KeyError:
@@ -251,6 +136,6 @@ def cache(
         wrapper.invalidate = _invalidate
         wrapper.get_stats = _stats
         wrapper.invalidate_containing = _invalidate_containing
-        return wrapper  # type: ignore # can't be done
+        return wrapper  # type: ignore
 
     return decorator

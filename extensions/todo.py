@@ -174,5 +174,5 @@ class Todo(commands.Cog):
             await ctx.send("Whoa, I know you're eager but close your active list first!")
 
 
-async def setup(bot):
+async def setup(bot) -> None:
     await bot.add_cog(Todo(bot))

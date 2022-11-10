@@ -15,7 +15,7 @@ import sys
 import traceback
 from collections import Counter, deque
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Coroutine, Iterable, Literal, TypeVar, overload
 
 import aiohttp
 import asyncpg
@@ -80,10 +80,10 @@ class MiphaCommandTree(app_commands.CommandTree):
 
 
 class RemoveNoise(logging.Filter):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="discord.state")
 
-    def filter(self, record):
+    def filter(self, record) -> bool:
         if record.levelname == "WARNING" and "referencing an unknown" in record.msg:
             return False
         return True
@@ -163,7 +163,7 @@ class Mipha(commands.Bot):
         "_stats_cog_gateway_handler",
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             command_prefix=_callable_prefix,
             tree_cls=MiphaCommandTree,
@@ -306,6 +306,61 @@ class Mipha(commands.Bot):
 
         return self.logging_webhook.send(embed=embed, wait=True)
 
+    async def get_or_fetch_member(self, guild: discord.Guild, member_id: int) -> discord.Member | None:
+        member = guild.get_member(member_id)
+        if member is not None:
+            return member
+
+        shard: discord.ShardInfo = self.get_shard(guild.shard_id)  # type: ignore  # will never be None
+        if shard.is_ws_ratelimited():
+            try:
+                member = await guild.fetch_member(member_id)
+            except discord.HTTPException:
+                return None
+            else:
+                return member
+
+        members = await guild.query_members(limit=1, user_ids=[member_id], cache=True)
+        if not members:
+            return None
+        return members[0]
+
+    async def resolve_member_ids(self, guild: discord.Guild, member_ids: Iterable[int]) -> AsyncIterator[discord.Member]:
+        needs_resolution = []
+        for member_id in member_ids:
+            member = guild.get_member(member_id)
+            if member is not None:
+                yield member
+            else:
+                needs_resolution.append(member_id)
+
+        total_need_resolution = len(needs_resolution)
+        if total_need_resolution == 1:
+            shard: discord.ShardInfo = self.get_shard(guild.shard_id)  # type: ignore  # will never be None
+            if shard.is_ws_ratelimited():
+                try:
+                    member = await guild.fetch_member(needs_resolution[0])
+                except discord.HTTPException:
+                    pass
+                else:
+                    yield member
+            else:
+                members = await guild.query_members(limit=1, user_ids=needs_resolution, cache=True)
+                if members:
+                    yield members[0]
+        elif total_need_resolution <= 100:
+            # Only a single resolution call needed here
+            resolved = await guild.query_members(limit=100, user_ids=needs_resolution, cache=True)
+            for member in resolved:
+                yield member
+        else:
+            # We need to chunk these in bits of 100...
+            for index in range(0, total_need_resolution, 100):
+                to_resolve = needs_resolution[index : index + 100]
+                members = await guild.query_members(limit=100, user_ids=to_resolve, cache=True)
+                for member in members:
+                    yield member
+
     async def get_context(self, origin: discord.Interaction | discord.Message, /, *, cls: type[CtxT] = Context) -> CtxT:
         return await super().get_context(origin, cls=cls)  # type: ignore # yeah I'm not too sure
 
@@ -386,7 +441,7 @@ class Mipha(commands.Bot):
         self.owner_id = self.bot_app_info.owner.id
 
 
-async def main():
+async def main() -> None:
     async with Mipha() as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
         dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
     ) as pool:

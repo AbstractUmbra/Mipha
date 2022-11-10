@@ -146,7 +146,7 @@ class SphinxObjectFileReader:
 
 
 class RTFX(commands.Cog):
-    def __init__(self, bot: Mipha):
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
 
     def parse_object_inv(self, stream: SphinxObjectFileReader, url: str) -> dict[str, str]:
@@ -304,7 +304,7 @@ class RTFX(commands.Cog):
 
     @rtfm.command(name="refresh")
     @commands.is_owner()
-    async def rtfm_refresh(self, ctx: Context):
+    async def rtfm_refresh(self, ctx: Context) -> None:
         """Refreshes the RTFM and FAQ cache"""
 
         async with ctx.typing():
@@ -406,5 +406,5 @@ class RTFX(commands.Cog):
         await ctx.send(fmt)
 
 
-async def setup(bot):
+async def setup(bot) -> None:
     await bot.add_cog(RTFX(bot))

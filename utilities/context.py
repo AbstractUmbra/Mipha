@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime
 import secrets
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, Protocol, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Iterable, Protocol, Sequence, TypeVar
 
 import discord
 from discord.ext import commands
@@ -26,7 +26,10 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 
-__all__ = ("Context",)
+__all__ = (
+    "Context",
+    "GuildContext",
+)
 
 T = TypeVar("T")
 
@@ -63,6 +66,12 @@ class DatabaseProtocol(Protocol):
     async def fetchval(self, query: str, *args: Any, timeout: float | None = None) -> Any | None:
         ...
 
+    async def executemany(self, query: str, args: Iterable[Sequence[Any]], *, timeout: float | None = None) -> None:
+        ...
+
+    async def close(self) -> None:
+        ...
+
     def acquire(self, *, timeout: float | None = None) -> ConnectionContextManager:
         ...
 
@@ -74,7 +83,7 @@ class DisambiguatorView(discord.ui.View, Generic[T]):
     message: discord.Message
     selected: T
 
-    def __init__(self, ctx: Context, data: list[T], entry: Callable[[T], Any]):
+    def __init__(self, ctx: Context, data: list[T], entry: Callable[[T], Any]) -> None:
         super().__init__()
         self.ctx: Context = ctx
         self.data: list[T] = data
@@ -99,7 +108,7 @@ class DisambiguatorView(discord.ui.View, Generic[T]):
             return False
         return True
 
-    async def on_select_submit(self, interaction: discord.Interaction):
+    async def on_select_submit(self, interaction: discord.Interaction) -> None:
         index = int(self.select.values[0])
         self.selected = self.data[index]
         await interaction.response.defer()
@@ -129,7 +138,7 @@ class Context(commands.Context["Mipha"]):
 
     @property
     def db(self) -> DatabaseProtocol:
-        return self.pool  # type: ignore
+        return self.pool  # type: ignore # override for protocol
 
     @discord.utils.cached_property
     def replied_reference(self) -> discord.MessageReference | None:
@@ -253,3 +262,11 @@ class Context(commands.Context["Mipha"]):
             suppress_embeds=suppress_embeds,
             ephemeral=ephemeral,
         )
+
+
+class GuildContext(Context):
+    author: discord.Member
+    guild: discord.Guild
+    channel: discord.VoiceChannel | discord.TextChannel | discord.Thread
+    me: discord.Member
+    prefix: str

@@ -15,7 +15,7 @@ import os
 import traceback
 import unicodedata
 from collections import Counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncGenerator
 
 import discord
 from discord import app_commands
@@ -61,7 +61,7 @@ class PatchedContext(Context):
             return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
-    async def typing(self):
+    async def typing(self) -> AsyncGenerator[None, None]:
         yield
 
 
@@ -131,7 +131,7 @@ class Meta(commands.Cog):
         Only up to 25 characters at a time.
         """
 
-        def to_string(c):
+        def to_string(c) -> str:
             digit = f"{ord(c):x}"
             name = unicodedata.name(c, "Name not found.")
             return f"`\\U{digit:>08}`: {name} - {c} \N{EM DASH} <http://www.fileformat.info/info/unicode/char/{digit}>"

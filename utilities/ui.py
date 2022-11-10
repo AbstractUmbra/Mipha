@@ -32,7 +32,7 @@ class ConfirmationView(discord.ui.View):
                 await self.message.edit(view=None, content="This is safe to dismiss now.")
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         self.value = True
         await interaction.response.defer()
         if self.delete_after and self.message:
@@ -44,7 +44,7 @@ class ConfirmationView(discord.ui.View):
         self.stop()
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         self.value = False
         await interaction.response.defer()
         if self.delete_after and self.message:

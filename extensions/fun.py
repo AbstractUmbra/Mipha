@@ -72,7 +72,7 @@ AL_BHED_CHARACTER_MAP = {
 class Fun(commands.Cog):
     """Some fun stuff, not fleshed out yet."""
 
-    def __init__(self, bot: Mipha):
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.lock = asyncio.Lock()
         self.message_deletes = 0
@@ -149,7 +149,7 @@ class Fun(commands.Cog):
         """I love this language."""
         keep = ABT_REG.findall(content)
 
-        def trans(m):
+        def trans(m) -> str:
             get = m.group(0)
             if get.isupper():
                 return AL_BHED_CHARACTER_MAP[get.lower()].upper()

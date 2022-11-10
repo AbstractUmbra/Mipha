@@ -47,7 +47,7 @@ class DataBatchEntry(TypedDict):
 
 
 class LoggingHandler(logging.Handler):
-    def __init__(self, cog: Stats):
+    def __init__(self, cog: Stats) -> None:
         self.cog: Stats = cog
         super().__init__(logging.INFO)
 
@@ -79,7 +79,7 @@ def object_at(addr: int) -> Optional[Any]:
 class Stats(commands.Cog):
     """Bot usage statistics."""
 
-    def __init__(self, bot: Mipha):
+    def __init__(self, bot: Mipha) -> None:
         self.bot: Mipha = bot
         self.process = psutil.Process()
         self._batch_lock = asyncio.Lock()
@@ -116,17 +116,17 @@ class Stats(commands.Cog):
                 log.info("Registered %s commands to the database.", total)
             self._data_batch.clear()
 
-    def cog_unload(self):
+    def cog_unload(self) -> None:
         self.bulk_insert_loop.stop()
         self.logging_worker.cancel()
 
     @tasks.loop(seconds=10.0)
-    async def bulk_insert_loop(self):
+    async def bulk_insert_loop(self) -> None:
         async with self._batch_lock:
             await self.bulk_insert()
 
     @tasks.loop(seconds=0.0)
-    async def logging_worker(self):
+    async def logging_worker(self) -> None:
         record = await self._logging_queue.get()
         await self.send_log_record(record)
 
@@ -168,11 +168,11 @@ class Stats(commands.Cog):
             )
 
     @commands.Cog.listener()
-    async def on_command_completion(self, ctx: Context):
+    async def on_command_completion(self, ctx: Context) -> None:
         await self.register_command(ctx)
 
     @commands.Cog.listener()
-    async def on_interaction(self, interaction: discord.Interaction):
+    async def on_interaction(self, interaction: discord.Interaction) -> None:
         command = interaction.command
         # Check if a command is found and it's not a hybrid command
         # Hybrid commands are already counted via on_command_completion
@@ -188,7 +188,7 @@ class Stats(commands.Cog):
             await self.register_command(ctx)
 
     @commands.Cog.listener()
-    async def on_socket_event_type(self, event_type: str):
+    async def on_socket_event_type(self, event_type: str) -> None:
         self.bot.socket_stats[event_type] += 1
 
     @discord.utils.cached_property
@@ -198,7 +198,7 @@ class Stats(commands.Cog):
 
     @commands.command(hidden=True)
     @commands.is_owner()
-    async def commandstats(self, ctx: Context, limit: int = 12):
+    async def commandstats(self, ctx: Context, limit: int = 12) -> None:
         """Shows command stats.
 
         Use a negative number for bottom instead of top.
@@ -227,7 +227,7 @@ class Stats(commands.Cog):
         await pages.start()
 
     @commands.command(hidden=True)
-    async def socketstats(self, ctx: Context):
+    async def socketstats(self, ctx: Context) -> None:
         delta = discord.utils.utcnow() - self.bot.start_time
         minutes = delta.total_seconds() / 60
         total = sum(self.bot.socket_stats.values())
@@ -238,7 +238,7 @@ class Stats(commands.Cog):
         return time.human_timedelta(self.bot.start_time, accuracy=None, brief=brief, suffix=False)
 
     @commands.command()
-    async def uptime(self, ctx: Context):
+    async def uptime(self, ctx: Context) -> None:
         """Tells you how long the bot has been up for."""
         await ctx.send(f"Uptime: **{self.get_bot_uptime()}**")
 
@@ -252,13 +252,13 @@ class Stats(commands.Cog):
         offset = time.format_relative(commit_time.astimezone(datetime.timezone.utc))
         return f"[`{short_sha2}`](https://github.com/AbstractUmbra/mipha/commit/{commit.hex}) {short} ({offset})"
 
-    def get_last_commits(self, count=3):
+    def get_last_commits(self, count=3) -> str:
         repo = pygit2.Repository(".git")
         commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL), count))
         return "\n".join(self.format_commit(c) for c in commits)
 
     @commands.command()
-    async def about(self, ctx: Context):
+    async def about(self, ctx: Context) -> None:
         """Tells you information about the bot itself."""
 
         revision = self.get_last_commits()
@@ -480,7 +480,7 @@ class Stats(commands.Cog):
     @commands.group(invoke_without_command=True)
     @commands.guild_only()
     @commands.cooldown(1, 30.0, type=commands.BucketType.member)
-    async def stats(self, ctx: Context, *, member: discord.Member | None = None):
+    async def stats(self, ctx: Context, *, member: discord.Member | None = None) -> None:
         """Tells you command usage stats for the server or a member."""
         async with ctx.typing():
             if member is None:
@@ -490,7 +490,7 @@ class Stats(commands.Cog):
 
     @stats.command(name="global")
     @commands.is_owner()
-    async def stats_global(self, ctx: Context):
+    async def stats_global(self, ctx: Context) -> None:
         """Global all time command statistics."""
 
         query = "SELECT COUNT(*) FROM commands;"
@@ -557,7 +557,7 @@ class Stats(commands.Cog):
 
     @stats.command(name="today")
     @commands.is_owner()
-    async def stats_today(self, ctx: Context):
+    async def stats_today(self, ctx: Context) -> None:
         """Global command statistics for the day."""
 
         query = "SELECT failed, COUNT(*) FROM commands WHERE used > (CURRENT_TIMESTAMP - INTERVAL '1 day') GROUP BY failed;"
@@ -637,7 +637,7 @@ class Stats(commands.Cog):
         e.add_field(name="Top Users", value="\n".join(value), inline=False)
         await ctx.send(embed=e)
 
-    async def send_guild_stats(self, e: discord.Embed, guild: discord.Guild):
+    async def send_guild_stats(self, e: discord.Embed, guild: discord.Guild) -> None:
         e.add_field(name="Name", value=guild.name)
         e.add_field(name="ID", value=guild.id)
         e.add_field(name="Shard ID", value=guild.shard_id or "N/A")
@@ -658,16 +658,16 @@ class Stats(commands.Cog):
 
     @stats_today.before_invoke
     @stats_global.before_invoke
-    async def before_stats_invoke(self, ctx: Context):
+    async def before_stats_invoke(self, ctx: Context) -> None:
         await ctx.typing()
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild):
+    async def on_guild_join(self, guild: discord.Guild) -> None:
         e = discord.Embed(colour=0x53DDA4, title="New Guild")  # green colour
         await self.send_guild_stats(e, guild)
 
     @commands.Cog.listener()
-    async def on_guild_remove(self, guild: discord.Guild):
+    async def on_guild_remove(self, guild: discord.Guild) -> None:
         e = discord.Embed(colour=0xDD5F53, title="Left Guild")  # red colour
         await self.send_guild_stats(e, guild)
 
@@ -726,7 +726,7 @@ class Stats(commands.Cog):
 
     @commands.command(hidden=True)
     @commands.is_owner()
-    async def bothealth(self, ctx: Context):
+    async def bothealth(self, ctx: Context) -> None:
         """Various bot health monitoring tools."""
 
         # This uses a lot of private methods because there is no
@@ -810,15 +810,17 @@ class Stats(commands.Cog):
 
     @commands.command(hidden=True, aliases=["cancel_task"])
     @commands.is_owner()
-    async def debug_task(self, ctx: Context, memory_id: Annotated[int, hex_value]):
+    async def debug_task(self, ctx: Context, memory_id: Annotated[int, hex_value]) -> None:
         """Debug a task by a memory location."""
         task = object_at(memory_id)
         if task is None or not isinstance(task, asyncio.Task):
-            return await ctx.send(f"Could not find Task object at {hex(memory_id)}.")
+            await ctx.send(f"Could not find Task object at {hex(memory_id)}.")
+            return
 
         if ctx.invoked_with == "cancel_task":
             task.cancel()
-            return await ctx.send(f"Cancelled task object {task!r}.")
+            await ctx.send(f"Cancelled task object {task!r}.")
+            return
 
         paginator = commands.Paginator(prefix="```py")
         fp = io.StringIO()
@@ -832,11 +834,12 @@ class Stats(commands.Cog):
         for page in paginator.pages:
             await ctx.send(page)
 
-    async def tabulate_query(self, ctx: Context, query: str, *args: Any):
+    async def tabulate_query(self, ctx: Context, query: str, *args: Any) -> None:
         records = await ctx.db.fetch(query, *args)
 
         if len(records) == 0:
-            return await ctx.send("No results found.")
+            await ctx.send("No results found.")
+            return
 
         headers = list(records[0].keys())
         table = formats.TabularData()
@@ -853,7 +856,7 @@ class Stats(commands.Cog):
 
     @commands.group(hidden=True, invoke_without_command=True)
     @commands.is_owner()
-    async def command_history(self, ctx: Context):
+    async def command_history(self, ctx: Context) -> None:
         """Command history."""
         query = """SELECT
                         CASE failed
@@ -871,7 +874,7 @@ class Stats(commands.Cog):
 
     @command_history.command(name="for")
     @commands.is_owner()
-    async def command_history_for(self, ctx: Context, days: Annotated[int, Optional[int]] = 7, *, command: str):
+    async def command_history_for(self, ctx: Context, days: Annotated[int, Optional[int]] = 7, *, command: str) -> None:
         """Command history for a command."""
 
         query = """SELECT *, t.success + t.failed AS "total"
@@ -892,7 +895,7 @@ class Stats(commands.Cog):
 
     @command_history.command(name="guild", aliases=["server"])
     @commands.is_owner()
-    async def command_history_guild(self, ctx: Context, guild_id: int):
+    async def command_history_guild(self, ctx: Context, guild_id: int) -> None:
         """Command history for a guild."""
 
         query = """SELECT
@@ -912,7 +915,7 @@ class Stats(commands.Cog):
 
     @command_history.command(name="user", aliases=["member"])
     @commands.is_owner()
-    async def command_history_user(self, ctx: Context, user_id: int):
+    async def command_history_user(self, ctx: Context, user_id: int) -> None:
         """Command history for a user."""
 
         query = """SELECT
@@ -931,7 +934,7 @@ class Stats(commands.Cog):
 
     @command_history.command(name="log")
     @commands.is_owner()
-    async def command_history_log(self, ctx: Context, days: int = 7):
+    async def command_history_log(self, ctx: Context, days: int = 7) -> None:
         """Command history log for the last N days."""
 
         query = """SELECT command, COUNT(*)
@@ -972,14 +975,15 @@ class Stats(commands.Cog):
 
     @command_history.command(name="cog")
     @commands.is_owner()
-    async def command_history_cog(self, ctx: Context, days: int = 7, *, cog_name: str | None = None):
+    async def command_history_cog(self, ctx: Context, days: int = 7, *, cog_name: str | None = None) -> None:
         """Command history for a cog or grouped by a cog."""
 
         interval = datetime.timedelta(days=days)
         if cog_name is not None:
             cog = self.bot.get_cog(cog_name)
             if cog is None:
-                return await ctx.send(f"Unknown cog: {cog_name}")
+                await ctx.send(f"Unknown cog: {cog_name}")
+                return
 
             query = """SELECT *, t.success + t.failed AS "total"
                        FROM (
@@ -1011,12 +1015,12 @@ class Stats(commands.Cog):
         class Count:
             __slots__ = ("success", "failed", "total")
 
-            def __init__(self):
+            def __init__(self) -> None:
                 self.success = 0
                 self.failed = 0
                 self.total = 0
 
-            def add(self, record):
+            def add(self, record) -> None:
                 self.success += record["success"]
                 self.failed += record["failed"]
                 self.total += record["total"]
@@ -1066,7 +1070,7 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
         pass
 
 
-async def setup(bot: Mipha):
+async def setup(bot: Mipha) -> None:
     if not hasattr(bot, "command_stats"):
         bot.command_stats = Counter()
 
@@ -1083,7 +1087,7 @@ async def setup(bot: Mipha):
     commands.Bot.on_error = on_error
 
 
-async def teardown(bot: Mipha):
+async def teardown(bot: Mipha) -> None:
     commands.Bot.on_error = old_on_error
     logging.getLogger().removeHandler(bot._stats_cog_gateway_handler)
     del bot._stats_cog_gateway_handler

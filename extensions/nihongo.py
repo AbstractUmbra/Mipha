@@ -400,7 +400,7 @@ class KanjiEmbed(discord.Embed):
 class Nihongo(commands.Cog):
     """The description for Nihongo goes here."""
 
-    def __init__(self, bot: Mipha):
+    def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.converter = _create_kakasi()
         self.nihongo_study_reminders.start()
@@ -411,13 +411,13 @@ class Nihongo(commands.Cog):
         self.nihon_travel_reminders.cancel()
 
     @commands.command()
-    async def romaji(self, ctx: Context, *, text: commands.clean_content):
+    async def romaji(self, ctx: Context, *, text: commands.clean_content) -> None:
         """Sends the Romaji version of passed Kana."""
         ret = await self.bot.loop.run_in_executor(None, self.converter.do, text)
         await ctx.send(ret)
 
     @commands.group(name="kanji", aliases=["かんじ", "漢字"], invoke_without_command=True)
-    async def kanji(self, ctx: Context, character: str):
+    async def kanji(self, ctx: Context, character: str) -> None:
         """KanjiApi.dev - Return data on a single Kanji."""
         if len(character) > 1:
             raise commands.BadArgument("Only one Kanji please.")
@@ -434,7 +434,7 @@ class Nihongo(commands.Cog):
         await menu.start()
 
     @kanji.command(name="words")
-    async def words(self, ctx: Context, character: str):
+    async def words(self, ctx: Context, character: str) -> None:
         """KanjiApi.dev - Return the words a Kanji is used in, or in conjuction with."""
         if len(character) > 1:
             raise commands.BadArgument("Only one Kanji please.")
@@ -535,7 +535,7 @@ class Nihongo(commands.Cog):
 
     @commands.command()
     @commands.cooldown(1, 10, commands.BucketType.channel)
-    async def kanarace(self, ctx: Context, amount: int = 10, kana: Literal["k", "h"] | None = "h"):
+    async def kanarace(self, ctx: Context, amount: int = 10, kana: Literal["k", "h"] | None = "h") -> None:
         """Kana racing.
 
         This command will send an image of a string of Kana of [amount] length.

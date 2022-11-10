@@ -64,23 +64,23 @@ class BooruData(NamedTuple):
 class BlacklistedBooru(commands.CommandError):
     """Error raised when you request a blacklisted tag."""
 
-    def __init__(self, tags: set[str]):
+    def __init__(self, tags: set[str]) -> None:
         self.blacklisted_tags: set[str] = tags
         self.blacklist_tags_fmt: str = " | ".join(tags)
         super().__init__("Bad Booru tags.")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Found blacklisted tags in query: `{self.blacklist_tags_fmt}`."
 
 
 class BadNHentaiID(commands.CommandError):
     """Error raised when you request a bad nhentai ID."""
 
-    def __init__(self, hentai_id: int, message: str):
+    def __init__(self, hentai_id: int, message: str) -> None:
         self.nhentai_id: int = hentai_id
         super().__init__(message)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Invalid NHentai ID: `{self.nhentai_id}`."
 
 
@@ -95,7 +95,7 @@ class BooruConfig:
         "auto_six_digits",
     )
 
-    def __init__(self, *, guild_id: int, bot: Mipha, record: _LewdTableData | None = None):
+    def __init__(self, *, guild_id: int, bot: Mipha, record: _LewdTableData | None = None) -> None:
         self.guild_id: int = guild_id
         self.bot: Mipha = bot
         self.record: _LewdTableData | None = record
@@ -187,7 +187,7 @@ class Lewd(commands.Cog):
         self,
         guild_id: int,
         *,
-        connection: asyncpg.Pool | asyncpg.Connection | None = None,
+        connection: asyncpg.Connection | asyncpg.Pool | None = None,
     ) -> BooruConfig:
         connection = connection or self.bot.pool
         query = """
@@ -403,7 +403,7 @@ class Lewd(commands.Cog):
             return
 
         id_: int = getattr(ctx.guild, "id", -1)
-        current_config = await self.get_booru_config(id_)  # type: ignore # cache is gay
+        current_config = await self.get_booru_config(id_)
 
         limit = max(min(0, real_args.limit), 100)
         aiohttp_params.update({"limit": limit})
@@ -476,7 +476,7 @@ class Lewd(commands.Cog):
             return
 
         id_: int = getattr(ctx.guild, "id", -1)
-        current_config = await self.get_booru_config(id_)  # type: ignore # cache is gay
+        current_config = await self.get_booru_config(id_)
 
         limit = max(min(0, real_args.limit), 100)
         aiohttp_params.update({"limit": limit})
@@ -541,7 +541,7 @@ class Lewd(commands.Cog):
 
     @blacklist.command()
     @checks.has_permissions(manage_messages=True)
-    async def add(self, ctx: Context, *tags: str):
+    async def add(self, ctx: Context, *tags: str) -> None:
         """Add an item to the blacklist."""
         assert ctx.guild is not None
 
@@ -559,7 +559,7 @@ class Lewd(commands.Cog):
 
     @blacklist.command()
     @checks.has_permissions(manage_messages=True)
-    async def remove(self, ctx: Context, *tags: str):
+    async def remove(self, ctx: Context, *tags: str) -> None:
         """Remove an item from the blacklist."""
         assert ctx.guild is not None
 
@@ -578,7 +578,7 @@ class Lewd(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     @commands.max_concurrency(1, commands.BucketType.user, wait=False)
     @commands.is_nsfw()
-    async def nhentai(self, ctx, hentai_id: int):
+    async def nhentai(self, ctx, hentai_id: int) -> None:
         """Naughty. Return info, the cover and links to an nhentai gallery."""
         gallery = await self.bot.h_client.fetch_gallery(hentai_id)
 
@@ -615,7 +615,7 @@ class Lewd(commands.Cog):
         """
         assert ctx.guild is not None
 
-        config: BooruConfig = await self.get_booru_config(ctx.guild.id)  # type: ignore # cache is gay
+        config: BooruConfig = await self.get_booru_config(ctx.guild.id)
         if not config:
             await ctx.send("No recorded config for this guild. Creating one.")
             self.get_booru_config.invalidate(self, ctx.guild.id)
@@ -634,7 +634,7 @@ class Lewd(commands.Cog):
         if not isinstance(message.channel, discord.DMChannel) and not message.channel.is_nsfw():
             return
 
-        config: BooruConfig = await self.get_booru_config(message.guild.id)  # type: ignore # cache is gay
+        config: BooruConfig = await self.get_booru_config(message.guild.id)
         if config.auto_six_digits is False:
             return
 

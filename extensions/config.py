@@ -233,7 +233,7 @@ class Config(commands.Cog):
                 return True
 
         # check if we're plonked
-        is_plonked = await self.is_plonked(  # type: ignore # typing is gay with instance bindings
+        is_plonked = await self.is_plonked(
             ctx.guild.id,
             ctx.author.id,
             channel_id=ctx.channel.id,
@@ -265,7 +265,7 @@ class Config(commands.Cog):
         if is_owner:
             return True
 
-        resolved = await self.get_command_permissions(ctx.guild.id, connection=ctx.db)  # type: ignore # typing is gay with instance bindings
+        resolved = await self.get_command_permissions(ctx.guild.id, connection=ctx.db)
         return not resolved.is_blocked(ctx)
 
     async def _bulk_ignore_entries(
@@ -560,7 +560,7 @@ class Config(commands.Cog):
         assert isinstance(ctx.channel, discord.TextChannel)
 
         channel = channel or ctx.channel
-        resolved = await self.get_command_permissions(ctx.guild.id)  # type: ignore # typing is gay with instance bindings
+        resolved = await self.get_command_permissions(ctx.guild.id)
         disabled = resolved.get_blocked_commands(channel.id)
 
         if len(disabled) > 15:
@@ -571,21 +571,21 @@ class Config(commands.Cog):
 
     @config.group(name="global")
     @commands.is_owner()
-    async def _global(self, ctx: Context):
+    async def _global(self, ctx: Context) -> None:
         """Handles global bot configuration."""
 
     @_global.command(name="block")
-    async def global_block(self, ctx: Context, object_id: int):
+    async def global_block(self, ctx: Context, object_id: int) -> None:
         """Blocks a user or guild globally."""
         await self.bot._blacklist_add(object_id)
         await ctx.send(ctx.tick(True))
 
     @_global.command(name="unblock")
-    async def global_unblock(self, ctx: Context, object_id: int):
+    async def global_unblock(self, ctx: Context, object_id: int) -> None:
         """Unblocks a user or guild globally."""
         await self.bot._blacklist_remove(object_id)
         await ctx.send(ctx.tick(True))
 
 
-async def setup(bot: Mipha):
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Config(bot))

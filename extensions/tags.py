@@ -11,7 +11,7 @@ import asyncio
 import datetime
 import io
 import shlex
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Generator, TypeVar
 
 import asyncpg
 import discord
@@ -359,7 +359,7 @@ class Tags(commands.Cog):
         converter = TagName()
         original = ctx.message
 
-        def check(msg):
+        def check(msg: discord.Message) -> bool:
             return msg.author == ctx.author and ctx.channel == msg.channel
 
         try:
@@ -467,7 +467,7 @@ class Tags(commands.Cog):
             # fill with data to ensure that we have a minimum of 3
             records.extend((None, None, None, None) for _ in range(0, 3 - len(records)))
 
-        def emojize(seq):
+        def emojize(seq: list[Any]) -> Generator[tuple[str, str], None, None]:
             emoji = 129351  # ord(':first_place:')
             for index, value in enumerate(seq):
                 yield chr(emoji + index), value
@@ -1038,7 +1038,7 @@ class Tags(commands.Cog):
         await ctx.send(f"Successfully transferred tag ownership to {member}.")
 
     @tag.command(hidden=True)
-    async def config(self, ctx):
+    async def config(self, ctx: Context) -> None:
         """This is a reserved tag command. Check back later."""
         pass
 

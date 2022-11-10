@@ -93,7 +93,7 @@ class TabularData:
 
         to_draw = [sep]
 
-        def get_entry(d):
+        def get_entry(d: Sequence[Any]) -> str:
             elem = "|".join(f"{e:^{self._widths[i]}}" for i, e in enumerate(d))
             return f"|{elem}|"
 

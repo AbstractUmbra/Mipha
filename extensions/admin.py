@@ -202,6 +202,6 @@ class Admin(commands.Cog):
         await ctx.send(f"Synced the tree to {formats.plural(ret):guild}.")
 
 
-async def setup(bot: Mipha):
+async def setup(bot: Mipha) -> None:
     """Cog entrypoint."""
     await bot.add_cog(Admin(bot))

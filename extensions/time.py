@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import zoneinfo
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, overload
 
 import discord
 from discord.ext import commands
@@ -23,14 +23,14 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 
-class TimezoneConverter(commands.Converter):
-    async def convert(self, ctx: Context, argument: str):
+class TimezoneConverter(commands.Converter[zoneinfo.ZoneInfo]):
+    async def convert(self, ctx: Context, argument: str) -> zoneinfo.ZoneInfo:
         query = extract(query=argument.lower(), choices=list(zoneinfo.available_timezones()), limit=5)
         if argument.lower() not in {timezone.lower() for timezone in zoneinfo.available_timezones()}:
             matches = "\n".join([f"`{index}.` {match[0]}" for index, match in enumerate(query, start=1)])
             await ctx.send(f"That was not a recognised timezone. Maybe you meant one of these?\n{matches}")
 
-            def check(message: discord.Message):
+            def check(message: discord.Message) -> bool:
                 return (
                     message.author == ctx.author
                     and message.channel == ctx.channel
@@ -88,7 +88,15 @@ class Time(commands.Cog):
             embeds.append(embed)
         return embeds
 
-    def _curr_tz_time(self, curr_timezone: zoneinfo.ZoneInfo, *, ret_datetime: bool = False):
+    @overload
+    def _curr_tz_time(self, curr_timezone: zoneinfo.ZoneInfo, *, ret_datetime: Literal[True]) -> datetime.datetime:
+        ...
+
+    @overload
+    def _curr_tz_time(self, curr_timezone: zoneinfo.ZoneInfo, *, ret_datetime: Literal[False]) -> str:
+        ...
+
+    def _curr_tz_time(self, curr_timezone: zoneinfo.ZoneInfo, *, ret_datetime: bool = False) -> datetime.datetime | str:
         """We assume it's a good tz here."""
         dt_obj = datetime.datetime.now(curr_timezone)
         if ret_datetime:
@@ -207,6 +215,6 @@ class Time(commands.Cog):
             await ctx.send("How am I supposed to do this if you don't supply the timezone?")
 
 
-async def setup(bot):
+async def setup(bot: Mipha) -> None:
     """Cog entrypoint."""
     await bot.add_cog(Time(bot))

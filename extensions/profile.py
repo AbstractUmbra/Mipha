@@ -52,7 +52,7 @@ class DisambiguateMember(commands.IDConverter, app_commands.Transformer):
                     if member.name == argument or (member.nick and member.nick == argument)
                 ]
 
-                def to_str(m):
+                def to_str(m: discord.Member) -> str:
                     if m.nick:
                         return f"{m} (a.k.a {m.nick})"
                     else:
@@ -61,7 +61,7 @@ class DisambiguateMember(commands.IDConverter, app_commands.Transformer):
                 entry = to_str
 
             try:
-                result = await ctx.disambiguate(matches, entry)
+                result = await ctx.disambiguate(matches, entry)  # type: ignore # re-used
             except Exception as e:
                 raise commands.BadArgument(f"Could not find this member. {e}") from None
 
@@ -151,7 +151,7 @@ class PromptProfileCreationView(discord.ui.View):
         return True
 
     @discord.ui.button(label="Create Profile", style=discord.ButtonStyle.blurple)
-    async def create_profile(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def create_profile(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(ProfileCreateModal(self.cog, self.ctx))
 
 
@@ -161,7 +161,7 @@ class Profile(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot: Mipha = bot
 
-    async def cog_command_error(self, ctx: Context, error: commands.CommandError):
+    async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         if isinstance(error, commands.BadArgument):
             await ctx.send(str(error), ephemeral=True)
 
@@ -209,7 +209,7 @@ class Profile(commands.Cog):
         e.set_author(name=member.display_name, icon_url=member.display_avatar.with_format("png"))
         await ctx.send(embed=e)
 
-    async def edit_fields(self, ctx: Context, **fields: str):
+    async def edit_fields(self, ctx: Context, **fields: str) -> None:
         keys = ", ".join(fields)
         values = ", ".join(f"${2 + i}" for i in range(len(fields)))
 
@@ -224,21 +224,21 @@ class Profile(commands.Cog):
 
     @profile.command(usage="<NNID>")
     @app_commands.describe(nnid="Your NNID (Nintendo Network ID)")
-    async def nnid(self, ctx: Context, *, nnid: Annotated[str, valid_nnid]):
+    async def nnid(self, ctx: Context, *, nnid: Annotated[str, valid_nnid]) -> None:
         """Sets the NNID portion of your profile."""
         await self.edit_fields(ctx, nnid=nnid)
         await ctx.send("Updated NNID.")
 
     @profile.command(name="3ds")
     @app_commands.describe(fc="Your 3DS Friend Code")
-    async def profile_3ds(self, ctx: Context, *, fc: Annotated[str, valid_fc]):
+    async def profile_3ds(self, ctx: Context, *, fc: Annotated[str, valid_fc]) -> None:
         """Sets the 3DS friend code of your profile."""
         await self.edit_fields(ctx, fc_3ds=fc)
         await ctx.send("Updated 3DS friend code.")
 
     @profile.command()
     @app_commands.describe(fc="Your Switch Friend Code")
-    async def switch(self, ctx: Context, *, fc: Annotated[str, valid_fc]):
+    async def switch(self, ctx: Context, *, fc: Annotated[str, valid_fc]) -> None:
         """Sets the Switch friend code of your profile."""
         await self.edit_fields(ctx, fc_switch=fc)
         await ctx.send("Updated Switch friend code.")
@@ -306,7 +306,7 @@ class Profile(commands.Cog):
 
     @profile.command()
     @app_commands.describe(query="The search query, must be at least 3 characters")
-    async def search(self, ctx: Context, *, query: str):
+    async def search(self, ctx: Context, *, query: str) -> None:
         """Searches profiles via either friend code or NNID.
 
         The query must be at least 3 characters long.
@@ -336,7 +336,8 @@ class Profile(commands.Cog):
         records = await ctx.db.fetch(query, value)
 
         if len(records) == 0:
-            return await ctx.send("No results found...")
+            await ctx.send("No results found...")
+            return
 
         e = discord.Embed(colour=discord.Colour.random())
 
