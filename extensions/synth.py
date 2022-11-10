@@ -138,6 +138,7 @@ class SynthCog(commands.Cog, name="Synth"):
     @app_commands.command(
         name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
     )
+    @app_commands.describe(engine="Which voice engine to use", text="What do you want the voice engine to say?")
     async def tiktok_callback(self, itx: discord.Interaction, engine: str, text: str) -> None:
         await itx.response.defer(thinking=True)
 
@@ -183,7 +184,7 @@ class SynthCog(commands.Cog, name="Synth"):
             if _x:
                 ret.append(_x)
 
-        return ret
+        return ret[:25]
 
     @app_commands.command(name="synth", description="Synthesise some Japanese text as a sound file.", nsfw=False)
     async def synth_callback(self, itx: discord.Interaction, engine: int, text: str) -> None:
@@ -209,7 +210,7 @@ class SynthCog(commands.Cog, name="Synth"):
             if _x:
                 ret.append(_x)
 
-        return ret[:25]
+        return ret
 
 
 async def setup(bot: Mipha) -> None:
