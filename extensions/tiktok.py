@@ -4,13 +4,17 @@ import asyncio
 import logging
 import pathlib
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 import discord
 import yt_dlp
 from discord import app_commands
 from discord.ext import commands
 from jishaku.shell import ShellReader
+from yt_dlp.extractor.instagram import InstagramIE
+from yt_dlp.extractor.tiktok import TikTokIE, TikTokVMIE
+
+from utilities.time import ordinal
 
 
 if TYPE_CHECKING:
@@ -19,10 +23,10 @@ if TYPE_CHECKING:
 LOGGER: logging.Logger = logging.getLogger(__name__)
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
 
-MOBILE_PATTERN = re.compile(r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+)(?:\/\?.*\>?)?\>?")
-DESKTOP_PATTERN = re.compile(r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?")
+MOBILE_PATTERN: re.Pattern[str] = TikTokVMIE._VALID_URL_RE
+DESKTOP_PATTERN: re.Pattern[str] = TikTokIE._VALID_URL_RE
 
-INSTAGRAM_PATTERN = re.compile(r"\<?(?:https?://)?(?:www\.)?instagram\.com/reel/[a-zA-Z\-\_\d]+/\?.*\=\>?")
+INSTAGRAM_PATTERN: re.Pattern[str] = InstagramIE._VALID_URL_RE
 
 
 class FilesizeLimitExceeded(Exception):
@@ -56,11 +60,11 @@ class TiktokCog(commands.Cog):
         await interaction.response.defer(thinking=True)
 
         if match := MOBILE_PATTERN.search(message.content):
-            url = match[1]
+            url = match[0]
         elif match := DESKTOP_PATTERN.search(message.content):
-            url = match[1]
-        # elif match := INSTAGRAM_PATTERN.search(message.content):
-        #     url = match[0]
+            url = match[0]
+        elif match := INSTAGRAM_PATTERN.search(message.content):
+            url = match["url"]
         else:
             await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.", ephemeral=True)
             return
@@ -90,6 +94,7 @@ class TiktokCog(commands.Cog):
             path.unlink(missing_ok=True)
 
     async def _extract_video_info(self, url: str, *, loop: asyncio.AbstractEventLoop | None = None) -> dict[str, Any] | None:
+        LOGGER.info("Extracting URL: %r", url)
         loop = loop or asyncio.get_running_loop()
 
         info = await loop.run_in_executor(None, ydl.extract_info, url)
@@ -151,24 +156,26 @@ class TiktokCog(commands.Cog):
         if message.guild.id not in {174702278673039360, 149998214810959872}:
             return
 
-        matches = (
-            DESKTOP_PATTERN.findall(message.content)
-            or MOBILE_PATTERN.findall(message.content)
-            # or INSTAGRAM_PATTERN.findall(message.content)
+        matches: Iterator[re.Match[str]] = (
+            DESKTOP_PATTERN.finditer(message.content)
+            or MOBILE_PATTERN.finditer(message.content)
+            or INSTAGRAM_PATTERN.finditer(message.content)
         )
-        if not matches:
+
+        processed_matches = list(matches)
+        if not processed_matches:
             return
 
-        LOGGER.debug("Processing %s detected TikToks...", len(matches))
+        LOGGER.debug("Processing %s detected TikToks...", len(processed_matches))
 
         async with message.channel.typing():
-            urls = self._pull_matches(matches)
+            urls = self._pull_matches(processed_matches)
             loop = asyncio.get_running_loop()
             _errors: list[int] = []
             for idx, url in enumerate(urls, start=1):
                 try:
                     info = await self._extract_video_info(url, loop=loop)
-                except yt_dlp.DownloadError:
+                except (yt_dlp.DownloadError, yt_dlp.utils.ExtractorError):
                     _errors.append(idx)
                     continue
 
@@ -190,11 +197,16 @@ class TiktokCog(commands.Cog):
                 content = content[:1000] + f"\nRequested by: {message.author} | Replying to: {message.jump_url}"
 
                 await message.channel.send(content, file=file)
+                if _errors:
+                    formatted = "I had issues downloading the "
+                    formatted += ", ".join([ordinal(idx) for idx in _errors])
+                    formatted += " links in your message."
+                    await message.channel.send(formatted)
                 if message.channel.permissions_for(message.guild.me).manage_messages and any(
                     [
                         DESKTOP_PATTERN.fullmatch(message.content),
                         MOBILE_PATTERN.fullmatch(message.content),
-                        # INSTAGRAM_PATTERN.fullmatch(message.content),
+                        INSTAGRAM_PATTERN.fullmatch(message.content),
                     ]
                 ):
                     await message.delete()
