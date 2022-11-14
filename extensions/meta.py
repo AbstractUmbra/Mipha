@@ -23,13 +23,20 @@ from discord.ext import commands
 
 from utilities import checks, formats, time
 from utilities._types.discord_ import MessageableGuildChannel
-from utilities.context import Context
 
 
 if TYPE_CHECKING:
     from bot import Mipha
+    from utilities.context import Context, GuildContext
 
-GuildChannel = discord.TextChannel | discord.VoiceChannel | discord.StageChannel | discord.CategoryChannel | discord.Thread
+GuildChannel = (
+    discord.TextChannel
+    | discord.VoiceChannel
+    | discord.StageChannel
+    | discord.CategoryChannel
+    | discord.Thread
+    | discord.ForumChannel
+)
 
 
 class Prefix(commands.Converter):
@@ -161,7 +168,7 @@ class Meta(commands.Cog):
         await ctx.send(embed=e)
 
     @prefix.command(name="add", ignore_extra=False)
-    @checks.is_mod()
+    @checks.is_manager()
     async def prefix_add(
         self,
         ctx: Context,
@@ -197,7 +204,7 @@ class Meta(commands.Cog):
             await ctx.send("You've given too many prefixes. Either quote it or only do it one by one.")
 
     @prefix.command(name="remove", aliases=["delete"], ignore_extra=False)
-    @checks.is_mod()
+    @checks.is_manager()
     async def prefix_remove(
         self,
         ctx: Context,
@@ -350,7 +357,7 @@ class Meta(commands.Cog):
 
     @commands.command(aliases=["guildinfo"], usage="")
     @commands.guild_only()
-    async def serverinfo(self, ctx: Context, *, guild: discord.Guild | None = None) -> None:
+    async def serverinfo(self, ctx: GuildContext, *, guild: discord.Guild | None = None) -> None:
         """Shows info about the current server."""
 
         if await self.bot.is_owner(ctx.author):
@@ -557,9 +564,8 @@ class Meta(commands.Cog):
 
     @commands.check(lambda ctx: bool(ctx.guild and ctx.guild.voice_client))
     @commands.command(name="disconnect")
-    async def disconnect_(self, ctx: Context) -> None:
+    async def disconnect_(self, ctx: GuildContext) -> None:
         """Disconnects the bot from the voice channel."""
-        assert ctx.guild is not None  # guarded by check
         assert ctx.guild.voice_client is not None  # guarded by check
 
         v_client: discord.VoiceClient = ctx.guild.voice_client  # type: ignore # python types are gae
