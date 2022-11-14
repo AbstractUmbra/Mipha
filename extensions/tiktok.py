@@ -12,7 +12,6 @@ from discord import app_commands
 from discord.ext import commands
 from jishaku.shell import ShellReader
 from yt_dlp.extractor.instagram import InstagramIE
-from yt_dlp.extractor.tiktok import TikTokIE, TikTokVMIE
 
 from utilities.time import ordinal
 
@@ -23,8 +22,12 @@ if TYPE_CHECKING:
 LOGGER: logging.Logger = logging.getLogger(__name__)
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
 
-MOBILE_PATTERN: re.Pattern[str] = TikTokVMIE._VALID_URL_RE
-DESKTOP_PATTERN: re.Pattern[str] = TikTokIE._VALID_URL_RE
+MOBILE_PATTERN: re.Pattern[str] = re.compile(
+    r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+\/?)(?:\/\?.*\>?)?\>?"
+)
+DESKTOP_PATTERN: re.Pattern[str] = re.compile(
+    r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?"
+)
 
 INSTAGRAM_PATTERN: re.Pattern[str] = InstagramIE._VALID_URL_RE
 
