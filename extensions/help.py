@@ -129,7 +129,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
 
 class Help(commands.Cog):
     """
-    mipha's help command!
+    Mipha's help command!
     """
 
     def __init__(self, bot: Mipha) -> None:
