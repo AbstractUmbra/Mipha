@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import secrets
 from textwrap import shorten
 from typing import TYPE_CHECKING, Callable, Coroutine
 
@@ -296,7 +297,19 @@ class MangaCog(commands.Cog, name="Manga"):
         fmt = "<@!155863164544614402> \n"
         to_send = formats.to_codeblock("".join(lines), escape_md=False)
 
-        await self.webhook.send((fmt + to_send), allowed_mentions=discord.AllowedMentions(users=True))
+        clean = fmt + to_send
+        if len(clean) >= 2000:
+            password = secrets.token_urlsafe(16)
+            expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+            paste = await self.bot.mb_client.create_paste(
+                filename="error.py", content=clean, password=password, expires=expires
+            )
+            clean = (
+                f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."
+                f"\nThe password is {password} and it expires at {discord.utils.format_dt(expires, 'F')}."
+            )
+
+        await self.webhook.send(clean, allowed_mentions=discord.AllowedMentions(users=True))
 
     def cog_unload(self) -> None:
         self.get_personal_feed.cancel()

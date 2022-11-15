@@ -11,6 +11,7 @@ import datetime
 import json
 import logging
 import pathlib
+import secrets
 import sys
 import traceback
 from collections import Counter, deque
@@ -73,7 +74,18 @@ class MiphaCommandTree(app_commands.CommandTree):
         (exc_type, exc, tb) = type(error), error, error.__traceback__
         trace = traceback.format_exception(exc_type, exc, tb)
         clean = "".join(trace)
-        e.description = f"```py\n{clean}\n```"
+        if len(clean) >= 2000:
+            password = secrets.token_urlsafe(16)
+            expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+            paste = await self.client.mb_client.create_paste(
+                filename="error.py", content=clean, password=password, expires=expires
+            )
+            e.description = (
+                f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."
+                f"\nThe password is {password} and it expires at {discord.utils.format_dt(expires, 'F')}."
+            )
+        else:
+            e.description = f"```py\n{clean}\n```"
         e.timestamp = datetime.datetime.now(datetime.timezone.utc)
         await self.client.logging_webhook.send(embed=e)
         await self.client.owner.send(embed=e)
@@ -433,9 +445,6 @@ class Mipha(commands.Bot):
                         f.write(f"{last_log}\n")
 
     async def setup_hook(self) -> None:
-        self.mb_client = mystbin.Client(session=self.session, token=self.config.MYSTBIN_TOKEN)
-        self.md_client = hondana.Client(**self.config.MANGADEX_AUTH, session=self.session)
-        self.h_client = nhentaio.Client()
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
 
         self.bot_app_info = await self.application_info()
@@ -453,6 +462,10 @@ async def main() -> None:
         bot.pool = pool
 
         bot.session = session
+
+        bot.mb_client = mystbin.Client(session=session, token=bot.config.MYSTBIN_TOKEN)
+        bot.md_client = hondana.Client(**bot.config.MANGADEX_AUTH, session=session)
+        bot.h_client = nhentaio.Client()
 
         with SetupLogging():
             await bot.load_extension("jishaku")
