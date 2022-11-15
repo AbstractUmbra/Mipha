@@ -29,7 +29,7 @@ DESKTOP_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?"
 )
 
-INSTAGRAM_PATTERN: re.Pattern[str] = InstagramIE._VALID_URL_RE
+INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(rf"\<?{InstagramIE._VALID_URL}\>?")
 
 
 class FilesizeLimitExceeded(Exception):
@@ -63,9 +63,9 @@ class TiktokCog(commands.Cog):
         await interaction.response.defer(thinking=True)
 
         if match := MOBILE_PATTERN.search(message.content):
-            url = match[0]
+            url = match[1]
         elif match := DESKTOP_PATTERN.search(message.content):
-            url = match[0]
+            url = match[1]
         elif match := INSTAGRAM_PATTERN.search(message.content):
             url = match["url"]
         else:
@@ -140,10 +140,7 @@ class TiktokCog(commands.Cog):
     def _pull_matches(self, matches: list[re.Match[str]]) -> list[str]:
         cleaned: list[str] = []
         for _url in matches:
-            if isinstance(_url, str):
-                exposed_url: str = _url
-            else:
-                exposed_url: str = _url[0]
+            exposed_url: str = _url[1]
 
             if not exposed_url.endswith("/"):
                 exposed_url = exposed_url + "/"
