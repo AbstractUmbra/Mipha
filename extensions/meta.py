@@ -23,11 +23,11 @@ from discord.ext import commands
 
 from utilities import checks, formats, time
 from utilities._types.discord_ import MessageableGuildChannel
+from utilities.context import Context, GuildContext
 
 
 if TYPE_CHECKING:
     from bot import Mipha
-    from utilities.context import Context, GuildContext
 
 GuildChannel = (
     discord.TextChannel
