@@ -529,11 +529,12 @@ class Mod(commands.Cog):
 
         self._automod_migration_view = MigrateJoinLogView(self)
         bot.add_view(self._automod_migration_view)
+        bot.loop.create_task(self._load_avatar())
 
     def __repr__(self) -> str:
         return "<cogs.Mod>"
 
-    async def cog_load(self) -> None:
+    async def _load_avatar(self) -> None:
         await self.bot.wait_until_ready()
         self._avatar: bytes = await self.bot.user.display_avatar.read()
 
