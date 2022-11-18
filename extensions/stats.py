@@ -86,7 +86,7 @@ class Stats(commands.Cog):
         self._data_batch: list[DataBatchEntry] = []
         self.bulk_insert_loop.add_exception_type(asyncpg.PostgresConnectionError)
         self.bulk_insert_loop.start()
-        self._logging_queue = asyncio.Queue()
+        self._logging_queue = asyncio.Queue[logging.LogRecord]()
         self.logging_worker.start()
 
     @property
@@ -183,7 +183,7 @@ class Stats(commands.Cog):
         ):
             # This is technically bad, but since we only access Command.qualified_name and it's
             # available on all types of commands then it's fine
-            ctx = await self.bot.get_context(interaction, cls=Context)
+            ctx = await Context.from_interaction(interaction)
             ctx.command_failed = interaction.command_failed or ctx.command_failed
             await self.register_command(ctx)
 
@@ -264,7 +264,7 @@ class Stats(commands.Cog):
         revision = self.get_last_commits()
         embed = discord.Embed(description="Latest Changes:\n" + revision)
         embed.title = "Official Bot Server Invite"
-        embed.url = "https://discord.gg/DWEaqMy"
+        embed.url = "https://discord.gg/aYGYJxwqe5"
         embed.colour = discord.Colour.blurple()
 
         embed.set_author(name=str(self.bot.owner), icon_url=self.bot.owner.display_avatar.url)
