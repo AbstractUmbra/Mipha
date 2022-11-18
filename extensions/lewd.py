@@ -647,7 +647,10 @@ class Lewd(commands.Cog):
             gallery: nhentaio.Gallery | None = await self.bot.h_client.fetch_gallery(digits)
         except nhentaio.NHentaiError:
             await message.channel.send(
-                "I would have given you the cum provocation but NHentai is down. I queued it and will try again."
+                (
+                    "I would have given you the cum provocation but NHentai is down. I queued it and will try again."
+                    f"\nHave the link in the meantime: https://nhentai.net/g/{digits}"
+                )
             )
             self._nhen_queu.add((message.author.id, message.channel.id, digits))
             return
