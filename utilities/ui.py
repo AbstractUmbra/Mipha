@@ -6,10 +6,31 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import discord
 
 
-class ConfirmationView(discord.ui.View):
+if TYPE_CHECKING:
+    from typing_extensions import Self
+
+    from bot import Mipha
+
+__all__ = ("MiphaBaseView", "ConfirmationView")
+
+
+class MiphaBaseView(discord.ui.View):
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Self], /) -> None:
+        client: Mipha = interaction.client  # type: ignore
+        await client.tree.on_error(interaction, error)  # type: ignore
+
+    def _disable_all_buttons(self) -> None:
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.disabled = True
+
+
+class ConfirmationView(MiphaBaseView):
     def __init__(self, *, timeout: float, author_id: int, delete_after: bool) -> None:
         super().__init__(timeout=timeout)
         self.value: bool | None = None
