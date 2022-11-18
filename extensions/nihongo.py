@@ -685,7 +685,7 @@ class Nihongo(commands.Cog):
     @tasks.loop(hours=1)
     async def nihon_travel_reminders(self) -> None:
         target_date = datetime.datetime(
-            year=2023, month=8, day=25, hour=9, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc
+            year=2023, month=8, day=24, hour=9, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc
         )
 
         hf_time = human_timedelta(target_date, accuracy=5)
