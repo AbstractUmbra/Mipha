@@ -4,14 +4,13 @@ import asyncio
 import logging
 import pathlib
 import re
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 import discord
 import yt_dlp
 from discord import app_commands
 from discord.ext import commands
 from jishaku.shell import ShellReader
-from yt_dlp.extractor.instagram import InstagramIE
 
 from utilities.cache import ExpiringCache
 from utilities.time import ordinal
@@ -21,7 +20,9 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
-ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
+ydl = yt_dlp.YoutubeDL(
+    {"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER, "cookiefile": "configs/insta_cookies.txt"}
+)
 
 MOBILE_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+\/?)(?:\/\?.*\>?)?\>?"
@@ -29,8 +30,9 @@ MOBILE_PATTERN: re.Pattern[str] = re.compile(
 DESKTOP_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?"
 )
-
-INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(rf"\<?{InstagramIE._VALID_URL}\>?")
+INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(
+    r"\<?(?P<url>https?://(?:www\.)?instagram\.com(?:/[^/]+)?/(?:p|tv|reel)/(?P<id>[^/?#&]+))\>?"
+)
 
 
 class FilesizeLimitExceeded(Exception):
@@ -162,20 +164,19 @@ class TiktokCog(commands.Cog):
         if message.guild.id not in {174702278673039360, 149998214810959872}:
             return
 
-        matches: Iterator[re.Match[str]] = (
-            DESKTOP_PATTERN.finditer(message.content)
-            or MOBILE_PATTERN.finditer(message.content)
-            or INSTAGRAM_PATTERN.finditer(message.content)
+        matches: list[re.Match[str]] = (
+            list(DESKTOP_PATTERN.finditer(message.content))
+            + list(MOBILE_PATTERN.finditer(message.content))
+            + list(INSTAGRAM_PATTERN.finditer(message.content))
         )
 
-        processed_matches = list(matches)
-        if not processed_matches:
+        if not matches:
             return
 
-        LOGGER.debug("Processing %s detected TikToks...", len(processed_matches))
+        LOGGER.debug("Processing %s detected TikToks...", len(matches))
 
         async with message.channel.typing():
-            urls = self._pull_matches(processed_matches)
+            urls = self._pull_matches(matches)
             loop = asyncio.get_running_loop()
             _errors: list[int] = []
             for idx, url in enumerate(urls, start=1):

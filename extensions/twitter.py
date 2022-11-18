@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from .tiktok import TiktokCog
 
-TWITTER_URL_REGEX = re.compile(r"https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+)")
+TWITTER_URL_REGEX: re.Pattern[str] = re.compile(r"https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+)")
 
 
 class RepostView(MiphaBaseView):
@@ -75,16 +75,22 @@ class Twitter(commands.Cog):
     def __init__(self, bot: Mipha, /) -> None:
         self.bot: Mipha = bot
 
-    def _pull_matches(self, message: discord.Message, /) -> list[re.Match[str]] | None:
+    def _pull_matches(self, message: discord.Message, /) -> list[re.Match[str]]:
         return list(TWITTER_URL_REGEX.finditer(message.content))
 
     def _handle_url(self, match: re.Match[str]) -> yarl.URL:
         url = yarl.URL(match[0])
+        if url.host in ("www.instagram.com", "instagram.com"):
+            return url.with_host("ddinstagram.com").with_scheme("https")
         return url.with_host("fxtwitter.com").with_scheme("https")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message, /) -> None:
         if not message.guild or message.guild.id not in {174702278673039360, 149998214810959872}:
+            return
+
+        matches = self._pull_matches(message)
+        if not matches:
             return
 
         if message.embeds:
@@ -95,15 +101,13 @@ class Twitter(commands.Cog):
         if not has_video:
             return
 
-        matches = self._pull_matches(message)
-        if not matches:
-            return
-
         new_urls = [self._handle_url(match) for match in matches]
         tiktok_cog: TiktokCog | None = self.bot.get_cog("TiktokCog")  # type: ignore # this can't be narrowed
         view = RepostView(new_urls, cog=tiktok_cog)
         view.message = await message.reply(
-            content="I found twitter links with videos in them. Should I repost them?", view=view, mention_author=False
+            content="I have found Twitter links in your message with video. Should I repost them?",
+            view=view,
+            mention_author=False,
         )
 
 

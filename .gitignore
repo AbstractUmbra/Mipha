@@ -2,7 +2,7 @@ _bot_config.py
 poetry.lock
 extensions/private/*
 static/
-configs/**/*.json
+configs/**/*
 *.log*
 _pyright/
 buffer/
