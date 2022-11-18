@@ -13,6 +13,7 @@ from discord.ext import commands
 from jishaku.shell import ShellReader
 from yt_dlp.extractor.instagram import InstagramIE
 
+from utilities.cache import ExpiringCache
 from utilities.time import ordinal
 
 
@@ -48,6 +49,7 @@ class TiktokCog(commands.Cog):
         )
         self.tiktok_context_menu.error(self.tiktok_context_menu_error)
         self.bot.tree.add_command(self.tiktok_context_menu)
+        self.task_mapping: dict[str, asyncio.Task] = ExpiringCache(seconds=20)
 
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.tiktok_context_menu.name, type=self.tiktok_context_menu.type)
@@ -133,7 +135,11 @@ class TiktokCog(commands.Cog):
         content = f"**Uploader**: {info['uploader']}\n\n" * (bool(info["uploader"]))
         content += f"**Description**: {info['description']}" * (bool(info["uploader"]))
 
-        loop.create_task(self._cleanup_paths(file_loc, fixed_file_loc))
+        if file_loc.name in self.task_mapping:
+            self.task_mapping[file_loc.name].cancel()
+
+        task = loop.create_task(self._cleanup_paths(file_loc, fixed_file_loc))
+        self.task_mapping[file_loc.name] = task
 
         return file, content
 
