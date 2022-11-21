@@ -9,15 +9,18 @@ from typing import TYPE_CHECKING, Any
 import discord
 import yarl
 import yt_dlp
-from discord import app_commands
+from discord import app_commands, ui
 from discord.ext import commands
 from jishaku.shell import ShellReader
 
 from utilities.cache import ExpiringCache
 from utilities.time import ordinal
+from utilities.ui import MiphaBaseView
 
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from bot import Mipha
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -35,6 +38,89 @@ DESKTOP_PATTERN: re.Pattern[str] = re.compile(
 INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(?P<url>https?://(?:www\.)?instagram\.com(?:/[^/]+)?/(?:p|tv|reel)/(?P<id>[^/?#&]+))\>?"
 )
+TWITTER_PATTERN: re.Pattern[str] = re.compile(r"https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+)")
+
+GUILDS: list[discord.Object] = [
+    discord.Object(id=174702278673039360),
+    discord.Object(id=149998214810959872),
+]
+
+
+class RepostView(MiphaBaseView):
+    message: discord.InteractionMessage
+
+    def __init__(
+        self,
+        urls: list[yarl.URL],
+        /,
+        *,
+        timeout: float | None = 10,
+        cog: MediaReposter,
+        owner_id: int,
+        target_message: discord.Message,
+    ) -> None:
+        self.urls: list[yarl.URL] = urls
+        self.tiktok: MediaReposter = cog
+        self.owner_id: int = owner_id
+        self.target_message: discord.Message = target_message
+        super().__init__(timeout=timeout)
+        if self.tiktok is None:
+            self.download_video.disabled = True
+
+    async def on_timeout(self) -> None:
+        await self.message.delete()
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: ui.Item[Self], /) -> None:
+        client: Mipha = interaction.client  # type: ignore
+        await client.tree.on_error(interaction, error)  # type: ignore
+
+    @ui.button(label="Repost?", emoji="\U0001f503")
+    async def repost_button(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+        first_url = self.urls.pop(0)
+        await interaction.response.send_message(content=str(first_url))
+        self._disable_all_buttons()
+        await self.message.edit(view=self)
+
+        if self.urls:
+            for url in self.urls:
+                await interaction.channel.send(str(url))  # type: ignore # it's definitely not a stagechannel thanks
+
+    @ui.button(label="Upload video?", emoji="\U0001f4fa")
+    async def download_video(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        assert self.tiktok
+        assert interaction.guild  # covered in the guard in message
+
+        await interaction.response.defer()
+        await self.message.delete()
+
+        url = self.urls.pop(0)
+
+        try:
+            _info = await self.tiktok._extract_video_info(url)
+        except yt_dlp.utils.DownloadError as error:
+            await interaction.followup.send(
+                "Sorry downloading this video broke somehow. Umbra knows don't worry.", ephemeral=True
+            )
+            await interaction.client.tree.on_error(interaction, error)  # type: ignore
+            return
+
+        if not _info:
+            await interaction.followup.send(content="I couldn't grab the video details.")
+            self.repost_button.disabled = False
+            await self.message.edit(view=self)
+            return
+
+        file, _ = await self.tiktok._manipulate_video(_info, filesize_limit=interaction.guild.filesize_limit)
+        await self.target_message.reply(content="I downloaded the video for you:-", file=file)
+
+    @ui.button(label="No thanks", style=discord.ButtonStyle.danger, row=2, emoji="\U0001f5d1\U0000fe0f")
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button[RepostView]) -> None:
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message(
+                "You're not allowed to close this, only the message author can!", ephemeral=True
+            )
+        await self.message.delete()
+        self.stop()
 
 
 class FilesizeLimitExceeded(Exception):
@@ -43,29 +129,29 @@ class FilesizeLimitExceeded(Exception):
         super().__init__("The filesize limit was exceeded for this guild.")
 
 
-class TiktokCog(commands.Cog):
+class MediaReposter(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot: Mipha = bot
-        self.tiktok_context_menu = app_commands.ContextMenu(
-            name="Process TikTok link",
-            callback=self.tiktok_context_menu_callback,
+        self.media_context_menu = app_commands.ContextMenu(
+            name="Process media links",
+            callback=self.media_context_menu_callback,
             guild_ids=[174702278673039360, 149998214810959872],
         )
-        self.tiktok_context_menu.error(self.tiktok_context_menu_error)
-        self.bot.tree.add_command(self.tiktok_context_menu)
+        self.media_context_menu.error(self.media_context_menu_error)
+        self.bot.tree.add_command(self.media_context_menu)
         self.task_mapping: dict[str, asyncio.Task] = ExpiringCache(seconds=20)
 
     async def cog_unload(self) -> None:
-        self.bot.tree.remove_command(self.tiktok_context_menu.name, type=self.tiktok_context_menu.type)
+        self.bot.tree.remove_command(self.media_context_menu.name, type=self.media_context_menu.type)
 
-    async def tiktok_context_menu_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+    async def media_context_menu_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         send = interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
 
         error = getattr(error, "original", error)
 
         await send("Sorry but something broke. <@155863164544614402> knows and will fix it.")
 
-    async def tiktok_context_menu_callback(self, interaction: discord.Interaction, message: discord.Message) -> None:
+    async def media_context_menu_callback(self, interaction: discord.Interaction, message: discord.Message) -> None:
         await interaction.response.defer(thinking=True)
 
         if match := MOBILE_PATTERN.search(message.content):
@@ -74,6 +160,8 @@ class TiktokCog(commands.Cog):
             url = match[1]
         elif match := INSTAGRAM_PATTERN.search(message.content):
             url = match["url"]
+        elif match := TWITTER_PATTERN.search(message.content):
+            url = match[0]
         else:
             await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.", ephemeral=True)
             return
@@ -231,4 +319,4 @@ class TiktokCog(commands.Cog):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(TiktokCog(bot))
+    await bot.add_cog(MediaReposter(bot))
