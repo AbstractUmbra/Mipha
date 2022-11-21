@@ -200,7 +200,7 @@ class SynthCog(commands.Cog, name="Synth"):
         choices = await self._get_engine_choices()
 
         if not current:
-            return choices
+            return choices[:25]
 
         cleaned = extract(current, choices=[choice.name for choice in choices], limit=5, score_cutoff=20)
 
@@ -210,7 +210,7 @@ class SynthCog(commands.Cog, name="Synth"):
             if _x:
                 ret.append(_x)
 
-        return ret
+        return ret[:25]
 
 
 async def setup(bot: Mipha) -> None:
