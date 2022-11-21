@@ -7,6 +7,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 import discord
+import yarl
 import yt_dlp
 from discord import app_commands
 from discord.ext import commands
@@ -20,7 +21,8 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
-ydl = yt_dlp.YoutubeDL(
+ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
+insta_ydl = yt_dlp.YoutubeDL(
     {"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER, "cookiefile": "configs/insta_cookies.txt"}
 )
 
@@ -78,6 +80,8 @@ class TiktokCog(commands.Cog):
 
         loop = asyncio.get_running_loop()
 
+        url = yarl.URL(url)
+
         info = await self._extract_video_info(url, loop=loop)
         if not info:
             await interaction.followup.send(
@@ -100,11 +104,18 @@ class TiktokCog(commands.Cog):
         for path in args:
             path.unlink(missing_ok=True)
 
-    async def _extract_video_info(self, url: str, *, loop: asyncio.AbstractEventLoop | None = None) -> dict[str, Any] | None:
+    async def _extract_video_info(
+        self, url: yarl.URL, *, loop: asyncio.AbstractEventLoop | None = None
+    ) -> dict[str, Any] | None:
         LOGGER.info("Extracting URL: %r", url)
         loop = loop or asyncio.get_running_loop()
 
-        info = await loop.run_in_executor(None, ydl.extract_info, url)
+        if url.host in {"instagram.com", "www.instagram.com"}:
+            yt = insta_ydl
+        else:
+            yt = ydl
+
+        info = await loop.run_in_executor(None, yt.extract_info, str(url))
 
         if not info:
             return
@@ -181,7 +192,7 @@ class TiktokCog(commands.Cog):
             _errors: list[int] = []
             for idx, url in enumerate(urls, start=1):
                 try:
-                    info = await self._extract_video_info(url, loop=loop)
+                    info = await self._extract_video_info(yarl.URL(url), loop=loop)
                 except (yt_dlp.DownloadError, yt_dlp.utils.ExtractorError):
                     _errors.append(idx)
                     continue
