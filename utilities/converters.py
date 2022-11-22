@@ -15,8 +15,10 @@ from discord import app_commands
 from discord.ext import commands
 from typing_extensions import NotRequired, Self
 
-from utilities.context import Context
+from utilities.context import Context, GuildContext
 
+
+MYSTBIN_REGEX = re.compile(r"(?:(?:https?://)?(?:beta\.)?(?:mystb\.in\/))?(?P<id>(?:[A-Z]{1}[a-z]+)*)(?P<ext>\.\w+)?")
 
 __all__ = (
     "RedditMediaURL",
@@ -25,6 +27,7 @@ __all__ = (
     "WhenAndWhatTransformer",
     "DatetimeTransformer",
     "BadDatetimeTransform",
+    "MystbinPasteConverter",
 )
 
 
@@ -441,3 +444,12 @@ class Snowflake:
             if param:
                 raise commands.BadArgument(f"{param.name} argument expected a Discord ID not {argument!r}")
             raise commands.BadArgument(f"expected a Discord ID not {argument!r}")
+
+
+class MystbinPasteConverter(commands.Converter[str]):
+    async def convert(self, ctx: GuildContext, argument: str) -> str:
+        matches = MYSTBIN_REGEX.search(argument)
+        if not matches:
+            raise commands.ConversionError(self, ValueError("No Mystbin IDs found in this text."))
+
+        return matches["id"]
