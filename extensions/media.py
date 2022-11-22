@@ -38,7 +38,7 @@ DESKTOP_PATTERN: re.Pattern[str] = re.compile(
 INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(?P<url>https?://(?:www\.)?instagram\.com(?:/[^/]+)?/(?:p|tv|reel)/(?P<id>[^/?#&]+))\>?"
 )
-TWITTER_PATTERN: re.Pattern[str] = re.compile(r"https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+)")
+TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+)\>?")
 
 GUILDS: list[discord.Object] = [
     discord.Object(id=174702278673039360),
@@ -69,10 +69,6 @@ class RepostView(MiphaBaseView):
 
     async def on_timeout(self) -> None:
         await self.message.delete()
-
-    async def on_error(self, interaction: discord.Interaction, error: Exception, item: ui.Item[Self], /) -> None:
-        client: Mipha = interaction.client  # type: ignore
-        await client.tree.on_error(interaction, error)  # type: ignore
 
     @ui.button(label="Repost?", emoji="\U0001f503")
     async def repost_button(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:

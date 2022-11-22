@@ -76,13 +76,10 @@ class MiphaCommandTree(app_commands.CommandTree):
         clean = "".join(trace)
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
-            expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
-            paste = await self.client.mb_client.create_paste(
-                filename="error.py", content=clean, password=password, expires=expires
-            )
+            paste = await self.client.mb_client.create_paste(filename="error.py", content=clean, password=password)
             e.description = (
                 f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."
-                f"\nThe password is {password} and it expires at {discord.utils.format_dt(expires, 'F')}."
+                f"\nThe password is `{password}`."
             )
         else:
             e.description = f"```py\n{clean}\n```"

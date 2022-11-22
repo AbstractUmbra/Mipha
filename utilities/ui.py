@@ -6,6 +6,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
+import datetime
+import secrets
+import traceback
 from typing import TYPE_CHECKING
 
 import discord
@@ -23,6 +26,36 @@ class MiphaBaseView(discord.ui.View):
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Self], /) -> None:
         client: Mipha = interaction.client  # type: ignore
         await client.tree.on_error(interaction, error)  # type: ignore
+
+        view_name = self.__class__.__name__
+        client.global_log.exception("Exception occurred in View '%s':\n%s", view_name, error)
+
+        embed = discord.Embed(title=f"{view_name} View Error", colour=0xA32952)
+        embed.add_field(name="Author", value=interaction.user, inline=False)
+        channel = interaction.channel
+        guild = interaction.guild
+        location_fmt = f"Channel: {channel.name} ({channel.id})"  # type: ignore
+
+        if guild:
+            location_fmt += f"\nGuild: {guild.name} ({guild.id})"
+            embed.add_field(name="Location", value=location_fmt, inline=True)
+
+        (exc_type, exc, tb) = type(error), error, error.__traceback__
+        trace = traceback.format_exception(exc_type, exc, tb)
+        clean = "".join(trace)
+        if len(clean) >= 2000:
+            password = secrets.token_urlsafe(16)
+            paste = await client.mb_client.create_paste(filename="error.py", content=clean, password=password)
+            embed.description = (
+                f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."
+                f"\nThe password is `{password}`."
+            )
+        else:
+            embed.description = f"```py\n{clean}\n```"
+
+        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        await client.logging_webhook.send(embed=embed)
+        await client.owner.send(embed=embed)
 
     def _disable_all_buttons(self) -> None:
         for item in self.children:
