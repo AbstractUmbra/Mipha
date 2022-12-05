@@ -6,12 +6,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import codecs
 import json
+import random
 import re
 import sys
 import unicodedata
 from collections.abc import Iterable, Sequence
 from typing import Any, SupportsAbs
 
+import discord
 from discord.utils import escape_markdown
 
 
@@ -202,3 +204,7 @@ def clean_triple_backtick(line: str) -> str:
 
 def to_json(obj: Any) -> str:
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=True)
+
+
+def random_pastel_colour() -> discord.Colour:
+    return discord.Colour.from_hsv(random.random(), 0.28, 0.97)
