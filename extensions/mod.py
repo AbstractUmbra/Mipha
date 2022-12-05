@@ -13,7 +13,7 @@ import asyncpg
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Self
 
 from utilities import cache, checks, flags, time
 from utilities.converters import Snowflake
@@ -23,7 +23,6 @@ from utilities.paginator import SimplePages
 
 if TYPE_CHECKING:
     from discord.ext.commands._types import Check
-    from typing_extensions import Self
 
     from bot import Mipha
     from utilities.context import GuildContext
@@ -1721,8 +1720,10 @@ class Mod(commands.Cog):
         if flags.suffix:
             predicates.append(lambda m: m.content.endswith(flags.suffix))  # type: ignore
 
+        require_prompt = False
         if not predicates:
             # If nothing is passed then default to `True` to emulate ?purge all behaviour
+            require_prompt = True
             predicates.append(lambda m: True)
 
         op = all if flags.require == "all" else any
@@ -1737,6 +1738,12 @@ class Mod(commands.Cog):
 
         if search is None:
             search = 100
+
+        if require_prompt:
+            confirm = await ctx.prompt(f"Are you sure you want to delete {plural(search):message}?", timeout=20.0)
+            if not confirm:
+                await ctx.send("Aborting.")
+                return
 
         before = discord.Object(id=flags.before) if flags.before else None
         after = discord.Object(id=flags.after) if flags.after else None
