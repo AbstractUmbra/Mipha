@@ -78,6 +78,8 @@ class SourceConverter(commands.Converter[str]):
             "ui",
         ):
             top_level = f"discord.{top_level}"
+        elif top_level in ("commands",):
+            top_level = f"discord.ext.{top_level}"
 
         if top_level not in RTFS:
             raise BadSource(f"`{top_level}` is not an allowed sourceable module.")
@@ -332,7 +334,7 @@ class RTFX(commands.Cog):
         error = getattr(error, "original", error)
 
         if isinstance(error, (TypeError, BadSource)):
-            await ctx.send(f"Not a valid source-able type or path:-\n\n{error}")
+            await ctx.send(f"Not a valid source-able type or path:-\n\n`{error}`.")
 
     @commands.command(name="pyright", aliases=["pr"])
     async def _pyright(
