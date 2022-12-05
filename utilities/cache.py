@@ -4,7 +4,7 @@ import asyncio
 import enum
 import time
 from functools import wraps
-from typing import Any, Callable, Coroutine, MutableMapping, Protocol, TypeVar
+from typing import Any, Callable, Coroutine, Generic, MutableMapping, Protocol, TypeVar
 
 from lru import LRU
 
@@ -31,7 +31,7 @@ class CacheProtocol(Protocol[R]):
         ...
 
 
-class ExpiringCache(dict):
+class ExpiringCache(dict, Generic[R]):
     def __init__(self, seconds: float) -> None:
         self.__ttl: float = seconds
         super().__init__()
@@ -47,11 +47,11 @@ class ExpiringCache(dict):
         self.__verify_cache_integrity()
         return super().__contains__(key)
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: str) -> tuple[R, float]:
         self.__verify_cache_integrity()
         return super().__getitem__(key)
 
-    def __setitem__(self, key: str, value: Any) -> None:
+    def __setitem__(self, key: str, value: R) -> None:
         super().__setitem__(key, (value, time.monotonic()))
 
 

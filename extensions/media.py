@@ -135,7 +135,7 @@ class MediaReposter(commands.Cog):
         )
         self.media_context_menu.error(self.media_context_menu_error)
         self.bot.tree.add_command(self.media_context_menu)
-        self.task_mapping: dict[str, asyncio.Task] = ExpiringCache(seconds=20)
+        self.task_mapping = ExpiringCache[asyncio.Task[None]](seconds=20)
 
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.media_context_menu.name, type=self.media_context_menu.type)
@@ -233,7 +233,7 @@ class MediaReposter(commands.Cog):
         content += f"**Description**: {info['description']}" * (bool(info["uploader"]))
 
         if file_loc.name in self.task_mapping:
-            self.task_mapping[file_loc.name].cancel()
+            self.task_mapping[file_loc.name][0].cancel()
 
         task = loop.create_task(self._cleanup_paths(file_loc, fixed_file_loc))
         self.task_mapping[file_loc.name] = task
