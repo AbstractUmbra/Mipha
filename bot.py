@@ -38,6 +38,7 @@ from utilities.prefix import callable_prefix as _callable_prefix
 
 
 if TYPE_CHECKING:
+    from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
 
 LOGGER = logging.getLogger("bot.mipha")
@@ -213,6 +214,10 @@ class Mipha(commands.Bot):
     @property
     def reminder(self) -> Reminder | None:
         return self.get_cog("Reminder")  # type: ignore # valid
+
+    @property
+    def config_cog(self) -> ConfigCog | None:
+        return self.get_cog("Config")  # type: ignore
 
     @discord.utils.cached_property
     def logging_webhook(self) -> discord.Webhook:

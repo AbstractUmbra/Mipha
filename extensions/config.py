@@ -1,95 +1,89 @@
-"""
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at http://mozilla.org/MPL/2.0/.
-"""
-
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable
-from itertools import accumulate
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator, Iterable, Optional, Union
 
 import asyncpg
 import discord
 from discord.ext import commands, menus
 
 from utilities import cache, checks
-from utilities.context import Context
-from utilities.paginator import SimplePages
+from utilities.paginator import RoboPages, SimplePages
 
 
 if TYPE_CHECKING:
+    from asyncpg import Connection, Pool, Record
+    from typing_extensions import TypeAlias
+
     from bot import Mipha
+    from utilities.context import Context, GuildContext
 
 
-class LazyEntity:
-    """This is meant for use with the Paginator.
-
-    It lazily computes __str__ when requested and
-    caches it so it doesn't do the lookup again.
-    """
-
-    __slots__ = (
-        "entity_id",
-        "guild",
-        "_cache",
-    )
-
-    def __init__(self, guild: discord.Guild, entity_id: int) -> None:
-        self.entity_id = entity_id
-        self.guild = guild
-        self._cache = None
-
-    def __str__(self) -> str:
-        if self._cache:
-            return self._cache
-
-        entity = self.entity_id
-        guild = self.guild
-        resolved = guild.get_channel(entity) or guild.get_member(entity)
+async def plonk_iterator(bot: Mipha, guild: discord.Guild, records: list[Record]) -> AsyncIterator[str]:
+    for record in records:
+        entity_id = record[0]
+        resolved = guild.get_channel(entity_id) or await bot.get_or_fetch_member(guild, entity_id)
         if resolved is None:
-            self._cache = f"<Not Found: {entity}>"
-        else:
-            self._cache = resolved.mention
-        return self._cache
+            yield f"<Not Found: {entity_id}>"
+        yield str(resolved)
 
 
-class CommandName(commands.Converter[str]):
-    """Command name converter."""
+class PlonkedPageSource(menus.AsyncIteratorPageSource):
+    def __init__(self, bot: Mipha, guild: discord.Guild, records: list[Record]):
+        super().__init__(plonk_iterator(bot, guild, records), per_page=20)
 
-    async def convert(self, ctx: Context, argument: str) -> str:
-        """Perform conversion."""
-        lowered = argument.lower()
+    async def format_page(self, menu: RoboPages, entries: list[str]):
+        embed = discord.Embed(colour=discord.Colour.blurple())
+        pages = []
+        for index, entry in enumerate(entries, start=menu.current_page * self.per_page):
+            pages.append(f"{index + 1}. {entry}")
 
-        valid_commands = {c.qualified_name for c in ctx.bot.walk_commands() if c.cog_name not in ("Config", "Admin")}
+        embed.description = "\n".join(pages)
+        return embed
 
-        if lowered not in valid_commands:
-            raise commands.BadArgument(f"Command {lowered!r} is not valid.")
 
-        return lowered
+class ChannelOrMember(commands.Converter):
+    async def convert(self, ctx: GuildContext, argument: str):
+        try:
+            return await commands.TextChannelConverter().convert(ctx, argument)
+        except commands.BadArgument:
+            return await commands.MemberConverter().convert(ctx, argument)
+
+
+if TYPE_CHECKING:
+    CommandName: TypeAlias = str
+else:
+
+    class CommandName(commands.Converter):
+        async def convert(self, ctx: Context, argument: str) -> str:
+            lowered = argument.lower()
+
+            # fmt: off
+            valid_commands = {
+                c.qualified_name
+                for c in ctx.bot.walk_commands()
+                if c.cog_name not in ('Config', 'Admin')
+            }
+            # fmt: on
+
+            if lowered not in valid_commands:
+                raise commands.BadArgument(f"Command {lowered!r} is not valid.")
+
+            return lowered
 
 
 class ResolvedCommandPermissions:
-    """Resolves command permissions."""
-
     class _Entry:
-        """Quick entry hack."""
+        __slots__ = ("allow", "deny")
 
-        __slots__ = (
-            "allow",
-            "deny",
-        )
+        def __init__(self):
+            self.allow: set[str] = set()
+            self.deny: set[str] = set()
 
-        def __init__(self) -> None:
-            self.allow = set()
-            self.deny = set()
+    def __init__(self, guild_id: int, records: list[tuple[str, int, bool]]):
+        self.guild_id: int = guild_id
 
-    def __init__(self, guild_id: int, records: list[asyncpg.Record]) -> None:
-        self.guild_id = guild_id
-
-        self._lookup = defaultdict(self._Entry)
+        self._lookup: defaultdict[Optional[int], ResolvedCommandPermissions._Entry] = defaultdict(self._Entry)
 
         # channel_id: { allow: [commands], deny: [commands] }
 
@@ -101,13 +95,13 @@ class ResolvedCommandPermissions:
                 entry.deny.add(name)
 
     def _split(self, obj: str) -> list[str]:
-        """Splits objects into list."""
         # "hello there world" -> ["hello", "hello there", "hello there world"]
+        from itertools import accumulate
+
         return list(accumulate(obj.split(), lambda x, y: f"{x} {y}"))
 
     def get_blocked_commands(self, channel_id: int) -> set[str]:
-        """Gets the blocked command."""
-        if not self._lookup:
+        if len(self._lookup) == 0:
             return set()
 
         guild = self._lookup[None]
@@ -119,7 +113,7 @@ class ResolvedCommandPermissions:
         # then apply the channel-level denies
         return ret | (channel.deny - channel.allow)
 
-    def _is_command_blocked(self, name: str, channel_id: int) -> bool | None:
+    def _is_command_blocked(self, name: str, channel_id: int) -> Optional[bool]:
         command_names = self._split(name)
 
         guild = self._lookup[None]  # no special channel_id
@@ -154,19 +148,15 @@ class ResolvedCommandPermissions:
 
         return blocked
 
-    def is_command_blocked(self, name: str, channel_id: int) -> bool | None:
-        """ " Is the command blocked?"""
+    def is_command_blocked(self, name: str, channel_id: int) -> Optional[bool]:
         # fast path
-        if not self._lookup:
+        if len(self._lookup) == 0:
             return False
         return self._is_command_blocked(name, channel_id)
 
-    def is_blocked(self, ctx: Context) -> bool | None:
-        """It is blocked!"""
-        assert ctx.command is not None
-
+    def is_blocked(self, ctx: Context) -> Optional[bool]:
         # fast path
-        if not self._lookup:
+        if len(self._lookup) == 0:
             return False
 
         if isinstance(ctx.author, discord.Member) and ctx.author.guild_permissions.manage_guild:
@@ -182,43 +172,49 @@ class Config(commands.Cog):
     for your server or block certain channels or members.
     """
 
-    def __init__(self, bot: Mipha) -> None:
+    def __init__(self, bot: Mipha):
         self.bot: Mipha = bot
+
+    @property
+    def display_emoji(self) -> discord.PartialEmoji:
+        return discord.PartialEmoji(name="\N{GEAR}\ufe0f")
 
     @cache.cache(strategy=cache.Strategy.lru, maxsize=1024, ignore_kwargs=True)
     async def is_plonked(
         self,
         guild_id: int,
         member_id: int,
-        channel_id: int | None = None,
+        channel: Optional[discord.VoiceChannel | discord.TextChannel | discord.Thread] = None,
         *,
-        connection: asyncpg.Connection | asyncpg.Pool | None = None,
+        connection: Optional[Connection | Pool] = None,
         check_bypass: bool = True,
     ) -> bool:
-        """They are plonked!"""
         if member_id in self.bot._blacklist_data or guild_id in self.bot._blacklist_data:
             return True
 
         if check_bypass:
             guild = self.bot.get_guild(guild_id)
             if guild is not None:
-                member = guild.get_member(member_id)
+                member = await self.bot.get_or_fetch_member(guild, member_id)
                 if member is not None and member.guild_permissions.manage_guild:
                     return False
 
         connection = connection or self.bot.pool
 
-        if channel_id is None:
+        if channel is None:
             query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id=$2;"
             row = await connection.fetchrow(query, guild_id, member_id)
         else:
-            query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3);"
-            row = await connection.fetchrow(query, guild_id, member_id, channel_id)
+            if isinstance(channel, discord.Thread):
+                query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3, $4);"
+                row = await connection.fetchrow(query, guild_id, member_id, channel.id, channel.parent_id)
+            else:
+                query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3);"
+                row = await connection.fetchrow(query, guild_id, member_id, channel.id)
 
         return row is not None
 
     async def bot_check_once(self, ctx: Context) -> bool:
-        """Performs a check only once for the cog."""
         if ctx.guild is None:
             return True
 
@@ -233,26 +229,16 @@ class Config(commands.Cog):
                 return True
 
         # check if we're plonked
-        is_plonked = await self.is_plonked(
-            ctx.guild.id,
-            ctx.author.id,
-            channel_id=ctx.channel.id,
-            connection=ctx.db,
-            check_bypass=False,
-        )
+        is_plonked = await self.is_plonked(ctx.guild.id, ctx.author.id, channel=ctx.channel, check_bypass=False)
 
         return not is_plonked
 
     @cache.cache()
     async def get_command_permissions(
-        self, guild_id: int, *, connection: asyncpg.Connection | asyncpg.Pool | None = None
+        self, guild_id: int, *, connection: Optional[Connection | Pool] = None
     ) -> ResolvedCommandPermissions:
-        """Get command permissions."""
         connection = connection or self.bot.pool
-        query = """
-                SELECT name, channel_id, whitelist
-                FROM command_config WHERE guild_id = $1;
-                """
+        query = "SELECT name, channel_id, whitelist FROM command_config WHERE guild_id=$1;"
 
         records = await connection.fetch(query, guild_id)
         return ResolvedCommandPermissions(guild_id, records)
@@ -265,24 +251,14 @@ class Config(commands.Cog):
         if is_owner:
             return True
 
-        resolved = await self.get_command_permissions(ctx.guild.id, connection=ctx.db)
+        resolved = await self.get_command_permissions(ctx.guild.id)
         return not resolved.is_blocked(ctx)
 
-    async def _bulk_ignore_entries(
-        self,
-        ctx: Context,
-        entries: Iterable[discord.TextChannel | discord.Member],
-    ) -> None:
-        assert ctx.guild is not None
-
+    async def _bulk_ignore_entries(self, ctx: GuildContext, entries: Iterable[discord.abc.Snowflake]) -> None:
         async with ctx.db.acquire() as con:
             async with con.transaction():
-                query = """
-                        SELECT entity_id
-                        FROM plonks
-                        WHERE guild_id = $1;
-                        """
-                records = await ctx.db.fetch(query, ctx.guild.id)
+                query = "SELECT entity_id FROM plonks WHERE guild_id=$1;"
+                records = await con.fetch(query, ctx.guild.id)
 
                 # we do not want to insert duplicates
                 current_plonks = {r[0] for r in records}
@@ -295,32 +271,30 @@ class Config(commands.Cog):
                 # invalidate the cache for this guild
                 self.is_plonked.invalidate_containing(f"{ctx.guild.id!r}:")
 
-    async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
+    async def cog_command_error(self, ctx: Context, error: commands.CommandError):
         if isinstance(error, commands.BadArgument):
             await ctx.send(str(error))
 
     @commands.group()
-    @checks.is_mod()
-    async def config(self, ctx: Context) -> None:
+    async def config(self, ctx: Context):
         """Handles the server or channel permission configuration for the bot."""
         if ctx.invoked_subcommand is None:
             await ctx.send_help("config")
 
-    @config.group(invoke_without_command=True)
+    @config.group(invoke_without_command=True, aliases=["plonk"])
     @checks.is_mod()
-    async def ignore(self, ctx: Context, *entities: discord.TextChannel | discord.Member) -> None:
+    async def ignore(self, ctx: GuildContext, *entities: Union[discord.TextChannel, discord.Member, discord.VoiceChannel]):
         """Ignores text channels or members from using the bot.
 
         If no channel or member is specified, the current channel is ignored.
 
-        Users with Manage Server can still use the bot, regardless of ignore
+        Users with Administrator can still use the bot, regardless of ignore
         status.
 
-        To use this command you must have Manage Server permissions.
+        To use this command you must have Ban Members and Manage Messages permissions.
         """
-        assert ctx.guild is not None
 
-        if not entities:
+        if len(entities) == 0:
             # shortcut for a single insert
             query = "INSERT INTO plonks (guild_id, entity_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;"
             await ctx.db.execute(query, ctx.guild.id, ctx.channel.id)
@@ -335,108 +309,99 @@ class Config(commands.Cog):
     @ignore.command(name="list")
     @checks.is_mod()
     @commands.cooldown(2, 60.0, commands.BucketType.guild)
-    async def ignore_list(self, ctx: Context) -> None:
+    async def ignore_list(self, ctx: GuildContext):
         """Tells you what channels or members are currently ignored in this server.
 
-        To use this command you must have Manage Server permissions.
+        To use this command you must have Ban Members and Manage Messages permissions.
         """
-        assert ctx.guild is not None
 
         query = "SELECT entity_id FROM plonks WHERE guild_id=$1;"
 
         guild = ctx.guild
         records = await ctx.db.fetch(query, guild.id)
 
-        if not records:
-            await ctx.send("I am not ignoring anything here.")
-            return
+        if len(records) == 0:
+            return await ctx.send("I am not ignoring anything here.")
 
-        entries = [LazyEntity(guild, r[0]) for r in records]
-
-        try:
-            page = SimplePages(entries=entries, ctx=ctx, per_page=20)
-            await page.start()
-        except menus.MenuError as err:
-            await ctx.send(str(err))
+        source = PlonkedPageSource(self.bot, guild, records)
+        pages = RoboPages(source, ctx=ctx)
+        await pages.start()
 
     @ignore.command(name="all")
     @checks.is_mod()
-    async def _all(self, ctx: Context) -> None:
+    async def _all(self, ctx: GuildContext):
         """Ignores every channel in the server from being processed.
 
         This works by adding every channel that the server currently has into
         the ignore list. If more channels are added then they will have to be
         ignored by using the ignore command.
 
-        To use this command you must have Manage Server permissions.
+        To use this command you must have Ban Members and Manage Messages permissions.
         """
-        assert ctx.guild is not None
-
         await self._bulk_ignore_entries(ctx, ctx.guild.text_channels)
         await ctx.send("Successfully blocking all channels here.")
 
     @ignore.command(name="clear")
     @checks.is_mod()
-    async def ignore_clear(self, ctx: Context) -> None:
+    async def ignore_clear(self, ctx: GuildContext):
         """Clears all the currently set ignores.
 
-        To use this command you must have Manage Server permissions.
+        To use this command you must have Ban Members and Manage Messages permissions.
         """
-        assert ctx.guild is not None
 
         query = "DELETE FROM plonks WHERE guild_id=$1;"
         await ctx.db.execute(query, ctx.guild.id)
         self.is_plonked.invalidate_containing(f"{ctx.guild.id!r}:")
         await ctx.send("Successfully cleared all ignores.")
 
-    @config.group(pass_context=True, invoke_without_command=True)
+    @config.group(pass_context=True, invoke_without_command=True, aliases=["unplonk"])
     @checks.is_mod()
-    async def unignore(self, ctx: Context, *entities: discord.TextChannel | discord.Member) -> None:
+    async def unignore(self, ctx: GuildContext, *entities: Union[discord.TextChannel, discord.Member, discord.VoiceChannel]):
         """Allows channels or members to use the bot again.
 
         If nothing is specified, it unignores the current channel.
 
-        To use this command you must have the Manage Server permission.
+        To use this command you must have Ban Members and Manage Messages permissions.
         """
-        assert ctx.guild is not None
 
-        if not entities:
+        if len(entities) == 0:
             query = "DELETE FROM plonks WHERE guild_id=$1 AND entity_id=$2;"
             await ctx.db.execute(query, ctx.guild.id, ctx.channel.id)
         else:
             query = "DELETE FROM plonks WHERE guild_id=$1 AND entity_id = ANY($2::bigint[]);"
-            new_entities = [c.id for c in entities]
-            await ctx.db.execute(query, ctx.guild.id, new_entities)
+            entity_ids = [c.id for c in entities]
+            await ctx.db.execute(query, ctx.guild.id, entity_ids)
 
         self.is_plonked.invalidate_containing(f"{ctx.guild.id!r}:")
         await ctx.send(ctx.tick(True))
 
     @unignore.command(name="all")
     @checks.is_mod()
-    async def unignore_all(self, ctx: Context) -> None:
+    async def unignore_all(self, ctx: GuildContext):
         """An alias for ignore clear command."""
-        await self.ignore_clear(ctx)
+        await ctx.invoke(self.ignore_clear)
 
     @config.group(aliases=["guild"])
     @checks.is_mod()
-    async def server(self, ctx: Context) -> None:
+    async def server(self, ctx: GuildContext):
         """Handles the server-specific permissions."""
+        pass
 
     @config.group()
     @checks.is_mod()
-    async def channel(self, ctx: Context) -> None:
+    async def channel(self, ctx: GuildContext):
         """Handles the channel-specific permissions."""
+        pass
 
     async def command_toggle(
         self,
-        connection: asyncpg.Connection | asyncpg.Pool,
+        pool: Pool,
         guild_id: int,
-        channel_id: int | None,
+        channel_id: Optional[int],
         name: str,
         *,
         whitelist: bool = True,
     ) -> None:
-        """Toggles the passed command."""
         # clear the cache
         self.get_command_permissions.invalidate(self, guild_id)
 
@@ -447,141 +412,133 @@ class Config(commands.Cog):
             subcheck = "channel_id=$3"
             args = (guild_id, name, channel_id)
 
-        async with connection.transaction():  # type: ignore # this exists but asyncpg sucks
-            # delete the previous entry regardless of what it was
-            query = f"DELETE FROM command_config WHERE guild_id=$1 AND name=$2 AND {subcheck};"
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                # delete the previous entry regardless of what it was
+                query = f"DELETE FROM command_config WHERE guild_id=$1 AND name=$2 AND {subcheck};"
 
-            # DELETE <num>
-            await connection.execute(query, *args)
+                # DELETE <num>
+                await connection.execute(query, *args)
 
-            query = "INSERT INTO command_config (guild_id, channel_id, name, whitelist) VALUES ($1, $2, $3, $4);"
+                query = "INSERT INTO command_config (guild_id, channel_id, name, whitelist) VALUES ($1, $2, $3, $4);"
 
-            try:
-                await connection.execute(query, guild_id, channel_id, name, whitelist)
-            except asyncpg.UniqueViolationError:
-                msg = "This command is already disabled." if not whitelist else "This command is already explicitly enabled."
-                raise RuntimeError(msg)
+                try:
+                    await connection.execute(query, guild_id, channel_id, name, whitelist)
+                except asyncpg.UniqueViolationError:
+                    msg = (
+                        "This command is already disabled."
+                        if not whitelist
+                        else "This command is already explicitly enabled."
+                    )
+                    raise RuntimeError(msg)
 
     @channel.command(name="disable")
-    async def channel_disable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
+    async def channel_disable(self, ctx: GuildContext, *, command: CommandName):
         """Disables a command for this channel."""
-        assert ctx.guild is not None
 
         try:
             await self.command_toggle(ctx.pool, ctx.guild.id, ctx.channel.id, command, whitelist=False)
-        except RuntimeError as err:
-            await ctx.send(str(err))
+        except RuntimeError as e:
+            await ctx.send(str(e))
         else:
             await ctx.send("Command successfully disabled for this channel.")
 
     @channel.command(name="enable")
-    async def channel_enable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
+    async def channel_enable(self, ctx: GuildContext, *, command: CommandName):
         """Enables a command for this channel."""
-        assert ctx.guild is not None
 
         try:
             await self.command_toggle(ctx.pool, ctx.guild.id, ctx.channel.id, command, whitelist=True)
-        except RuntimeError as err:
-            await ctx.send(str(err))
+        except RuntimeError as e:
+            await ctx.send(str(e))
         else:
             await ctx.send("Command successfully enabled for this channel.")
 
     @server.command(name="disable")
-    async def server_disable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
+    async def server_disable(self, ctx: GuildContext, *, command: CommandName):
         """Disables a command for this server."""
-        assert ctx.guild is not None
 
         try:
             await self.command_toggle(ctx.pool, ctx.guild.id, None, command, whitelist=False)
-        except RuntimeError as err:
-            await ctx.send(str(err))
+        except RuntimeError as e:
+            await ctx.send(str(e))
         else:
             await ctx.send("Command successfully disabled for this server")
 
     @server.command(name="enable")
-    async def server_enable(self, ctx: Context, *, command: str = commands.param(converter=CommandName)) -> None:
+    async def server_enable(self, ctx: GuildContext, *, command: CommandName):
         """Enables a command for this server."""
-        assert ctx.guild is not None
 
         try:
             await self.command_toggle(ctx.pool, ctx.guild.id, None, command, whitelist=True)
-        except RuntimeError as err:
-            await ctx.send(str(err))
+        except RuntimeError as e:
+            await ctx.send(str(e))
         else:
             await ctx.send("Command successfully enabled for this server.")
 
     @config.command(name="enable")
     @checks.is_mod()
-    async def config_enable(
-        self,
-        ctx: Context,
-        channel: discord.TextChannel | None,
-        *,
-        command: str = commands.param(converter=CommandName),
-    ) -> None:
+    async def config_enable(self, ctx: GuildContext, channel: Optional[discord.TextChannel], *, command: CommandName):
         """Enables a command the server or a channel."""
-        assert ctx.guild is not None
 
         channel_id = channel.id if channel else None
         human_friendly = channel.mention if channel else "the server"
         try:
             await self.command_toggle(ctx.pool, ctx.guild.id, channel_id, command, whitelist=True)
-        except RuntimeError as err:
-            await ctx.send(str(err))
+        except RuntimeError as e:
+            await ctx.send(str(e))
         else:
             await ctx.send(f"Command successfully enabled for {human_friendly}.")
 
     @config.command(name="disable")
     @checks.is_mod()
-    async def config_disable(
-        self,
-        ctx: Context,
-        channel: discord.TextChannel | None,
-        *,
-        command: str = commands.param(converter=CommandName),
-    ) -> None:
+    async def config_disable(self, ctx: GuildContext, channel: Optional[discord.TextChannel], *, command: CommandName):
         """Disables a command for the server or a channel."""
-        assert ctx.guild is not None
 
         channel_id = channel.id if channel else None
         human_friendly = channel.mention if channel else "the server"
         try:
             await self.command_toggle(ctx.pool, ctx.guild.id, channel_id, command, whitelist=False)
-        except RuntimeError as err:
-            await ctx.send(str(err))
+        except RuntimeError as e:
+            await ctx.send(str(e))
         else:
             await ctx.send(f"Command successfully disabled for {human_friendly}.")
 
     @config.command(name="disabled")
     @checks.is_mod()
-    async def config_disabled(self, ctx: Context, *, channel: discord.TextChannel | None = None) -> None:
+    async def config_disabled(
+        self, ctx: GuildContext, *, channel: Optional[Union[discord.TextChannel, discord.VoiceChannel]] = None
+    ):
         """Shows the disabled commands for the channel given."""
-        assert ctx.guild is not None
-        assert isinstance(ctx.channel, discord.TextChannel)
 
-        channel = channel or ctx.channel
-        resolved = await self.get_command_permissions(ctx.guild.id)
-        disabled = resolved.get_blocked_commands(channel.id)
-
-        if len(disabled) > 15:
-            value = await self.bot.mb_client.create_paste(content="\n".join(disabled), filename="disabled_things.txt")
+        channel_id: int
+        if channel is None:
+            if isinstance(ctx.channel, discord.Thread):
+                channel_id = ctx.channel.parent_id
+            else:
+                channel_id = ctx.channel.id
         else:
-            value = "\n".join(disabled) or "None!"
-        await ctx.send(f"In {channel.mention} the following commands are disabled:\n{value}")
+            channel_id = channel.id
+
+        resolved = await self.get_command_permissions(ctx.guild.id)
+        disabled = list(resolved.get_blocked_commands(channel_id))
+        pages = SimplePages(disabled, ctx=ctx, per_page=15)
+        await pages.start(content=f"In <#{channel_id}> the following commands are disabled")
 
     @config.group(name="global")
     @commands.is_owner()
-    async def _global(self, ctx: Context) -> None:
+    async def _global(self, ctx: GuildContext):
         """Handles global bot configuration."""
+        pass
 
     @_global.command(name="block")
-    async def global_block(self, ctx: Context, object_id: int) -> None:
+    async def global_block(self, ctx: GuildContext, object_id: int):
         """Blocks a user or guild globally."""
         await self.bot._blacklist_add(object_id)
         await ctx.send(ctx.tick(True))
 
     @_global.command(name="unblock")
-    async def global_unblock(self, ctx: Context, object_id: int) -> None:
+    async def global_unblock(self, ctx: GuildContext, object_id: int):
         """Unblocks a user or guild globally."""
         await self.bot._blacklist_remove(object_id)
         await ctx.send(ctx.tick(True))
