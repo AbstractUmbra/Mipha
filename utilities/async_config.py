@@ -73,7 +73,7 @@ class Config(Generic[_T]):
             await self.loop.run_in_executor(None, self._dump)
 
     @overload
-    def get(self, key: Any) -> _T | Any | None:
+    def get(self, key: Any) -> _T | None:
         ...
 
     @overload
@@ -88,6 +88,8 @@ class Config(Generic[_T]):
         """Edits a config entry."""
         self._db[str(key)] = value
         await self.save()
+
+    __setitem__ = put
 
     async def remove(self, key: Any) -> None:
         """Removes a config entry."""

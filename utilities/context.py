@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Generic, Iterable, Protocol, Sequence, Ty
 import discord
 from discord.ext import commands
 
-from .ui import ConfirmationView
+from .ui import ConfirmationView, MiphaBaseView
 
 
 if TYPE_CHECKING:
@@ -79,7 +79,7 @@ class DatabaseProtocol(Protocol):
         ...
 
 
-class DisambiguatorView(discord.ui.View, Generic[T]):
+class DisambiguatorView(MiphaBaseView, Generic[T]):
     message: discord.Message
     selected: T
 

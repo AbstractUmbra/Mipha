@@ -21,6 +21,7 @@ from utilities import formats, time
 from utilities.context import Context
 from utilities.converters import BadDatetimeTransform, DatetimeTransformer, WhenAndWhatConverter, WhenAndWhatTransformer
 from utilities.db import MaybeAcquire
+from utilities.ui import MiphaBaseView
 
 
 if TYPE_CHECKING:
@@ -71,7 +72,7 @@ class SnoozeButton(discord.ui.Button["ReminderView"]):
         await interaction.response.send_modal(SnoozeModal(self.view, self.cog, self.timer))
 
 
-class ReminderView(discord.ui.View):
+class ReminderView(MiphaBaseView):
     message: discord.Message
 
     def __init__(self, *, url: str, timer: Timer, cog: Reminder, author_id: int) -> None:

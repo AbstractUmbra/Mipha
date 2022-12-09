@@ -17,13 +17,14 @@ import nhentaio
 from discord import app_commands
 from discord.ext import menus
 from discord.ext.commands import Paginator as CommandPaginator
+from typing_extensions import Self
 
 from utilities.context import Context
+from utilities.ui import MiphaBaseView
 
 
 if TYPE_CHECKING:
     import hondana
-    from typing_extensions import Self
 
 T = TypeVar("T")
 SourceT = TypeVar("SourceT", bound="menus.PageSource")
@@ -32,7 +33,7 @@ SimplePagesT = TypeVar("SimplePagesT", bound="SimplePages")
 
 
 class NumberedPageModal(discord.ui.Modal, title="Go to page"):
-    page = discord.ui.TextInput(label="Page", placeholder="Enter a number", min_length=1)
+    page = discord.ui.TextInput[Self](label="Page", placeholder="Enter a number", min_length=1)
 
     def __init__(self, max_pages: Optional[int]) -> None:
         super().__init__()
@@ -46,7 +47,7 @@ class NumberedPageModal(discord.ui.Modal, title="Go to page"):
         self.stop()
 
 
-class RoboPages(discord.ui.View):
+class RoboPages(MiphaBaseView):
     def __init__(
         self,
         source: menus.PageSource,
@@ -347,6 +348,12 @@ class MangaDexEmbed(discord.Embed):
         self.timestamp = chapter.created_at
         self.add_field(name="Manga link is:", value=f"[here!]({parent.url})", inline=False)
         self.add_field(name="Number of pages:", value=chapter.pages, inline=False)
+        if chapter.scanlator_groups:
+            self.add_field(
+                name="Scanlator groups:", value="\n".join([s.name for s in chapter.scanlator_groups]), inline=False
+            )
+        if chapter.uploader:
+            self.add_field(name="Uploader:", value=chapter.uploader.username, inline=False)
 
         if parent.content_rating is hondana.ContentRating.safe or (nsfw_allowed is True):
             if parent.cover_url() is None:

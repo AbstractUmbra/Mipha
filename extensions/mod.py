@@ -19,6 +19,7 @@ from utilities import cache, checks, flags, time
 from utilities.converters import Snowflake
 from utilities.formats import human_join, plural
 from utilities.paginator import SimplePages
+from utilities.ui import MiphaBaseView
 
 
 if TYPE_CHECKING:
@@ -122,7 +123,7 @@ class ModConfig:
             await member.add_roles(discord.Object(id=self.mute_role_id), reason=reason)
 
 
-class MigrateJoinLogView(discord.ui.View):
+class MigrateJoinLogView(MiphaBaseView):
     def __init__(self, cog: Mod) -> None:
         super().__init__(timeout=None)
         self.cog: Mod = cog
@@ -141,7 +142,7 @@ class MigrateJoinLogView(discord.ui.View):
             await interaction.followup.send("Successfully migrated to new join logs!", ephemeral=True)
 
 
-class PreExistingMuteRoleView(discord.ui.View):
+class PreExistingMuteRoleView(MiphaBaseView):
     message: discord.Message
 
     def __init__(self, user: discord.abc.User) -> None:
@@ -181,7 +182,7 @@ class PreExistingMuteRoleView(discord.ui.View):
         await self.message.delete()
 
 
-class LockdownPermissionIssueView(discord.ui.View):
+class LockdownPermissionIssueView(MiphaBaseView):
     message: discord.Message
 
     def __init__(self, me: discord.Member, channel: discord.abc.GuildChannel) -> None:

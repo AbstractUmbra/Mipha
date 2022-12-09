@@ -334,7 +334,7 @@ class RTFX(commands.Cog):
         error = getattr(error, "original", error)
 
         if isinstance(error, (TypeError, BadSource)):
-            await ctx.send(f"Not a valid source-able type or path:-\n\n`{error}`.")
+            await ctx.send(f"Not a valid source-able type or path:-\n\n{error}.")
 
     @commands.command(name="pyright", aliases=["pr"])
     async def _pyright(

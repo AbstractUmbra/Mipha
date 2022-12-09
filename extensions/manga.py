@@ -22,6 +22,7 @@ from hondana.query import FeedOrderQuery, MangaListOrderQuery, Order
 from utilities import formats
 from utilities.context import Context
 from utilities.paginator import MangaDexEmbed
+from utilities.ui import MiphaBaseView
 
 
 if TYPE_CHECKING:
@@ -56,7 +57,7 @@ class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hon
         return true_item
 
 
-class MangaView(discord.ui.View):
+class MangaView(MiphaBaseView):
     def __init__(self, user: discord.abc.Snowflake, bot: Mipha, manga: list[hondana.Manga], /) -> None:
         self.user: discord.abc.Snowflake = user
         self.bot: Mipha = bot
