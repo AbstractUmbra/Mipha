@@ -7,8 +7,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import asyncio
+import functools
+import inspect
 import io
 import math
+import pathlib
 import random
 import re
 import time
@@ -19,6 +22,7 @@ from typing import TYPE_CHECKING, Optional
 
 import aiohttp
 import discord
+import legofy
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -26,6 +30,9 @@ from utilities import checks
 from utilities.context import Context
 from utilities.formats import plural
 
+
+path_ = inspect.getabsfile(legofy.main)
+resolved_path = pathlib.Path(path_).parent / "assets" / "bricks" / "1x1.png"
 
 if TYPE_CHECKING:
     from bot import Mipha
@@ -344,6 +351,72 @@ class Fun(commands.Cog):
 
         for m in choices:
             await m.move_to(None)
+
+    def _handle_image(self, buffer: io.BytesIO) -> io.BytesIO:
+        output_buffer = io.BytesIO()
+        with Image.open(buffer) as image, Image.open(resolved_path) as bricks:
+            new_size = legofy.get_new_size(image, bricks, None)
+            image = image.resize(new_size, Image.ANTIALIAS)
+
+            pil_image = legofy.make_lego_image(image, bricks)
+            pil_image.save(output_buffer, "png")
+
+            output_buffer.seek(0)
+
+        return output_buffer
+
+    @commands.command(name="lego")
+    async def lego_command(
+        self, ctx: Context, *, target: discord.User | discord.Emoji | discord.PartialEmoji | str | None
+    ) -> None:
+        if target is None:
+            if ctx.message.attachments:
+                bytes_ = await ctx.message.attachments[0].read()
+            else:
+                bytes_ = await ctx.author.display_avatar.read()
+        elif isinstance(target, (discord.User, discord.ClientUser)):
+            bytes_ = await target.display_avatar.read()
+        elif isinstance(target, discord.Emoji):
+            bytes_ = await target.read()
+        elif isinstance(target, discord.PartialEmoji):
+            if target.is_unicode_emoji():
+                raise commands.BadArgument("The passed emoji must be a custom emoji, sorry.")
+            bytes_ = await target.read()
+        elif isinstance(target, str):
+            try:
+                async with ctx.bot.session.get(target) as resp:
+                    bytes_ = await resp.read()
+                    try:
+                        discord.utils._get_mime_type_for_image(bytes_)
+                    except:
+                        pass
+            except aiohttp.ClientError:
+                raise commands.BadArgument("Sorry, this url doesn't appear to be valid.")
+
+        else:
+            bytes_ = await ctx.author.display_avatar.read()
+
+        buffer = io.BytesIO(bytes_)
+        buffer.seek(0)
+
+        message = await ctx.send("Generating image...")
+
+        async with ctx.typing():
+            func_ = functools.partial(self._handle_image, buffer)
+            output_buffer = await asyncio.to_thread(func_)
+
+        file_ = discord.File(output_buffer, filename="lego.png")
+
+        await message.edit(content=None, attachments=[file_])
+
+    @lego_command.error
+    async def lego_error_handler(self, ctx: Context, error: commands.CommandError):
+        error = getattr(error, "original", error)
+
+        if isinstance(error, commands.BadArgument):
+            await ctx.send(str(error))
+            return
+        await ctx.send("Something else broke, Umbra will fix it.")
 
 
 async def setup(bot: Mipha) -> None:
