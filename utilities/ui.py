@@ -12,6 +12,7 @@ import traceback
 from typing import TYPE_CHECKING
 
 import discord
+from discord import app_commands
 
 
 if TYPE_CHECKING:
@@ -22,13 +23,32 @@ if TYPE_CHECKING:
 __all__ = ("MiphaBaseView", "ConfirmationView")
 
 
+class MiphaBaseModal(discord.ui.Modal):
+    async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        client: Mipha = interaction.client  # type: ignore
+
+        e = discord.Embed(title="IRLs Modal Error", colour=0xA32952)
+        e.add_field(name="Modal", value=self.__class__.__name__, inline=False)
+
+        (exc_type, exc, tb) = type(error), error, error.__traceback__
+        trace = "\n".join(traceback.format_exception(exc_type, exc, tb))
+
+        e.add_field(name="Error", value=f"```py\n{trace}\n```")
+        e.timestamp = datetime.datetime.now(datetime.timezone.utc)
+
+        stats: Stats = client.get_cog("Stats")  # type: ignore
+        try:
+            await stats.webhook.send(embed=e)
+        except discord.HTTPException:
+            pass
+
+
 class MiphaBaseView(discord.ui.View):
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Self], /) -> None:
         client: Mipha = interaction.client  # type: ignore
-        await client.tree.on_error(interaction, error)  # type: ignore
 
         view_name = self.__class__.__name__
-        client.global_log.exception("Exception occurred in View '%s':\n%s", view_name, error)
+        client.global_log.exception("Exception occurred in View %r:\n%s", view_name, error)
 
         embed = discord.Embed(title=f"{view_name} View Error", colour=0xA32952)
         embed.add_field(name="Author", value=interaction.user, inline=False)
@@ -90,10 +110,7 @@ class ConfirmationView(MiphaBaseView):
         self.value = True
         await interaction.response.defer()
         if self.delete_after and self.message:
-            if not self.message.flags.ephemeral:
-                await interaction.delete_original_response()
-            else:
-                await interaction.edit_original_response(view=None, content="This is safe to dismiss now.")
+            await interaction.delete_original_response()
 
         self.stop()
 
@@ -102,9 +119,6 @@ class ConfirmationView(MiphaBaseView):
         self.value = False
         await interaction.response.defer()
         if self.delete_after and self.message:
-            if not self.message.flags.ephemeral:
-                await interaction.delete_original_response()
-            else:
-                await interaction.edit_original_response(view=None, content="This is safe to dismiss now.")
+            await interaction.delete_original_response()
 
         self.stop()
