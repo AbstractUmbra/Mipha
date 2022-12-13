@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
+from discord.utils import MISSING
 
 from utilities.context import Context
 
@@ -22,11 +23,7 @@ from utilities.context import Context
 if TYPE_CHECKING:
     from bot import Mipha
 
-EMOJI: dict[bool | None, str] = {
-    True: "\U0001f7e9",
-    False: "\U0001f7e5",
-    None: "\U0001f7e7",
-}
+EMOJI: dict[bool | None, str] = {True: "\U0001f7e9", False: "\U0001f7e5", None: "\U0001f7e7", MISSING: "\U0001f7e8"}
 
 WORDS_PATH = pathlib.Path("utilities/scrabble.txt")
 with WORDS_PATH.open("r") as fp:
@@ -80,7 +77,7 @@ class WordleGame:
         self._last_guess: str = ""
         self._message: discord.Message | None = None
         self._owner: int = owner
-        self._current_map: str = f"<@{self._owner}>\n"
+        self._current_map: str = f"<@{self._owner}>'s game.\n"
         self.over: bool = False
         self.solved: bool = False
 
@@ -88,7 +85,14 @@ class WordleGame:
     def guess(self, *, guess: str) -> str:
         ret: str = ""
         for guess_char, answer_char in zip(guess, self._answer):
-            ret += EMOJI[guess_char == answer_char]
+            char_natch = guess_char == answer_char
+            if char_natch:
+                ret += EMOJI[True]
+            elif guess_char in self._answer:
+                ret += EMOJI[MISSING]
+            else:
+                ret += EMOJI[False]
+
             ret += "\N{ZERO WIDTH SPACE}"
         self._current_map += f"\n{ret}"
 
@@ -121,7 +125,7 @@ class DLECog(commands.Cog):
 
     @commands.command(name="wordle")
     @commands.max_concurrency(number=1, per=commands.BucketType.user, wait=False)
-    async def wordle_command(self, ctx: Context, word_length: int = 6) -> None:
+    async def wordle_command(self, ctx: Context, word_length: int = 5) -> None:
         """Launches a game of wordle, with a hidden word of the given lenth.
 
         Sending `stop`, `quit` or `cancel` will end the game early.
@@ -129,7 +133,9 @@ class DLECog(commands.Cog):
         """
         answer = self.get_wordle_word(size=word_length)
         game = WordleGame(answer=answer, owner=ctx.author.id)
-        await ctx.send(f"Okay, start guessing the word. This game is locked to {ctx.author.mention}!")
+        await ctx.send(
+            f"Okay, start guessing the word. This game is locked to {ctx.author.mention}!\nJust send your {word_length} length messages and I will read them."
+        )
 
         def wordle_check(message: discord.Message) -> bool:
             if message.author.id == ctx.author.id and message.channel.id == ctx.channel.id:

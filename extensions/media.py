@@ -296,7 +296,7 @@ class MediaReposter(commands.Cog):
                 if message.mentions:
                     content = " ".join(m.mention for m in message.mentions) + "\n\n" + content
 
-                content = content[:1000] + f"\nRequested by: {message.author} | Replying to: {message.jump_url}"
+                content = content[:1000] + f"\n\nRequested by:\n{message.author} ({message.author.id})"
 
                 await message.channel.send(content, file=file)
                 if _errors:

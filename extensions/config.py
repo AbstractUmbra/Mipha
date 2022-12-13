@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 async def plonk_iterator(bot: Mipha, guild: discord.Guild, records: list[Record]) -> AsyncIterator[str]:
     for record in records:
-        entity_id = record[0]
+        entity_id: int = record[0]
         resolved = guild.get_channel(entity_id) or await bot.get_or_fetch_member(guild, entity_id)
         if resolved is None:
             yield f"<Not Found: {entity_id}>"

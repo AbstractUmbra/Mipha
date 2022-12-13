@@ -118,6 +118,11 @@ class DisambiguatorView(MiphaBaseView, Generic[T]):
         self.stop()
 
 
+class SupportsStr(Protocol):
+    def __str__(self) -> str:
+        ...
+
+
 class Context(commands.Context["Mipha"]):
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
     bot: Mipha
@@ -165,7 +170,7 @@ class Context(commands.Context["Mipha"]):
 
     async def prompt(
         self,
-        message: str,
+        message: SupportsStr,
         *,
         timeout: float = 60.0,
         delete_after: bool = True,
@@ -214,7 +219,7 @@ class Context(commands.Context["Mipha"]):
 
     async def send(
         self,
-        content: str | None = None,
+        content: SupportsStr | None = None,
         *,
         tts: bool = False,
         embed: discord.Embed | None = None,

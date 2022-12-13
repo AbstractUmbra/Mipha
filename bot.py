@@ -340,7 +340,7 @@ class Mipha(commands.Bot):
         return members[0]
 
     async def resolve_member_ids(self, guild: discord.Guild, member_ids: Iterable[int]) -> AsyncIterator[discord.Member]:
-        needs_resolution = []
+        needs_resolution: list[int] = []
         for member_id in member_ids:
             member = guild.get_member(member_id)
             if member is not None:
@@ -379,7 +379,7 @@ class Mipha(commands.Bot):
         return await super().get_context(origin, cls=cls)  # type: ignore # yeah I'm not too sure
 
     async def process_commands(self, message: discord.Message, /) -> None:
-        ctx = await self.get_context(message)
+        ctx: Context = await self.get_context(message, cls=Context)
 
         if ctx.command is None:
             return

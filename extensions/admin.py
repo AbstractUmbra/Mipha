@@ -162,7 +162,7 @@ class Admin(commands.Cog):
     @commands.command()
     @commands.guild_only()
     async def sync(
-        self, ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Literal["~", "*", "^"]] = None
+        self, ctx: GuildContext, guilds: Greedy[discord.Object], spec: Optional[Literal["~", "*", "^"]] = None
     ) -> None:
         """
         Pass guild ids or pass a sync specification:-
@@ -171,8 +171,6 @@ class Admin(commands.Cog):
         `*` -> Copies global to current guild.
         `^` -> Clears all guild commands.
         """
-        assert ctx.guild is not None
-
         if not guilds:
             if spec == "~":
                 fmt = await ctx.bot.tree.sync(guild=ctx.guild)

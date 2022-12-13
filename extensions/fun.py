@@ -27,7 +27,7 @@ from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from utilities import checks
-from utilities.context import Context
+from utilities.context import Context, GuildContext
 from utilities.formats import plural
 
 
@@ -80,16 +80,7 @@ class Fun(commands.Cog):
     """Some fun stuff, not fleshed out yet."""
 
     def __init__(self, bot: Mipha) -> None:
-        self.bot = bot
-        self.lock = asyncio.Lock()
-        self.message_deletes = 0
-        self.bulk_message_deletes = 0
-        self.message_edits = 0
-        self.bans = 0
-        self.unbans = 0
-        self.channel_deletes = 0
-        self.channel_creates = 0
-        self.command_count = 0
+        self.bot: Mipha = bot
 
     # @commands.Cog.listener("on_message")
     async def quote(self, message: discord.Message) -> None:
@@ -156,7 +147,7 @@ class Fun(commands.Cog):
         """I love this language."""
         keep = ABT_REG.findall(content)
 
-        def trans(m) -> str:
+        def trans(m: re.Match[str]) -> str:
             get = m.group(0)
             if get.isupper():
                 return AL_BHED_CHARACTER_MAP[get.lower()].upper()
@@ -315,7 +306,7 @@ class Fun(commands.Cog):
 
     @commands.command(hidden=True, name="scatter", aliases=["scattertheweak"])
     @checks.has_guild_permissions(administrator=True)
-    async def scatter(self, ctx: Context, voice_channel: Optional[discord.VoiceChannel] = None) -> None:
+    async def scatter(self, ctx: GuildContext, voice_channel: Optional[discord.VoiceChannel] = None) -> None:
         assert isinstance(ctx.author, discord.Member)
         if voice_channel:
             channel = voice_channel
@@ -330,7 +321,6 @@ class Fun(commands.Cog):
             return
 
         members = channel.members
-        assert ctx.guild is not None
         for member in members:
             target = self.safe_chan(member, ctx.guild.voice_channels)
             if target is None:
@@ -339,9 +329,7 @@ class Fun(commands.Cog):
 
     @commands.command(hidden=True, name="snap")
     @checks.has_guild_permissions(administrator=True)
-    async def snap(self, ctx: Context) -> None:
-        assert ctx.guild is not None
-
+    async def snap(self, ctx: GuildContext) -> None:
         members: list[discord.Member] = []
         for vc in ctx.guild.voice_channels:
             members.extend(vc.members)
@@ -370,8 +358,14 @@ class Fun(commands.Cog):
         self, ctx: Context, *, target: discord.User | discord.Emoji | discord.PartialEmoji | str | None
     ) -> None:
         if target is None:
-            if ctx.message.attachments:
-                bytes_ = await ctx.message.attachments[0].read()
+            if attachments := (
+                ctx.message.attachments
+                or (
+                    (ctx.replied_reference and ctx.replied_reference.cached_message)
+                    and ctx.replied_reference.cached_message.attachments
+                )
+            ):
+                bytes_ = await attachments[0].read()
             else:
                 bytes_ = await ctx.author.display_avatar.read()
         elif isinstance(target, (discord.User, discord.ClientUser)):
