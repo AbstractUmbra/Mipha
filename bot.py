@@ -16,7 +16,7 @@ import sys
 import traceback
 from collections import Counter, deque
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Coroutine, Iterable, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Coroutine, Iterable, Literal, overload
 
 import aiohttp
 import asyncpg
@@ -27,7 +27,7 @@ import mystbin
 import nhentaio
 from discord import app_commands
 from discord.ext import commands
-from discord.utils import _ColourFormatter as ColourFormatter, stream_supports_colour
+from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
 from typing_extensions import Self
 
 import _bot_config
@@ -38,6 +38,8 @@ from utilities.prefix import callable_prefix as _callable_prefix
 
 
 if TYPE_CHECKING:
+    from discord.ext.commands._types import ContextT
+
     from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
 
@@ -47,8 +49,6 @@ jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.NO_DM_TRACEBACK = True
 INTENTS = discord.Intents(_bot_config.INTENTS)
-
-CtxT = TypeVar("CtxT", bound=Context)
 
 
 class MiphaCommandTree(app_commands.CommandTree):
@@ -198,6 +198,7 @@ class Mipha(commands.Bot):
         )
         self.command_stats = Counter()
         self.socket_stats = Counter()
+        self.owner_ids = self.config.OWNER_IDS
         self.global_log = LOGGER
 
     def run(self) -> None:
@@ -375,11 +376,23 @@ class Mipha(commands.Bot):
                 for member in members:
                     yield member
 
-    async def get_context(self, origin: discord.Interaction | discord.Message, /, *, cls: type[CtxT] = Context) -> CtxT:
-        return await super().get_context(origin, cls=cls)  # type: ignore # yeah I'm not too sure
+    @overload
+    async def get_context(self, origin: discord.Interaction | discord.Message, /) -> Context:
+        ...
+
+    @overload
+    async def get_context(self, origin: discord.Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT:
+        ...
+
+    async def get_context(
+        self, origin: discord.Interaction | discord.Message, /, *, cls: type[ContextT] = MISSING
+    ) -> ContextT:
+        if cls is MISSING:
+            cls = Context  # type: ignore
+        return await super().get_context(origin, cls=cls)
 
     async def process_commands(self, message: discord.Message, /) -> None:
-        ctx: Context = await self.get_context(message, cls=Context)
+        ctx = await self.get_context(message)
 
         if ctx.command is None:
             return
@@ -416,10 +429,18 @@ class Mipha(commands.Bot):
         await self.process_commands(message)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message, /) -> None:
-        if after.author.id == self.owner_id:
-            if not before.embeds and after.embeds:
-                return
+        if not before.embeds and after.embeds:
+            return
 
+        can_edit = False
+        if self.owner_ids:
+            if after.author.id in self.owner_ids:
+                can_edit = True
+        else:
+            if after.author.id == self.owner_id:
+                can_edit = True
+
+        if can_edit:
             await self.process_commands(after)
 
     async def on_guild_join(self, guild: discord.Guild) -> None:
@@ -450,7 +471,8 @@ class Mipha(commands.Bot):
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
 
         self.bot_app_info = await self.application_info()
-        self.owner_id = self.bot_app_info.owner.id
+        # self.owner_id = self.bot_app_info.owner.id
+        self.owner_ids = self.config.OWNER_IDS
 
 
 async def main() -> None:
