@@ -701,7 +701,8 @@ class Nihongo(commands.Cog):
         await self.bot.wait_until_ready()
 
         now = datetime.datetime.now(datetime.timezone.utc)
-        if now.hour > 18:
+        time = datetime.time(hour=18, minute=0, second=0, microsecond=0)
+        if now.time() > time:
             LOGGER.info("After 6pm, sleeping until tomorrow.")
             sleep_until = now + datetime.timedelta(days=1)
             sleep_until = sleep_until.replace(hour=18, minute=0, second=0, microsecond=0)
