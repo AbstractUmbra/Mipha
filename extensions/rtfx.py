@@ -246,7 +246,7 @@ class RTFX(commands.Cog):
 
         cache = list(self._rtfm_cache[key].items())
 
-        matches = fuzzy.finder(obj, cache, key=lambda t: t[0], lazy=False)
+        matches = fuzzy.finder(obj, cache, key=lambda t: t[0], raw=False)
 
         e = discord.Embed(colour=discord.Colour.dark_magenta())
         if not matches:

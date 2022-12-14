@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -79,7 +77,7 @@ def partial_token_sort_ratio(a: str, b: str) -> int:
 @overload
 def _extraction_generator(
     query: str,
-    choices: Sequence[str],
+    choices: Iterable[str],
     scorer: Callable[[str, str], int] = ...,
     score_cutoff: int = ...,
 ) -> Generator[tuple[str, int], None, None]:
@@ -98,7 +96,7 @@ def _extraction_generator(
 
 def _extraction_generator(
     query: str,
-    choices: Sequence[str] | dict[str, T],
+    choices: Iterable[str] | dict[str, T],
     scorer: Callable[[str, str], int] = quick_ratio,
     score_cutoff: int = 0,
 ) -> Generator[tuple[str, int, T] | tuple[str, int], None, None]:
@@ -117,7 +115,7 @@ def _extraction_generator(
 @overload
 def extract(
     query: str,
-    choices: Sequence[str],
+    choices: Iterable[str],
     *,
     scorer: Callable[[str, str], int] = ...,
     score_cutoff: int = ...,
@@ -140,7 +138,7 @@ def extract(
 
 def extract(
     query: str,
-    choices: dict[str, T] | Sequence[str],
+    choices: dict[str, T] | Iterable[str],
     *,
     scorer: Callable[[str, str], int] = quick_ratio,
     score_cutoff: int = 0,
@@ -149,8 +147,8 @@ def extract(
     it = _extraction_generator(query, choices, scorer, score_cutoff)
     key = lambda t: t[1]
     if limit is not None:
-        return heapq.nlargest(limit, it, key=key)  # type: ignore
-    return sorted(it, key=key, reverse=True)  # type: ignore
+        return heapq.nlargest(limit, it, key=key)
+    return sorted(it, key=key, reverse=True)
 
 
 @overload
@@ -235,7 +233,7 @@ def extract_or_exact(
 
     # check if the top one is exact or more than 30% more correct than the top
     if top == 100 or top > (second + 30):
-        return [matches[0]]  # type: ignore
+        return [matches[0]]
 
     return matches
 
@@ -294,66 +292,66 @@ def extract_matches(
 @overload
 def finder(
     text: str,
-    collection: Iterable[str],
+    collection: Iterable[T],
     *,
-    key: Callable[[str], str] | None = ...,
-    lazy: Literal[True] = ...,
-) -> Generator[str, None, None]:
+    key: Callable[[T], str] | None = ...,
+    raw: Literal[True],
+) -> list[tuple[int, int, T]]:
     ...
 
 
 @overload
 def finder(
     text: str,
-    collection: Iterable[str],
+    collection: Iterable[T],
     *,
-    key: Callable[[str], str] | None = ...,
-    lazy: Literal[False],
-) -> list[str]:
+    key: Callable[[T], str] | None = ...,
+    raw: Literal[False],
+) -> list[T]:
     ...
 
 
 @overload
 def finder(
     text: str,
-    collection: Iterable[str],
+    collection: Iterable[T],
     *,
-    key: Callable[[str], str] | None = ...,
-    lazy: bool = ...,
-) -> Generator[str, None, None] | list[str]:
+    key: Callable[[T], str] | None = ...,
+    raw: bool = ...,
+) -> list[T]:
     ...
 
 
 def finder(
     text: str,
-    collection: Iterable[str],
+    collection: Iterable[T],
     *,
-    key: Callable[[str], str] | None = ...,
-    lazy: bool = True,
-) -> Generator[str, None, None] | list[str]:
-    suggestions: list[tuple[int, int, str]] = []
+    key: Callable[[T], str] | None = None,
+    raw: bool = False,
+) -> list[tuple[int, int, T]] | list[T]:
+    suggestions: list[tuple[int, int, T]] = []
     text = str(text)
     pat = ".*?".join(map(re.escape, text))
     regex = re.compile(pat, flags=re.IGNORECASE)
     for item in collection:
-        to_search = key(item) if key else item
+        to_search = key(item) if key else str(item)  # type: ignore # TODO fix pylance?
         r = regex.search(to_search)
         if r:
             suggestions.append((len(r.group()), r.start(), item))
 
-    def sort_key(tup: tuple[int, int, str]) -> tuple[int, int, str]:
+    def sort_key(tup: tuple[int, int, T]) -> tuple[int, int, str | T]:
         if key:
             return tup[0], tup[1], key(tup[2])
         return tup
 
-    if lazy:
-        return (z for _, _, z in sorted(suggestions, key=sort_key))
+    if raw:
+        return sorted(suggestions, key=sort_key)
     else:
         return [z for _, _, z in sorted(suggestions, key=sort_key)]
 
 
 def find(text: str, collection: Iterable[str], *, key: Callable[[str], str] | None = None) -> str | None:
     try:
-        return finder(text, collection, key=key, lazy=False)[0]
+        return finder(text, collection, key=key)[0]
     except IndexError:
         return None
