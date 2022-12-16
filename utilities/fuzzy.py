@@ -334,7 +334,7 @@ def finder(
     pat = ".*?".join(map(re.escape, text))
     regex = re.compile(pat, flags=re.IGNORECASE)
     for item in collection:
-        to_search = key(item) if key else str(item)  # type: ignore # TODO fix pylance?
+        to_search = key(item) if key else str(item)
         r = regex.search(to_search)
         if r:
             suggestions.append((len(r.group()), r.start(), item))
