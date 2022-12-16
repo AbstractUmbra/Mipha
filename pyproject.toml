@@ -35,6 +35,12 @@ optional = true
 black = "*"
 guppy3 = "*"
 
+[tool.poetry.group.private]
+optional = true
+
+[tool.poetry.group.private.dependencies]
+pygsheets = "^2.0.6"
+
 [tool.black]
 line-length = 125
 
