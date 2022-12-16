@@ -108,6 +108,8 @@ class SourceConverter(commands.Converter[str]):
 
         if isinstance(recur, property):
             recur = recur.fget
+        elif inspect.ismemberdescriptor(recur):
+            raise BadSource(f"`{current}` seems like it's an instance attribute, can't source those")
 
         return inspect.getsource(recur)  # type: ignore # unreachable
 
