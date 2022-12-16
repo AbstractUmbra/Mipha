@@ -99,6 +99,14 @@ class RemoveNoise(logging.Filter):
         return True
 
 
+class ProxyObject(discord.Object):
+    __slots__ = ("guild",)
+
+    def __init__(self, guild: discord.abc.Snowflake | None, /) -> None:
+        super().__init__(id=0)
+        self.guild: discord.abc.Snowflake | None = guild
+
+
 class SetupLogging:
     def __init__(self, *, stream: bool = True) -> None:
         self.log: logging.Logger = logging.getLogger()
@@ -261,15 +269,14 @@ class Mipha(commands.Bot):
         self,
         guild: discord.abc.Snowflake,
         *,
-        local_: Callable[[Mipha, discord.Message], list[str]] = _callable_prefix,
+        local_: Callable[[Self, discord.Message], list[str]] = _callable_prefix,
         raw: bool = False,
     ) -> list[str]:
         if raw:
             return self._prefix_data.get(guild.id, ["hey babe "])
 
-        snowflake_proxy = discord.Object(id=0)
-        snowflake_proxy.guild = guild  # type: ignore # this is actually valid, the class just has no slots or attr to override.
-        return local_(self, snowflake_proxy)  # type: ignore # this is actually valid, the class just has no slots or attr to override.
+        snowflake_proxy = ProxyObject(guild)
+        return local_(self, snowflake_proxy)  # type: ignore # lying here
 
     async def _set_guild_prefixes(self, guild: discord.abc.Snowflake, prefixes: list[str] | None) -> None:
         if not prefixes:
