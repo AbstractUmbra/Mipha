@@ -19,19 +19,21 @@ import aiohttp
 import asyncpg
 import discord
 import nhentaio
-from discord.ext import commands, tasks
+from discord.ext import commands
+from discord.http import json_or_text
 
 from utilities import checks
 from utilities._types.danbooru import DanbooruPayload
 from utilities._types.gelbooru import GelbooruPayload, GelbooruPostPayload
+from utilities._types.uploader import AudioPost
 from utilities.cache import cache
+from utilities.context import Context, GuildContext
 from utilities.formats import to_codeblock
 from utilities.paginator import NHentaiEmbed, RoboPages, SimpleListSource
 
 
 if TYPE_CHECKING:
     from bot import Mipha
-    from utilities.context import Context
 
 SIX_DIGITS = re.compile(r"\{(\d{1,6})\}")
 SOUNDGASM_MEDIA_PATTERN = re.compile(r"(https?://media\.soundgasm\.net\/sounds\/(?P<media>[a-f0-9]+)\.(?P<ext>m4a|mp3))")
@@ -161,8 +163,6 @@ class Lewd(commands.Cog):
             aiohttp.BasicAuth(bot.config.DANBOORU_AUTH["user_id"], bot.config.DANBOORU_AUTH["api_key"]),
             "https://danbooru.donmai.us/posts.json",
         )
-        self._nhen_queu: set[tuple[int, int, int]] = set()
-        self.nhen_deque.start()
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
@@ -258,7 +258,9 @@ class Lewd(commands.Cog):
 
         return source
 
-    async def _cache_soundgasm(self, url: re.Match[str], /, *, title: str | None, author: str | None) -> tuple[bytes, str]:
+    async def _cache_soundgasm(
+        self, url: re.Match[str], /, *, title: str | None, author: str | None
+    ) -> tuple[bytes, str, int]:
         actual_url = url[0]
         ext = url["ext"]
 
@@ -273,11 +275,14 @@ class Lewd(commands.Cog):
         async with self.bot.session.post(
             "https://upload.umbra-is.gay/audio", data=form_data, headers={"Authorization": self.bot.config.IMAGE_HOST_AUTH}
         ) as resp:
-            data = await resp.json()
+            data: AudioPost | str = await json_or_text(resp)  # type: ignore # this is weird dict narrowing
 
-        return audio, data["url"]
+        if isinstance(data, str):
+            raise ValueError(f"Returned response is not a dict:\n{data}")
 
-    @commands.command()
+        return audio, data["url"], data["size"]
+
+    @commands.command(aliases=["sg"])
     @commands.is_owner()
     async def soundgasm(self, ctx: Context, *, url: str) -> None:
         """
@@ -304,24 +309,22 @@ class Lewd(commands.Cog):
             fmt += f"{found_url[1]}"
 
             await ctx.send(fmt)
-            audio, cache_url = await self._cache_soundgasm(found_url, title=title, author=author)
+            audio, cache_url, size = await self._cache_soundgasm(found_url, title=title, author=author)
         else:
             await ctx.send("Can't find the content within the main url.")
+            return
+
+        target_size = (ctx.guild and ctx.guild.filesize_limit) or 1024 * 1024 * 8
+        if size >= target_size:
+            await ctx.send(f"The file is too large, have the url: {cache_url}")
             return
 
         fmt = BytesIO(audio)
         fmt.seek(0)
 
-        if len(fmt.read()) >= ctx.guild.filesize_limit:
-            await ctx.send(f"The file is too large, have the url: {cache_url}")
-            return
-
-        fmt.seek(0)
         await ctx.send(file=discord.File(fmt, filename="you_horny_fuck.m4a"))
 
-    async def _play_asmr(self, url: str, /, *, ctx: Context, v_client: discord.VoiceClient | None) -> None:
-        assert isinstance(ctx.author, discord.Member)
-
+    async def _play_asmr(self, url: str, /, *, ctx: GuildContext, v_client: discord.VoiceClient | None) -> None:
         if not ctx.author.voice or not ctx.author.voice.channel:
             return
 
@@ -337,8 +340,6 @@ class Lewd(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def asmr(self, ctx: Context) -> None:
-        assert isinstance(ctx.author, discord.Member)
-
         query = """
                 SELECT *
                 FROM audio
@@ -358,7 +359,7 @@ class Lewd(commands.Cog):
 
         await ctx.send(f"You're listening to: **{row['title']}**\nBy: **{row['soundgasm_author']}**\n{url}")
 
-        if ctx.guild is not None:
+        if ctx.guild:
             await self._play_asmr(url, ctx=ctx, v_client=ctx.guild.voice_client)  # type: ignore # did a dummy break voice
 
     @commands.command(usage="<flags>+ | subcommand", cooldown_after_parsing=True)
@@ -518,17 +519,17 @@ class Lewd(commands.Cog):
     @commands.group(invoke_without_command=True, name="lewd", aliases=["booru", "naughty"])
     @checks.has_permissions(manage_messages=True)
     @commands.is_nsfw()
-    async def lewd(self, ctx: Context) -> None:
+    async def lewd(self, ctx: GuildContext) -> None:
         """Naughty commands! Please see the subcommands."""
         if not ctx.invoked_subcommand:
             return await ctx.send_help(ctx.command)
 
     @lewd.group(invoke_without_command=True)
     @checks.has_permissions(manage_messages=True)
-    async def blacklist(self, ctx: Context) -> None:
+    async def blacklist(self, ctx: GuildContext) -> None:
         """Blacklist management for booru command and nhentai auto-six-digits."""
         if not ctx.invoked_subcommand:
-            config = await self.get_booru_config(ctx.guild.id)  # type: ignore # cache is gay
+            config = await self.get_booru_config(ctx.guild.id)
             if config.blacklist:
                 fmt = "\n".join(config.blacklist)
             else:
@@ -541,10 +542,8 @@ class Lewd(commands.Cog):
 
     @blacklist.command()
     @checks.has_permissions(manage_messages=True)
-    async def add(self, ctx: Context, *tags: str) -> None:
+    async def add(self, ctx: GuildContext, *tags: str) -> None:
         """Add an item to the blacklist."""
-        assert ctx.guild is not None
-
         query = """
                 --begin-sql
                 INSERT INTO lewd_config (guild_id, blacklist)
@@ -559,10 +558,8 @@ class Lewd(commands.Cog):
 
     @blacklist.command()
     @checks.has_permissions(manage_messages=True)
-    async def remove(self, ctx: Context, *tags: str) -> None:
+    async def remove(self, ctx: GuildContext, *tags: str) -> None:
         """Remove an item from the blacklist."""
-        assert ctx.guild is not None
-
         query = """
                 --begin-sql
                 UPDATE lewd_config
@@ -578,7 +575,7 @@ class Lewd(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.user)
     @commands.max_concurrency(1, commands.BucketType.user, wait=False)
     @commands.is_nsfw()
-    async def nhentai(self, ctx, hentai_id: int) -> None:
+    async def nhentai(self, ctx: Context, hentai_id: int) -> None:
         """Naughty. Return info, the cover and links to an nhentai gallery."""
         gallery = await self.bot.h_client.fetch_gallery(hentai_id)
 
@@ -601,7 +598,7 @@ class Lewd(commands.Cog):
 
     @nhentai.command(name="toggle")
     @checks.has_guild_permissions(manage_messages=True)
-    async def nhentai_toggle(self, ctx: Context) -> None:
+    async def nhentai_toggle(self, ctx: GuildContext) -> None:
         """
         This command will toggle the auto parsing of NHentai IDs in messages in the form of:-
         `{123456}`
@@ -613,8 +610,6 @@ class Lewd(commands.Cog):
         Toggle will do as it says, switch between True and False. Only when it is True will it parse and respond.
         The reaction added will tell you if it is on (check mark), or off (cross).
         """
-        assert ctx.guild is not None
-
         config: BooruConfig = await self.get_booru_config(ctx.guild.id)
         if not config:
             await ctx.send("No recorded config for this guild. Creating one.")
@@ -648,11 +643,10 @@ class Lewd(commands.Cog):
         except nhentaio.NHentaiError:
             await message.channel.send(
                 (
-                    "I would have given you the cum provocation but NHentai is down. I queued it and will try again."
+                    "I would have given you the cum provocation but NHentai is down."
                     f"\nHave the link in the meantime: https://nhentai.net/g/{digits}"
                 )
             )
-            self._nhen_queu.add((message.author.id, message.channel.id, digits))
             return
 
         if not gallery:
@@ -666,27 +660,6 @@ class Lewd(commands.Cog):
 
         embed = NHentaiEmbed.from_gallery(gallery)
         await message.reply(embed=embed)
-
-    @tasks.loop(minutes=20)
-    async def nhen_deque(self) -> None:
-        for author, channel_id, digits in self._nhen_queu:
-            try:
-                gallery = await self.bot.h_client.fetch_gallery(digits)
-            except nhentaio.NHentaiError:
-                continue
-            if gallery is None:
-                self._nhen_queu.remove((author, channel_id, digits))
-                return
-
-            fmt = f"Hey <@{author}>, I finally got that gallery:-"
-            embed = NHentaiEmbed.from_gallery(gallery)
-            channel = self.bot.get_channel(channel_id)
-            self._nhen_queu.remove((author, channel_id, digits))
-            if channel is None:
-                return
-            assert isinstance(channel, discord.TextChannel)
-
-            await channel.send(fmt, embed=embed)
 
 
 async def setup(bot: Mipha) -> None:
