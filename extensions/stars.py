@@ -6,7 +6,8 @@ import logging
 import re
 import time
 import weakref
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal
 
 import asyncpg
 import discord
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
     class StarboardContext(GuildContext):
         starboard: CompleteStarboardConfig
 
-    StarableChannel = Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]
+    StarableChannel = discord.TextChannel | discord.VoiceChannel | discord.Thread
 
 
 log = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def requires_starboard():
         if ctx.guild is None:
             return False
 
-        cog: Stars = ctx.bot.get_cog("Stars")  # type: ignore
+        cog: Stars | None = ctx.bot.get_cog("Stars")  # type: ignore
 
         ctx.starboard = await cog.get_starboard(ctx.guild.id)  # type: ignore
         if ctx.starboard.channel is None:
@@ -62,12 +63,12 @@ def MessageID(argument: str) -> int:
 class StarboardConfig:
     __slots__ = ("bot", "id", "channel_id", "threshold", "locked", "needs_migration", "max_age")
 
-    def __init__(self, *, guild_id: int, bot: Mipha, record: Optional[asyncpg.Record] = None):
+    def __init__(self, *, guild_id: int, bot: Mipha, record: asyncpg.Record | None = None):
         self.id: int = guild_id
         self.bot: Mipha = bot
 
         if record:
-            self.channel_id: Optional[int] = record["channel_id"]
+            self.channel_id: int | None = record["channel_id"]
             self.threshold: int = record["threshold"]
             self.locked: bool = record["locked"]
             self.needs_migration: bool = self.locked is None
@@ -79,7 +80,7 @@ class StarboardConfig:
             self.channel_id = None
 
     @property
-    def channel(self) -> Optional[discord.TextChannel]:
+    def channel(self) -> discord.TextChannel | None:
         guild = self.bot.get_guild(self.id)
         return guild and guild.get_channel(self.channel_id)  # type: ignore
 
@@ -130,7 +131,7 @@ class Stars(commands.Cog):
 
     @cache.cache()
     async def get_starboard(
-        self, guild_id: int, *, connection: Optional[asyncpg.Pool | asyncpg.Connection] = None
+        self, guild_id: int, *, connection: asyncpg.Pool | asyncpg.Connection | None = None
     ) -> StarboardConfig:
         connection = connection or self.bot.pool
         query = "SELECT * FROM starboard WHERE id=$1;"
@@ -206,7 +207,7 @@ class Stars(commands.Cog):
         embed.colour = self.star_gradient_colour(stars)
         return content, embed
 
-    async def get_message(self, channel: discord.abc.Messageable, message_id: int) -> Optional[discord.Message]:
+    async def get_message(self, channel: discord.abc.Messageable, message_id: int) -> discord.Message | None:
         try:
             return self._message_cache[message_id]
         except KeyError:
@@ -361,7 +362,7 @@ class Stars(commands.Cog):
 
         Parameters
         ------------
-        channel: Union[:class:`TextChannel`, :class:`VoiceChannel`, :class:`Thread`]
+        channel: :class:`TextChannel` | :class:`VoiceChannel` | :class:`Thread`
             The channel that the starred message belongs to.
         message_id: int
             The message ID of the message being starred.
@@ -521,7 +522,7 @@ class Stars(commands.Cog):
 
         Parameters
         ------------
-        channel: Union[:class:`TextChannel`, :class:`VoiceChannel`, :class:`Thread`]
+        channel: :class:`TextChannel` | :class:`VoiceChannel` | :class:`Thread`
             The channel that the starred message belongs to.
         message_id: int
             The message ID of the message being unstarred.
@@ -830,7 +831,7 @@ class Stars(commands.Cog):
                 return
 
         # slow path, try to fetch the content
-        channel: Optional[discord.abc.Messageable] = ctx.guild.get_channel_or_thread(record["channel_id"])  # type: ignore
+        channel: discord.abc.Messageable | None = ctx.guild.get_channel_or_thread(record["channel_id"])  # type: ignore
         if channel is None:
             return await ctx.send("The message's channel has been deleted.")
 
@@ -959,9 +960,7 @@ class Stars(commands.Cog):
             e.timestamp = m.created_at
             await webhook.send(embed=e)
 
-    def records_to_value(
-        self, records: list[Any], fmt: Optional[Callable[[str], str]] = None, default: str = "None!"
-    ) -> str:
+    def records_to_value(self, records: list[Any], fmt: Callable[[str], str] | None = None, default: str = "None!") -> str:
         if not records:
             return default
 

@@ -18,7 +18,7 @@ import time
 from functools import partial
 from string import ascii_lowercase
 from textwrap import fill
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import aiohttp
 import discord
@@ -296,7 +296,7 @@ class Fun(commands.Cog):
         finally:
             task.cancel()
 
-    def safe_chan(self, member: discord.Member, channels: list[discord.VoiceChannel]) -> Optional[discord.VoiceChannel]:
+    def safe_chan(self, member: discord.Member, channels: list[discord.VoiceChannel]) -> discord.VoiceChannel | None:
         """ """
         random.shuffle(channels)
         for channel in channels:
@@ -306,7 +306,7 @@ class Fun(commands.Cog):
 
     @commands.command(hidden=True, name="scatter", aliases=["scattertheweak"])
     @checks.has_guild_permissions(administrator=True)
-    async def scatter(self, ctx: GuildContext, voice_channel: Optional[discord.VoiceChannel] = None) -> None:
+    async def scatter(self, ctx: GuildContext, voice_channel: discord.VoiceChannel | None = None) -> None:
         assert isinstance(ctx.author, discord.Member)
         if voice_channel:
             channel = voice_channel

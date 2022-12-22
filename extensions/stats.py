@@ -12,7 +12,7 @@ import sys
 import textwrap
 import traceback
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import asyncpg
 import discord
@@ -36,7 +36,7 @@ LOGGING_CHANNEL = 309632009427222529
 
 
 class DataBatchEntry(TypedDict):
-    guild: Optional[int]
+    guild: int | None
     channel: int
     author: int
     used: str
@@ -69,7 +69,7 @@ def hex_value(arg: str) -> int:
     return int(arg, base=16)
 
 
-def object_at(addr: int) -> Optional[Any]:
+def object_at(addr: int) -> Any | None:
     for o in gc.get_objects():
         if id(o) == addr:
             return o
@@ -874,7 +874,7 @@ class Stats(commands.Cog):
 
     @command_history.command(name="for")
     @commands.is_owner()
-    async def command_history_for(self, ctx: Context, days: Annotated[int, Optional[int]] = 7, *, command: str) -> None:
+    async def command_history_for(self, ctx: Context, days: Annotated[int, int | None] = 7, *, command: str) -> None:
         """Command history for a command."""
 
         query = """SELECT *, t.success + t.failed AS "total"

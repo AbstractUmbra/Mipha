@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, TypeVar, overload
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
 
 from typing_extensions import Self
 
@@ -42,7 +43,7 @@ class BaseFlags:
 class flag_value:
     def __init__(self, func: Callable[[Any], int]) -> None:
         self.flag: int = func(None)
-        self.__doc__: Optional[str] = func.__doc__
+        self.__doc__: str | None = func.__doc__
 
     @overload
     def __get__(self, instance: None, owner: type[Any]) -> Self:
@@ -52,7 +53,7 @@ class flag_value:
     def __get__(self, instance: T, owner: type[T]) -> bool:
         ...
 
-    def __get__(self, instance: Optional[T], owner: type[T]) -> Any:
+    def __get__(self, instance: T | None, owner: type[T]) -> Any:
         if instance is None:
             return self
         return instance._has_flag(self.flag)

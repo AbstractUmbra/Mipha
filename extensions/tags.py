@@ -75,7 +75,7 @@ class TagName(commands.clean_content):
 
         first_word, _, _ = lower.partition(" ")
 
-        root: Optional[commands.Group] = ctx.bot.get_command("tag")  # type: ignore
+        root: commands.Group | None = ctx.bot.get_command("tag")  # type: ignore
         assert root is not None
         if first_word in root.all_commands:
             raise commands.BadArgument("This tag name starts with a reserved word.")

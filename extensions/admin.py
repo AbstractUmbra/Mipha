@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 import time
 import traceback
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal
 
 import discord
 from discord.ext import commands
@@ -162,7 +162,7 @@ class Admin(commands.Cog):
     @commands.command()
     @commands.guild_only()
     async def sync(
-        self, ctx: GuildContext, guilds: Greedy[discord.Object], spec: Optional[Literal["~", "*", "^"]] = None
+        self, ctx: GuildContext, guilds: Greedy[discord.Object], spec: Literal["~", "*", "^"] | None = None
     ) -> None:
         """
         Pass guild ids or pass a sync specification:-

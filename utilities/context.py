@@ -185,12 +185,12 @@ class Context(commands.Context["Mipha"]):
             How long to wait before returning.
         delete_after: bool
             Whether to delete the confirmation message after we're done.
-        author_id: Optional[int]
+        author_id: int | None
             The member who should respond to the prompt. Defaults to the author of the
             Context's message.
         Returns
         --------
-        Optional[bool]
+        bool | None
             ``True`` if explicit confirm,
             ``False`` if explicit deny,
             ``None`` if deny due to timeout
