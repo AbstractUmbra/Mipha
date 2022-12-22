@@ -39,6 +39,7 @@ INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(?P<url>https?://(?:www\.)?instagram\.com(?:/[^/]+)?/(?:p|tv|reel)/(?P<id>[^/?#&]+))\>?"
 )
 TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+)\>?")
+REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\w+))\>?")
 
 GUILDS: list[discord.Object] = [
     discord.Object(id=174702278673039360),
@@ -158,6 +159,8 @@ class MediaReposter(commands.Cog):
             url = match["url"]
         elif match := TWITTER_PATTERN.search(message.content):
             url = match[0]
+        elif match := REDDIT_PATTERN.search(message.content):
+            url = match[0]
         else:
             await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.", ephemeral=True)
             return
@@ -263,6 +266,7 @@ class MediaReposter(commands.Cog):
             list(DESKTOP_PATTERN.finditer(message.content))
             + list(MOBILE_PATTERN.finditer(message.content))
             + list(INSTAGRAM_PATTERN.finditer(message.content))
+            + list(REDDIT_PATTERN.finditer(message.content))
         )
 
         if not matches:
@@ -309,6 +313,7 @@ class MediaReposter(commands.Cog):
                         DESKTOP_PATTERN.fullmatch(message.content),
                         MOBILE_PATTERN.fullmatch(message.content),
                         INSTAGRAM_PATTERN.fullmatch(message.content),
+                        REDDIT_PATTERN.fullmatch(message.content),
                     ]
                 ):
                     await message.delete()
