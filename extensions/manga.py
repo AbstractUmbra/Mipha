@@ -116,8 +116,8 @@ class MangaCog(commands.Cog, name="Manga"):
     """
 
     def __init__(self, bot: Mipha) -> None:
-        self.bot = bot
-        self.webhook = discord.Webhook.from_url(bot.config.MANGADEX_WEBHOOK, session=bot.session)
+        self.bot: Mipha = bot
+        self.webhook: discord.Webhook = discord.Webhook.from_url(bot.config.MANGADEX_WEBHOOK, session=bot.session)
         self.get_personal_feed.add_exception_type(hondana.APIException)
         self.get_personal_feed.start()
 
@@ -281,7 +281,6 @@ class MangaCog(commands.Cog, name="Manga"):
 
         for embeds in as_chunks(embeds, 10):
             await self.webhook.send(
-                "<@!155863164544614402>",
                 embeds=embeds,
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
