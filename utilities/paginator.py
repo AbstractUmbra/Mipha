@@ -354,8 +354,6 @@ class MangaDexEmbed(discord.Embed):
             self.add_field(name="Uploader:", value=chapter.uploader.username, inline=False)
 
         if parent.content_rating is hondana.ContentRating.safe or (nsfw_allowed is True):
-            if parent.cover_url() is None:
-                await parent.get_cover()
             self.set_thumbnail(url=parent.cover_url())
 
         return self
