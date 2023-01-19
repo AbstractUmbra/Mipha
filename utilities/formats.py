@@ -5,6 +5,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import codecs
+import datetime
 import json
 import random
 import re
@@ -41,6 +42,15 @@ class plural:
         if abs(v) != 1:
             return f"{v} {plural}"
         return f"{v} {singular}"
+
+
+class ts:
+    def __init__(self, value: datetime.datetime) -> None:
+        self.value: datetime.datetime = value
+
+    def __format__(self, __format_spec: str) -> str:
+        spec, _, _ = __format_spec.partition("|")
+        return discord.utils.format_dt(self.value, style=spec)  # type: ignore
 
 
 def human_join(seq: Sequence[str], delim: str = ", ", final: str = "or") -> str:
