@@ -9,13 +9,12 @@ import re
 import zoneinfo
 from typing import Any, Literal, Sequence, Type, TypedDict
 
-import discord
 import yarl
 from discord import app_commands
 from discord.ext import commands
 from typing_extensions import NotRequired, Self
 
-from utilities.context import Context, GuildContext
+from utilities.context import Context, GuildContext, Interaction
 
 
 MYSTBIN_REGEX = re.compile(r"(?:(?:https?://)?(?:beta\.)?(?:mystb\.in\/))?(?P<id>(?:[A-Z]{1}[a-z]+)*)(?P<ext>\.\w+)?")
@@ -250,7 +249,7 @@ class BadDatetimeTransform(app_commands.AppCommandError):
 
 class DatetimeTransformer(app_commands.Transformer):
     @staticmethod
-    async def get_timezone(interaction: discord.Interaction) -> zoneinfo.ZoneInfo | None:
+    async def get_timezone(interaction: Interaction) -> zoneinfo.ZoneInfo | None:
         if interaction.guild is None:
             tz = zoneinfo.ZoneInfo("UTC")
         else:
@@ -272,7 +271,7 @@ class DatetimeTransformer(app_commands.Transformer):
         argument: str,
         /,
         *,
-        interaction: discord.Interaction,
+        interaction: Interaction,
         timezone: datetime.tzinfo | None = datetime.timezone.utc,
         now: datetime.datetime | None = None,
     ) -> list[tuple[datetime.datetime, int, int]]:
@@ -280,7 +279,7 @@ class DatetimeTransformer(app_commands.Transformer):
 
         times: list[tuple[datetime.datetime, int, int]] = []
 
-        async with interaction.client.session.post(  # type: ignore # typevar defaults, sad
+        async with interaction.client.session.post(
             "http://127.0.0.1:7731/parse",
             data={
                 "locale": "en_US",
@@ -313,7 +312,7 @@ class DatetimeTransformer(app_commands.Transformer):
         return times
 
     @classmethod
-    async def transform(cls, interaction: discord.Interaction, argument: str) -> datetime.datetime:
+    async def transform(cls, interaction: Interaction, argument: str) -> datetime.datetime:
         timezone = await cls.get_timezone(interaction)
         now = interaction.created_at.astimezone(tz=timezone)
 
@@ -329,7 +328,7 @@ class DatetimeTransformer(app_commands.Transformer):
 
 class WhenAndWhatTransformer(app_commands.Transformer):
     @staticmethod
-    async def get_timezone(interaction: discord.Interaction) -> zoneinfo.ZoneInfo | None:
+    async def get_timezone(interaction: Interaction) -> zoneinfo.ZoneInfo | None:
         if interaction.guild is None:
             tz = zoneinfo.ZoneInfo("UTC")
         else:
@@ -351,7 +350,7 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         argument: str,
         /,
         *,
-        interaction: discord.Interaction,
+        interaction: Interaction,
         timezone: datetime.tzinfo | None = datetime.timezone.utc,
         now: datetime.datetime | None = None,
     ) -> list[tuple[datetime.datetime, int, int]]:
@@ -359,7 +358,7 @@ class WhenAndWhatTransformer(app_commands.Transformer):
 
         times: list[tuple[datetime.datetime, int, int]] = []
 
-        async with interaction.client.session.post(  # type: ignore
+        async with interaction.client.session.post(
             "http://127.0.0.1:7731/parse",
             data={
                 "locale": "en_US",
@@ -392,7 +391,7 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         return times
 
     @classmethod
-    async def transform(cls, interaction: discord.Interaction, value: str) -> datetime.datetime:
+    async def transform(cls, interaction: Interaction, value: str) -> datetime.datetime:
         timezone = await cls.get_timezone(interaction)
         now = interaction.created_at.astimezone(tz=timezone)
 

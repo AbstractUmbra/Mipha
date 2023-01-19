@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from discord.ext.commands._types import Check
 
     from bot import Mipha
-    from utilities.context import GuildContext
+    from utilities.context import GuildContext, Interaction
 
     from .reminders import Timer
 
@@ -129,12 +129,14 @@ class MigrateJoinLogView(MiphaBaseView):
         self.cog: Mod = cog
 
     @discord.ui.button(label="Migrate", custom_id="migrate_robomod_join_logs", style=discord.ButtonStyle.green)
-    async def migrate(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def migrate(self, interaction: Interaction, button: discord.ui.Button) -> None:
         assert interaction.message is not None
+        assert interaction.guild_id
+        assert isinstance(interaction.channel, discord.TextChannel)
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         try:
-            await self.cog.migrate_automod_broadcast(interaction.user, interaction.channel, interaction.guild_id)  # type: ignore
+            await self.cog.migrate_automod_broadcast(interaction.user, interaction.channel, interaction.guild_id)
         except RuntimeError as e:
             await interaction.followup.send(str(e), ephemeral=True)
         else:
@@ -157,26 +159,26 @@ class PreExistingMuteRoleView(MiphaBaseView):
         except:
             pass
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.user.id:
             await interaction.response.send_message("Sorry, these buttons aren't for you", ephemeral=True)
             return False
         return True
 
     @discord.ui.button(label="Merge", style=discord.ButtonStyle.blurple)
-    async def merge_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def merge_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.merge = True
 
     @discord.ui.button(label="Replace", style=discord.ButtonStyle.grey)
-    async def replace_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def replace_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.merge = False
 
     @discord.ui.button(label="Quit", style=discord.ButtonStyle.red)
-    async def abort_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def abort_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message("Aborting", ephemeral=True)
         self.merge = None
         await self.message.delete()
@@ -200,7 +202,7 @@ class LockdownPermissionIssueView(MiphaBaseView):
             pass
 
     @discord.ui.button(label="Resolve Permission Issue", style=discord.ButtonStyle.green)
-    async def resolve_permissions(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def resolve_permissions(self, interaction: Interaction, button: discord.ui.Button) -> None:
         overwrites = self.channel.overwrites
         ow = overwrites.setdefault(self.me, discord.PermissionOverwrite())
         ow.send_messages = True
@@ -220,7 +222,7 @@ class LockdownPermissionIssueView(MiphaBaseView):
             self.stop()
 
     @discord.ui.button(label="Quit", style=discord.ButtonStyle.red)
-    async def abort_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def abort_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
         self.abort = True
         await interaction.response.send_message(
             "Alright, feel free to edit the permissions yourself to give the bot Send Messages and Send Messages in Threads!"

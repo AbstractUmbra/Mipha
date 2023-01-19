@@ -17,7 +17,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utilities import time
-from utilities.context import Context
+from utilities.context import Context, Interaction
 from utilities.fuzzy import extract
 
 
@@ -29,27 +29,28 @@ AVAILABLE_TIMEZONES = {zone.replace("_", " "): zone for zone in zoneinfo.availab
 
 class TimezoneConverter(commands.Converter[zoneinfo.ZoneInfo]):
     async def convert(self, ctx: Context, argument: str) -> zoneinfo.ZoneInfo:
-        query = extract(query=argument.lower(), choices=list(zoneinfo.available_timezones()), limit=5)
+        query = extract(query=argument.lower(), choices=zoneinfo.available_timezones(), limit=5)
         if argument.lower() not in {timezone.lower() for timezone in zoneinfo.available_timezones()}:
             matches = "\n".join([f"`{index}.` {match[0]}" for index, match in enumerate(query, start=1)])
-            await ctx.send(f"That was not a recognised timezone. Maybe you meant one of these?\n{matches}")
+            question = await ctx.send(f"That was not a recognised timezone. Maybe you meant one of these?\n{matches}")
 
             def check(message: discord.Message) -> bool:
                 return (
                     message.author == ctx.author
                     and message.channel == ctx.channel
                     and message.content.removesuffix(".").isdigit()
-                    and 1 < int(message.content) <= 5
+                    and 1 >= int(message.content.removesuffix(".")) <= 5
                 )
 
             try:
-                result = await ctx.bot.wait_for("message", check=check, timeout=30)
+                result: discord.Message = await ctx.bot.wait_for("message", check=check, timeout=30)
             except asyncio.TimeoutError:
+                await question.delete()
                 raise commands.BadArgument("No valid timezone given or selected.")
 
             return zoneinfo.ZoneInfo(query[int(result.content) - 1][0])
 
-        return zoneinfo.ZoneInfo(query[0][0])
+        return zoneinfo.ZoneInfo(AVAILABLE_TIMEZONES[argument])
 
 
 class Time(commands.Cog):
@@ -215,10 +216,7 @@ class Time(commands.Cog):
 
     @timezone.command(name="info", aliases=["tz"])
     async def _info(
-        self,
-        ctx: Context,
-        *,
-        timezone: zoneinfo.ZoneInfo = commands.param(converter=TimezoneConverter),
+        self, ctx: Context, *, timezone: zoneinfo.ZoneInfo = commands.param(converter=TimezoneConverter)
     ) -> None:
         """This will return the time in a specified timezone."""
         embed = discord.Embed(
@@ -231,9 +229,7 @@ class Time(commands.Cog):
 
     @_info.autocomplete("timezone")
     @_set.autocomplete("timezone")
-    async def timezone_autocomplete_callback(
-        self, interaction: discord.Interaction, current: str
-    ) -> list[app_commands.Choice[str]]:
+    async def timezone_autocomplete_callback(self, interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
             return self._timezone_cache[:25]
 

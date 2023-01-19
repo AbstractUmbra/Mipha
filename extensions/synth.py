@@ -13,6 +13,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utilities._types.synth import KanaResponse, SpeakersResponse, TikTokSynth
+from utilities.context import Interaction
 from utilities.fuzzy import extract
 
 
@@ -139,7 +140,7 @@ class SynthCog(commands.Cog, name="Synth"):
         name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
     )
     @app_commands.describe(engine="Which voice engine to use", text="What do you want the voice engine to say?")
-    async def tiktok_callback(self, itx: discord.Interaction, engine: str, text: str) -> None:
+    async def tiktok_callback(self, itx: Interaction, engine: str, text: str) -> None:
         await itx.response.defer(thinking=True)
 
         data = await self._get_tiktok_response(engine=engine, text=text)
@@ -167,7 +168,7 @@ class SynthCog(commands.Cog, name="Synth"):
         await itx.followup.send(content=f">>> {text}", file=file)
 
     @tiktok_callback.autocomplete("engine")
-    async def tiktok_engine_autocomplete(self, itx: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    async def tiktok_engine_autocomplete(self, itx: Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
             return self._tiktok_voice_choices[:25]
 
@@ -187,7 +188,7 @@ class SynthCog(commands.Cog, name="Synth"):
         return ret[:25]
 
     @app_commands.command(name="synth", description="Synthesise some Japanese text as a sound file.", nsfw=False)
-    async def synth_callback(self, itx: discord.Interaction, engine: int, text: str) -> None:
+    async def synth_callback(self, itx: Interaction, engine: int, text: str) -> None:
         await itx.response.defer(thinking=True)
         kana = await self._get_kana_from_input(text, engine)
         data = await self._get_audio_from_kana(kana, engine)
@@ -196,7 +197,7 @@ class SynthCog(commands.Cog, name="Synth"):
         await itx.followup.send(f"`{kana['kana']}`", file=file)
 
     @synth_callback.autocomplete("engine")
-    async def synth_engine_autocomplete(self, itx: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
+    async def synth_engine_autocomplete(self, itx: Interaction, current: str) -> list[app_commands.Choice[int]]:
         choices = await self._get_engine_choices()
 
         if not current:

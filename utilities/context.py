@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime
 import secrets
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, Iterable, Protocol, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Iterable, Protocol, Sequence, TypeAlias, TypeVar
 
 import discord
 from discord.ext import commands
@@ -29,9 +29,11 @@ if TYPE_CHECKING:
 __all__ = (
     "Context",
     "GuildContext",
+    "Interaction",
 )
 
 T = TypeVar("T")
+Interaction: TypeAlias = discord.Interaction[Mipha]
 
 
 # For typing purposes, `Context.db` returns a Protocol type
@@ -102,13 +104,13 @@ class DisambiguatorView(MiphaBaseView, Generic[T]):
         self.select = select
         self.add_item(select)
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.ctx.author.id:
             await interaction.response.send_message("This select menu is not meant for you, sorry.", ephemeral=True)
             return False
         return True
 
-    async def on_select_submit(self, interaction: discord.Interaction) -> None:
+    async def on_select_submit(self, interaction: Interaction) -> None:
         index = int(self.select.values[0])
         self.selected = self.data[index]
         await interaction.response.defer()

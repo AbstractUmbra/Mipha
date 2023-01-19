@@ -23,7 +23,7 @@ from discord.ext import commands, menus, tasks
 from typing_extensions import Annotated
 
 from utilities import formats, time
-from utilities.context import Context
+from utilities.context import Context, Interaction
 from utilities.paginator import FieldPageSource, RoboPages
 
 
@@ -172,7 +172,7 @@ class Stats(commands.Cog):
         await self.register_command(ctx)
 
     @commands.Cog.listener()
-    async def on_interaction(self, interaction: discord.Interaction) -> None:
+    async def on_interaction(self, interaction: Interaction) -> None:
         command = interaction.command
         # Check if a command is found and it's not a hybrid command
         # Hybrid commands are already counted via on_command_completion

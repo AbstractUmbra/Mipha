@@ -8,6 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utilities.context import Interaction
 from utilities.formats import plural
 from utilities.ui import MiphaBaseView
 
@@ -74,7 +75,7 @@ class DisambiguateMember(commands.IDConverter, app_commands.Transformer):
     def type(self) -> discord.AppCommandOptionType:
         return discord.AppCommandOptionType.user
 
-    async def transform(self, interaction: discord.Interaction, value: discord.abc.User) -> discord.abc.User:
+    async def transform(self, interaction: Interaction, value: discord.abc.User) -> discord.abc.User:
         return value
 
 
@@ -107,7 +108,7 @@ class ProfileCreateModal(discord.ui.Modal, title="Create Profile"):
         self.cog: Profile = cog
         self.ctx: Context = ctx
 
-    async def on_submit(self, interaction: discord.Interaction) -> None:
+    async def on_submit(self, interaction: Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
 
         extra = {}
@@ -145,14 +146,14 @@ class PromptProfileCreationView(MiphaBaseView):
         self.cog: Profile = cog
         self.ctx: Context = ctx
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.ctx.author.id:
             await interaction.response.send_message("Sorry, this button is not meant for you.", ephemeral=True)
             return False
         return True
 
     @discord.ui.button(label="Create Profile", style=discord.ButtonStyle.blurple)
-    async def create_profile(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def create_profile(self, interaction: Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(ProfileCreateModal(self.cog, self.ctx))
 
 

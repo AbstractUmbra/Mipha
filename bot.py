@@ -32,7 +32,7 @@ from typing_extensions import Self
 
 import _bot_config
 from utilities.async_config import Config
-from utilities.context import Context
+from utilities.context import Context, Interaction
 from utilities.db import db_init
 from utilities.prefix import callable_prefix as _callable_prefix
 
@@ -43,7 +43,6 @@ if TYPE_CHECKING:
     from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
 
-LOGGER = logging.getLogger("bot.mipha")
 jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
@@ -56,12 +55,12 @@ class MiphaCommandTree(app_commands.CommandTree):
 
     async def on_error(
         self,
-        interaction: discord.Interaction,
+        interaction: Interaction,
         error: app_commands.AppCommandError,
     ) -> None:
         assert interaction.command is not None  # typechecking # disable assertions
 
-        LOGGER.exception("Exception occurred in the CommandTree:\n%s", error)
+        self.client.log_handler.log.exception("Exception occurred in the CommandTree:\n%s", error)
 
         e = discord.Embed(title="Command Error", colour=0xA32952)
         e.add_field(name="Command", value=interaction.command.name)
@@ -107,13 +106,16 @@ class ProxyObject(discord.Object):
         self.guild: discord.abc.Snowflake | None = guild
 
 
-class SetupLogging:
+class LogHandler:
     def __init__(self, *, stream: bool = True) -> None:
         self.log: logging.Logger = logging.getLogger()
         self.max_bytes: int = 32 * 1024 * 1024
         self.logging_path = pathlib.Path("./logs/")
         self.logging_path.mkdir(exist_ok=True)
         self.stream: bool = stream
+
+    async def __aenter__(self) -> Self:
+        return self.__enter__()
 
     def __enter__(self: Self) -> Self:
         logging.getLogger("discord").setLevel(logging.INFO)
@@ -138,6 +140,9 @@ class SetupLogging:
 
         return self
 
+    async def __aexit__(self, *args: Any) -> None:
+        return self.__exit__(*args)
+
     def __exit__(self, *args: Any) -> None:
         handlers = self.log.handlers[:]
         for hdlr in handlers:
@@ -148,6 +153,7 @@ class SetupLogging:
 class Mipha(commands.Bot):
     """Mipha's bot class."""
 
+    log_handler: LogHandler
     pool: asyncpg.Pool
     user: discord.ClientUser
     session: aiohttp.ClientSession
@@ -169,6 +175,7 @@ class Mipha(commands.Bot):
         "md_client",
         "start_time",
         "pool",
+        "log_handler",
         "command_stats",
         "socket_stats",
         "_blacklist_data",
@@ -207,7 +214,6 @@ class Mipha(commands.Bot):
         self.command_stats = Counter()
         self.socket_stats = Counter()
         self.owner_ids = self.config.OWNER_IDS
-        self.global_log = LOGGER
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
@@ -237,10 +243,10 @@ class Mipha(commands.Bot):
         self._previous_websocket_events.append(message)
 
     async def on_ready(self) -> None:
-        self.global_log.info("%s got a ready event at %s", self.user.name, datetime.datetime.now())
+        self.log_handler.log.info("%s got a ready event at %s", self.user.name, datetime.datetime.now())
 
     async def on_resume(self) -> None:
-        self.global_log.info("%s got a resume event at %s", self.user.name, datetime.datetime.now())
+        self.log_handler.log.info("%s got a resume event at %s", self.user.name, datetime.datetime.now())
 
     async def on_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         assert ctx.command is not None  # type checking - disable assertions
@@ -315,7 +321,7 @@ class Mipha(commands.Bot):
         guild_name = getattr(ctx.guild, "name", "No Guild (DMs)")
         guild_id = getattr(ctx.guild, "id", None)
         fmt = "User %s (ID %s) in guild %r (ID %s) is spamming. retry_after: %.2fs"
-        LOGGER.warning(fmt, message.author, message.author.id, guild_name, guild_id, retry_after)
+        self.log_handler.log.warning(fmt, message.author, message.author.id, guild_name, guild_id, retry_after)
         if not autoblock:
             return
 
@@ -384,16 +390,14 @@ class Mipha(commands.Bot):
                     yield member
 
     @overload
-    async def get_context(self, origin: discord.Interaction | discord.Message, /) -> Context:
+    async def get_context(self, origin: Interaction | discord.Message, /) -> Context:
         ...
 
     @overload
-    async def get_context(self, origin: discord.Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT:
+    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT:
         ...
 
-    async def get_context(
-        self, origin: discord.Interaction | discord.Message, /, *, cls: type[ContextT] = MISSING
-    ) -> ContextT:
+    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT] = MISSING) -> ContextT:
         if cls is MISSING:
             cls = Context  # type: ignore
         return await super().get_context(origin, cls=cls)
@@ -455,11 +459,6 @@ class Mipha(commands.Bot):
         if guild.id in self._blacklist_data:
             await guild.leave()
 
-    async def close(self) -> None:
-        await self.md_client.logout()
-        await self.pool.close()
-        await super().close()
-
     async def start(self) -> None:
         try:
             await super().start(token=self.config.TOKEN, reconnect=True)
@@ -485,11 +484,8 @@ class Mipha(commands.Bot):
 async def main() -> None:
     async with Mipha() as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
         dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
-    ) as pool:
-        if pool is None:
-            # thanks asyncpg...
-            raise RuntimeError("Could not connect to database.")
-
+    ) as pool, LogHandler() as log_handler:
+        bot.log_handler = log_handler
         bot.pool = pool
 
         bot.session = session
@@ -498,31 +494,30 @@ async def main() -> None:
         bot.md_client = hondana.Client(**bot.config.MANGADEX_AUTH, session=session)
         bot.h_client = nhentaio.Client()
 
-        with SetupLogging():
-            await bot.load_extension("jishaku")
-            path = pathlib.Path("extensions")
-            for file in path.rglob("[!_]*.py"):
-                if (file.is_dir() and file.name.startswith("ext-")) or (
-                    file.parent.is_dir() and file.parent.name.startswith("ext-")
-                ):
-                    continue
-                ext = ".".join(file.parts).removesuffix(".py")
-                try:
-                    await bot.load_extension(ext)
-                    LOGGER.info("Loaded extension: %s", ext)
-                except Exception as error:
-                    LOGGER.exception("Failed to load extension: %s\n\n%s", ext, error)
-            for directory in path.rglob("ext-*"):
-                if not directory.is_dir():
-                    return
-                module = ".".join(directory.parts)
-                try:
-                    await bot.load_extension(module)
-                    LOGGER.info("Loaded module extension: %s", module)
-                except Exception as error:
-                    LOGGER.exception("Failed to load module extension: %s\n\n%s", module, error)
+        await bot.load_extension("jishaku")
+        path = pathlib.Path("extensions")
+        for file in path.rglob("[!_]*.py"):
+            if (file.is_dir() and file.name.startswith("ext-")) or (
+                file.parent.is_dir() and file.parent.name.startswith("ext-")
+            ):
+                continue
+            ext = ".".join(file.parts).removesuffix(".py")
+            try:
+                await bot.load_extension(ext)
+                bot.log_handler.log.info("Loaded extension: %s", ext)
+            except Exception as error:
+                bot.log_handler.log.exception("Failed to load extension: %s\n\n%s", ext, error)
+        for directory in path.rglob("ext-*"):
+            if not directory.is_dir():
+                return
+            module = ".".join(directory.parts)
+            try:
+                await bot.load_extension(module)
+                bot.log_handler.log.info("Loaded module extension: %s", module)
+            except Exception as error:
+                bot.log_handler.log.exception("Failed to load module extension: %s\n\n%s", module, error)
 
-            await bot.start()
+        await bot.start()
 
 
 if __name__ == "__main__":

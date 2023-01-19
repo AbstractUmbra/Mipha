@@ -18,7 +18,7 @@ from discord.ext import commands
 from typing_extensions import Self
 
 from utilities import formats, time
-from utilities.context import Context
+from utilities.context import Context, Interaction
 from utilities.converters import BadDatetimeTransform, DatetimeTransformer, WhenAndWhatConverter, WhenAndWhatTransformer
 from utilities.db import MaybeAcquire
 from utilities.ui import MiphaBaseView
@@ -39,7 +39,7 @@ class SnoozeModal(discord.ui.Modal, title="Snooze"):
         self.timer: Timer = timer
         self.cog: Reminder = cog
 
-    async def on_submit(self, interaction: discord.Interaction) -> None:
+    async def on_submit(self, interaction: Interaction) -> None:
         try:
             when = await WhenAndWhatTransformer.transform(interaction, self.duration.value)
         except Exception:
@@ -67,7 +67,7 @@ class SnoozeButton(discord.ui.Button["ReminderView"]):
         self.timer: Timer = timer
         self.cog: Reminder = cog
 
-    async def callback(self, interaction: discord.Interaction) -> Any:
+    async def callback(self, interaction: Interaction) -> Any:
         assert self.view is not None
         await interaction.response.send_modal(SnoozeModal(self.view, self.cog, self.timer))
 
@@ -82,7 +82,7 @@ class ReminderView(MiphaBaseView):
         self.add_item(discord.ui.Button(url=url, label="Go to original message"))
         self.add_item(self.snooze)
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("This snooze button is not for you, sorry!", ephemeral=True)
             return False
@@ -328,7 +328,7 @@ class Reminder(commands.Cog):
     @app_commands.describe(when="When to be reminded of something.", text="What to be reminded of.")
     async def reminder_set(
         self,
-        interaction: discord.Interaction,
+        interaction: Interaction,
         when: app_commands.Transform[datetime.datetime, DatetimeTransformer],
         text: str = "…",
     ) -> None:
@@ -347,7 +347,7 @@ class Reminder(commands.Cog):
         await interaction.response.send_message(f"Alright {interaction.user.mention}, in {delta}: {text}")
 
     @reminder_set.error
-    async def reminder_set_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+    async def reminder_set_error(self, interaction: Interaction, error: app_commands.AppCommandError):
         if isinstance(error, BadDatetimeTransform):
             await interaction.response.send_message(str(error), ephemeral=True)
 

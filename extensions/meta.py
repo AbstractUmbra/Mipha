@@ -23,7 +23,7 @@ from discord.ext import commands
 
 from utilities import checks, formats, time
 from utilities._types.discord_ import MessageableGuildChannel
-from utilities.context import Context, GuildContext
+from utilities.context import Context, GuildContext, Interaction
 
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class Prefix(commands.Converter):
         return argument
 
 
-_current = contextvars.ContextVar[discord.Interaction]("_current")
+_current = contextvars.ContextVar[Interaction]("_current")
 
 
 class PatchedContext(Context):
@@ -89,7 +89,7 @@ class Meta(commands.Cog):
     def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.interpret_as_command_ctx_menu.name, type=self.interpret_as_command_ctx_menu.type)
 
-    async def interpret_as_command_callback(self, interaction: discord.Interaction, message: discord.Message, /) -> None:
+    async def interpret_as_command_callback(self, interaction: Interaction, message: discord.Message, /) -> None:
         if message.author.bot:
             return await interaction.response.send_message(
                 "Sorry I won't invoke commands based on a bot's messages.", ephemeral=True

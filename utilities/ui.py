@@ -14,19 +14,17 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 
+from utilities.context import Interaction
+
 
 if TYPE_CHECKING:
     from typing_extensions import Self
-
-    from bot import Mipha
 
 __all__ = ("MiphaBaseView", "ConfirmationView")
 
 
 class MiphaBaseModal(discord.ui.Modal):
-    async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
-        client: Mipha = interaction.client  # type: ignore
-
+    async def on_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         e = discord.Embed(title="IRLs Modal Error", colour=0xA32952)
         e.add_field(name="Modal", value=self.__class__.__name__, inline=False)
 
@@ -44,11 +42,9 @@ class MiphaBaseModal(discord.ui.Modal):
 
 
 class MiphaBaseView(discord.ui.View):
-    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Self], /) -> None:
-        client: Mipha = interaction.client  # type: ignore
-
+    async def on_error(self, interaction: Interaction, error: Exception, item: discord.ui.Item[Self], /) -> None:
         view_name = self.__class__.__name__
-        client.global_log.exception("Exception occurred in View %r:\n%s", view_name, error)
+        interaction.client.log_handler.log.exception("Exception occurred in View %r:\n%s", view_name, error)
 
         embed = discord.Embed(title=f"{view_name} View Error", colour=0xA32952)
         embed.add_field(name="Author", value=interaction.user, inline=False)
@@ -65,7 +61,7 @@ class MiphaBaseView(discord.ui.View):
         clean = "".join(trace)
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
-            paste = await client.mb_client.create_paste(filename="error.py", content=clean, password=password)
+            paste = await interaction.client.mb_client.create_paste(filename="error.py", content=clean, password=password)
             embed.description = (
                 f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."
                 f"\nThe password is `{password}`."
@@ -74,8 +70,8 @@ class MiphaBaseView(discord.ui.View):
             embed.description = f"```py\n{clean}\n```"
 
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        await client.logging_webhook.send(embed=embed)
-        await client.owner.send(embed=embed)
+        await interaction.client.logging_webhook.send(embed=embed)
+        await interaction.client.owner.send(embed=embed)
 
     def _disable_all_buttons(self) -> None:
         for item in self.children:
@@ -91,7 +87,7 @@ class ConfirmationView(MiphaBaseView):
         self.author_id: int = author_id
         self.message: discord.Message | None = None
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user and interaction.user.id == self.author_id:
             return True
         else:
@@ -106,7 +102,7 @@ class ConfirmationView(MiphaBaseView):
                 await self.message.edit(view=None, content="This is safe to dismiss now.")
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def confirm(self, interaction: Interaction, button: discord.ui.Button) -> None:
         self.value = True
         await interaction.response.defer()
         if self.delete_after and self.message:
@@ -115,7 +111,7 @@ class ConfirmationView(MiphaBaseView):
         self.stop()
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def cancel(self, interaction: Interaction, button: discord.ui.Button) -> None:
         self.value = False
         await interaction.response.defer()
         if self.delete_after and self.message:

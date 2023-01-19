@@ -16,6 +16,7 @@ from utilities import formats, fuzzy
 if TYPE_CHECKING:
     from bot import Mipha
     from utilities._types.scotrail import ScotrailData
+    from utilities.context import Interaction
 
 
 class TrainTime:
@@ -113,7 +114,7 @@ class ScotrailCog(commands.Cog):
 
     @app_commands.command(name="next-train", description="Check your next train times from Scotrail.")
     @app_commands.rename(from_="from")
-    async def next_train_callback(self, interaction: discord.Interaction, from_: str, to: str) -> None:
+    async def next_train_callback(self, interaction: Interaction, from_: str, to: str) -> None:
         await interaction.response.defer(thinking=True)
 
         async with self.bot.session.get(f"https://scotrail.co.uk/cache/nre/next-trains/{from_}/{to}") as resp:
@@ -136,9 +137,7 @@ class ScotrailCog(commands.Cog):
 
     @next_train_callback.autocomplete("from_")
     @next_train_callback.autocomplete("to")
-    async def next_train_autocomplete(
-        self, interaction: discord.Interaction, current: str
-    ) -> list[app_commands.Choice[str]]:
+    async def next_train_autocomplete(self, interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
 
         if not current:
             quick = self._generate_autocomplete()
@@ -155,7 +154,7 @@ class ScotrailCog(commands.Cog):
         return ret
 
     @next_train_callback.error
-    async def error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+    async def error_handler(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         error = getattr(error, "original", error)
 
         respond = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message

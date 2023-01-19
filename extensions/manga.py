@@ -21,7 +21,7 @@ from hondana.query import FeedOrderQuery, MangaListOrderQuery, Order
 from typing_extensions import Self
 
 from utilities import formats
-from utilities.context import Context
+from utilities.context import Context, Interaction
 from utilities.paginator import MangaDexEmbed
 from utilities.ui import MiphaBaseView
 
@@ -73,12 +73,13 @@ class MangaView(MiphaBaseView):
         self.select.options = options
 
     @discord.ui.select(min_values=1, max_values=1, options=[])
-    async def select(self, interaction: discord.Interaction, item: discord.ui.Select[Self]) -> None:
+    async def select(self, interaction: Interaction, item: discord.ui.Select[Self]) -> None:
         assert interaction.user is not None
         assert interaction.channel is not None
-        assert not isinstance(interaction.channel, discord.PartialMessageable)
 
-        embed = await MangaDexEmbed.from_manga(self._lookup[item.values[0]], nsfw_allowed=interaction.channel.is_nsfw())
+        is_nsfw = isinstance(interaction.channel, discord.PartialMessageable) or interaction.channel.is_nsfw()
+
+        embed = await MangaDexEmbed.from_manga(self._lookup[item.values[0]], nsfw_allowed=is_nsfw)
         self.manga_id = item.values[0]
         if await self.bot.is_owner(interaction.user):
             self.follow.disabled = False
@@ -86,7 +87,7 @@ class MangaView(MiphaBaseView):
         await interaction.response.edit_message(content=None, embed=embed, view=self)
 
     @discord.ui.button(label="Follow?", disabled=True)
-    async def follow(self, interaction: discord.Interaction, _: discord.ui.Button[Self]) -> None:
+    async def follow(self, interaction: Interaction, _: discord.ui.Button[Self]) -> None:
         assert interaction.user is not None
         if not await self.bot.is_owner(interaction.user):
             raise commands.CheckFailure("You can't follow manga unless you're Umbra.")
@@ -95,19 +96,18 @@ class MangaView(MiphaBaseView):
         await self.bot.md_client.follow_manga(self.manga_id)
         await interaction.response.send_message("You now follow this!", ephemeral=True)
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction: Interaction) -> bool:
         assert interaction.user is not None
         if self.user.id != interaction.user.id:
             raise app_commands.CheckFailure("You are not the owner of this interaction.")
         return True
 
     async def on_error(
-        self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError, _: discord.ui.Item[Self]
+        self, interaction: Interaction, error: discord.app_commands.AppCommandError, item: discord.ui.Item[Self]
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
             return await interaction.response.send_message("You can't choose someone else's Manga!", ephemeral=True)
-        else:
-            await self.bot.tree.on_error(interaction, error)
+        await super().on_error(interaction, error, item)
 
 
 class MangaCog(commands.Cog, name="Manga"):
@@ -175,7 +175,7 @@ class MangaCog(commands.Cog, name="Manga"):
 
     @mangadex_group.command(name="search")
     @app_commands.describe(query="The manga name to search for")
-    async def slash_search(self, interaction: discord.Interaction, query: str) -> None:
+    async def slash_search(self, interaction: Interaction, query: str) -> None:
         """Search mangadex for a manga given it's name."""
         await interaction.response.defer()
         manga = await self.perform_search(query)
@@ -214,7 +214,7 @@ class MangaCog(commands.Cog, name="Manga"):
 
     @mangadex_group.command(name="manga")
     @app_commands.describe(manga_id="The ID of the manga!")
-    async def slash_manga(self, interaction: discord.Interaction, manga_id: str) -> None:
+    async def slash_manga(self, interaction: Interaction, manga_id: str) -> None:
         """Fetch details about a manga from MangaDex."""
         await interaction.response.defer()
         manga = await self.bot.md_client.get_manga(manga_id)

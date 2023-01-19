@@ -14,6 +14,7 @@ from discord.ext import commands
 from jishaku.shell import ShellReader
 
 from utilities.cache import ExpiringCache
+from utilities.context import Interaction
 from utilities.time import ordinal
 from utilities.ui import MiphaBaseView
 
@@ -25,9 +26,6 @@ if TYPE_CHECKING:
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
-insta_ydl = yt_dlp.YoutubeDL(
-    {"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER, "cookiefile": "configs/insta_cookies.txt"}
-)
 
 MOBILE_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+\/?)(?:\/\?.*\>?)?\>?"
@@ -35,10 +33,7 @@ MOBILE_PATTERN: re.Pattern[str] = re.compile(
 DESKTOP_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?"
 )
-INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(
-    r"\<?(?P<url>https?://(?:www\.)?instagram\.com(?:/[^/]+)?/(?:p|tv|reel)/(?P<id>[^/?#&]+))\>?"
-)
-TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+)\>?")
+TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+))\>?")
 REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\w+))\>?")
 
 GUILDS: list[discord.Object] = [
@@ -72,7 +67,7 @@ class RepostView(MiphaBaseView):
         await self.message.delete()
 
     @ui.button(label="Repost?", emoji="\U0001f503")
-    async def repost_button(self, interaction: discord.Interaction, button: discord.ui.Button[Self]) -> None:
+    async def repost_button(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
         first_url = self.urls.pop(0)
         await interaction.response.send_message(content=str(first_url))
         self._disable_all_buttons()
@@ -83,7 +78,7 @@ class RepostView(MiphaBaseView):
                 await interaction.channel.send(str(url))  # type: ignore # it's definitely not a stagechannel thanks
 
     @ui.button(label="Upload video?", emoji="\U0001f4fa")
-    async def download_video(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def download_video(self, interaction: Interaction, button: discord.ui.Button) -> None:
         assert self.tiktok
         assert interaction.guild  # covered in the guard in message
 
@@ -111,7 +106,7 @@ class RepostView(MiphaBaseView):
         await self.target_message.reply(content="I downloaded the video for you:-", file=file)
 
     @ui.button(label="No thanks", style=discord.ButtonStyle.danger, row=2, emoji="\U0001f5d1\U0000fe0f")
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button[RepostView]) -> None:
+    async def close_button(self, interaction: Interaction, button: discord.ui.Button[RepostView]) -> None:
         if interaction.user.id != self.owner_id:
             return await interaction.response.send_message(
                 "You're not allowed to close this, only the message author can!", ephemeral=True
@@ -141,24 +136,22 @@ class MediaReposter(commands.Cog):
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.media_context_menu.name, type=self.media_context_menu.type)
 
-    async def media_context_menu_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+    async def media_context_menu_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         send = interaction.response.send_message if not interaction.response.is_done() else interaction.followup.send
 
         error = getattr(error, "original", error)
 
         await send("Sorry but something broke. <@155863164544614402> knows and will fix it.")
 
-    async def media_context_menu_callback(self, interaction: discord.Interaction, message: discord.Message) -> None:
+    async def media_context_menu_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(thinking=True)
 
         if match := MOBILE_PATTERN.search(message.content):
             url = match[1]
         elif match := DESKTOP_PATTERN.search(message.content):
             url = match[1]
-        elif match := INSTAGRAM_PATTERN.search(message.content):
-            url = match["url"]
         elif match := TWITTER_PATTERN.search(message.content):
-            url = match[0]
+            url = match[1]
         elif match := REDDIT_PATTERN.search(message.content):
             url = match[0]
         else:
@@ -197,12 +190,7 @@ class MediaReposter(commands.Cog):
         LOGGER.info("Extracting URL: %r", url)
         loop = loop or asyncio.get_running_loop()
 
-        if url.host in {"instagram.com", "www.instagram.com"}:
-            yt = insta_ydl
-        else:
-            yt = ydl
-
-        info = await loop.run_in_executor(None, yt.extract_info, str(url))
+        info = await loop.run_in_executor(None, ydl.extract_info, str(url))
 
         if not info:
             return
@@ -233,7 +221,7 @@ class MediaReposter(commands.Cog):
 
         file = discord.File(str(fixed_file_loc), filename=fixed_file_loc.name)
         content = f"**Uploader**: {info['uploader']}\n\n" * (bool(info["uploader"]))
-        content += f"**Description**: {info['description']}" * (bool(info["uploader"]))
+        content += f"**Description**: {info.get('description', '')}" * (bool(info["uploader"]))
 
         if file_loc.name in self.task_mapping:
             self.task_mapping[file_loc.name][0].cancel()
@@ -265,7 +253,6 @@ class MediaReposter(commands.Cog):
         matches: list[re.Match[str]] = (
             list(DESKTOP_PATTERN.finditer(message.content))
             + list(MOBILE_PATTERN.finditer(message.content))
-            + list(INSTAGRAM_PATTERN.finditer(message.content))
             + list(REDDIT_PATTERN.finditer(message.content))
         )
 
@@ -312,7 +299,6 @@ class MediaReposter(commands.Cog):
                     [
                         DESKTOP_PATTERN.fullmatch(message.content),
                         MOBILE_PATTERN.fullmatch(message.content),
-                        INSTAGRAM_PATTERN.fullmatch(message.content),
                         REDDIT_PATTERN.fullmatch(message.content),
                     ]
                 ):

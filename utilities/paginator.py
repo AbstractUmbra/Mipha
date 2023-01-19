@@ -17,7 +17,7 @@ from discord.ext import menus
 from discord.ext.commands import Paginator as CommandPaginator
 from typing_extensions import Self
 
-from utilities.context import Context
+from utilities.context import Context, Interaction
 from utilities.ui import MiphaBaseView
 
 
@@ -40,7 +40,7 @@ class NumberedPageModal(discord.ui.Modal, title="Go to page"):
             self.page.placeholder = f"Enter a number between 1 and {as_string}"
             self.page.max_length = len(as_string)
 
-    async def on_submit(self, interaction: discord.Interaction) -> None:
+    async def on_submit(self, interaction: Interaction) -> None:
         self.interaction = interaction
         self.stop()
 
@@ -95,7 +95,7 @@ class RoboPages(MiphaBaseView):
         else:
             return {}
 
-    async def show_page(self, interaction: discord.Interaction, page_number: int) -> None:
+    async def show_page(self, interaction: Interaction, page_number: int) -> None:
         page = await self.source.get_page(page_number)
         self.current_page = page_number
         kwargs = await self._get_kwargs_from_page(page)
@@ -133,7 +133,7 @@ class RoboPages(MiphaBaseView):
                 self.go_to_previous_page.disabled = True
                 self.go_to_previous_page.label = "…"
 
-    async def show_checked_page(self, interaction: discord.Interaction, page_number: int) -> None:
+    async def show_checked_page(self, interaction: Interaction, page_number: int) -> None:
         max_pages = self.source.get_max_pages()
         try:
             if max_pages is None:
@@ -145,7 +145,7 @@ class RoboPages(MiphaBaseView):
             # An error happened that can be handled, so ignore it.
             pass
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user and interaction.user.id in (self.ctx.bot.owner_id, self.ctx.author.id):
             return True
         await interaction.response.send_message("This pagination menu cannot be controlled by you, sorry!", ephemeral=True)
@@ -155,7 +155,7 @@ class RoboPages(MiphaBaseView):
         if self.message:
             await self.message.edit(view=None)
 
-    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item) -> None:
+    async def on_error(self, interaction: Interaction, error: Exception, item: discord.ui.Item) -> None:
         if interaction.response.is_done():
             await interaction.followup.send("An unknown error occurred, sorry", ephemeral=True)
         else:
@@ -176,32 +176,32 @@ class RoboPages(MiphaBaseView):
         self.message = await self.ctx.send(**kwargs, view=self, ephemeral=ephemeral)
 
     @discord.ui.button(label="≪", style=discord.ButtonStyle.grey)
-    async def go_to_first_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def go_to_first_page(self, interaction: Interaction, button: discord.ui.Button) -> None:
         """go to the first page"""
         await self.show_page(interaction, 0)
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.blurple)
-    async def go_to_previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def go_to_previous_page(self, interaction: Interaction, button: discord.ui.Button) -> None:
         """go to the previous page"""
         await self.show_checked_page(interaction, self.current_page - 1)
 
     @discord.ui.button(label="Current", style=discord.ButtonStyle.grey, disabled=True)
-    async def go_to_current_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def go_to_current_page(self, interaction: Interaction, button: discord.ui.Button) -> None:
         pass
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
-    async def go_to_next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def go_to_next_page(self, interaction: Interaction, button: discord.ui.Button) -> None:
         """go to the next page"""
         await self.show_checked_page(interaction, self.current_page + 1)
 
     @discord.ui.button(label="≫", style=discord.ButtonStyle.grey)
-    async def go_to_last_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def go_to_last_page(self, interaction: Interaction, button: discord.ui.Button) -> None:
         """go to the last page"""
         # The call here is safe because it's guarded by skip_if
         await self.show_page(interaction, self.source.get_max_pages() - 1)  # type: ignore
 
     @discord.ui.button(label="Skip to page...", style=discord.ButtonStyle.grey)
-    async def numbered_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def numbered_page(self, interaction: Interaction, button: discord.ui.Button) -> None:
         """lets you type a page number to go to"""
         if self.message is None:
             return
@@ -229,7 +229,7 @@ class RoboPages(MiphaBaseView):
             await modal.interaction.response.send_message(error, ephemeral=True)
 
     @discord.ui.button(label="Quit", style=discord.ButtonStyle.red)
-    async def stop_pages(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def stop_pages(self, interaction: Interaction, button: discord.ui.Button) -> None:
         """stops the pagination session."""
         await interaction.response.defer()
         await interaction.delete_original_response()
