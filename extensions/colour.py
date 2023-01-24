@@ -31,21 +31,17 @@ def hex_to_rgb(hex_: str | int) -> tuple[int, int, int]:
     return (hex_ >> 16, (hex_ >> 0) & 0xFF, hex_ & 0xFF)
 
 
-def int_to_rgb(rgb: int) -> tuple[int, int, int]:
-    return (((rgb >> 16) & 255), ((rgb >> 8) & 255), rgb & 255)
-
-
 class ColourShitCog(commands.Cog):
     def __init__(self, bot: Mipha, /) -> None:
         self.bot: Mipha = bot
 
     @executor_function
     def _create_image(self, colour: int | discord.Colour, /) -> io.BytesIO:
-        if isinstance(colour, discord.Colour):
-            colour = colour.value
+        if isinstance(colour, int):
+            colour = discord.Colour(colour)
 
         ret = io.BytesIO()
-        colours = int_to_rgb(colour)
+        colours = colour.to_rgb()
 
         image = Image.new("RGBA", (50, 50), color=colours)
         image.save(ret, "png", optimize=True)
