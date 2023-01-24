@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 
-from utilities.context import Interaction
-
 
 if TYPE_CHECKING:
     from typing_extensions import Self
+
+    from utilities.context import Interaction
 
 __all__ = ("MiphaBaseView", "ConfirmationView")
 

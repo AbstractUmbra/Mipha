@@ -33,7 +33,7 @@ __all__ = (
 )
 
 T = TypeVar("T")
-Interaction: TypeAlias = discord.Interaction[Mipha]
+Interaction: TypeAlias = discord.Interaction["Mipha"]
 
 
 # For typing purposes, `Context.db` returns a Protocol type
@@ -163,7 +163,7 @@ class Context(commands.Context["Mipha"]):
         if len(matches) > 25:
             raise ValueError("Too many results... sorry.")
 
-        view = DisambiguatorView(self, matches, entry)
+        view = DisambiguatorView[T](self, matches, entry)
         view.message = await self.send(
             "There are too many matches... Which one did you mean?", view=view, ephemeral=ephemeral
         )
