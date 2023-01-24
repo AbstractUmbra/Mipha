@@ -60,7 +60,7 @@ class MiphaCommandTree(app_commands.CommandTree):
     ) -> None:
         assert interaction.command is not None  # typechecking # disable assertions
 
-        self.client.log_handler.log.exception("Exception occurred in the CommandTree:\n%s", error)
+        self.client.log_handler.log.exception("Exception occurred in the CommandTree:\n%s", exc_info=error)
 
         e = discord.Embed(title="Command Error", colour=0xA32952)
         e.add_field(name="Command", value=interaction.command.name)
@@ -506,7 +506,7 @@ async def main() -> None:
                 await bot.load_extension(ext)
                 bot.log_handler.log.info("Loaded extension: %s", ext)
             except Exception as error:
-                bot.log_handler.log.exception("Failed to load extension: %s\n\n%s", ext, error)
+                bot.log_handler.log.exception("Failed to load extension: %s\n\n", ext, exc_info=error)
         for directory in path.rglob("ext-*"):
             if not directory.is_dir():
                 return
@@ -515,7 +515,7 @@ async def main() -> None:
                 await bot.load_extension(module)
                 bot.log_handler.log.info("Loaded module extension: %s", module)
             except Exception as error:
-                bot.log_handler.log.exception("Failed to load module extension: %s\n\n%s", module, error)
+                bot.log_handler.log.exception("Failed to load module extension: %s\n\n", module, exc_info=error)
 
         await bot.start()
 
