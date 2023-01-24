@@ -162,6 +162,7 @@ class MediaReposter(commands.Cog):
 
         url = yarl.URL(url)
 
+        LOGGER.info("%s is trying to process the url %r", str(interaction.user), str(url))
         info = await self._extract_video_info(url, loop=loop)
         if not info:
             await interaction.followup.send(
