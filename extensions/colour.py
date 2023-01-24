@@ -20,7 +20,7 @@ RGB_REGEX = re.compile(r"(\|(?P<R>\d{1,3})(?:,|\s)+(?P<G>\d{1,3})(?:,|\s)+(?P<B>
 HSV_REGEX = re.compile(r"(\*(?P<H>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<S>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<V>\d{1,3}(?:\.\d)?))")
 HEX_REGEX = re.compile(r"(\#[a-f0-9]{6})", re.IGNORECASE)
 COLOUR_REGEX = re.compile(
-    r"(?P<RGB>\|(?P<R>\d{1,3})(?:,|\s)+(?P<G>\d{1,3})(?:,?\s?)+(?P<B>\d{1,3}))|(?P<HSV>\*(?P<H>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<S>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<V>\d{1,3}(?:\.\d)?))|(?P<Hex>(?<!\<)\#[a-f0-9]{6})",
+    r"(?P<RGB>\|(?P<R>\d{1,3})(?:,|\s)+(?P<G>\d{1,3})(?:,?\s?)+(?P<B>\d{1,3}))|(?P<HSV>\*(?P<H>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<S>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<V>\d{1,3}(?:\.\d)?))|(?P<Hex>(?<!\<)\#(?:[a-f0-9]{6}|[a-f0-9]{3}))",
     re.IGNORECASE,
 )
 
@@ -61,7 +61,11 @@ class ColourShitCog(commands.Cog):
         elif match_.group("HSV"):
             return discord.Colour.from_hsv(*map(float, map(match_.group, "HSV")))
         elif match_.group("Hex"):
-            return discord.Colour(int(match_.group("Hex").lstrip("#"), 16))
+            group = match_["Hex"]
+            if len(group) == 4:
+                group = f"#{group[1]}{group[1]}{group[2]}{group[2]}{group[3]}{group[3]}"
+
+            return discord.Colour(int(group.lstrip("#"), 16))
 
         raise RuntimeError("Unreachable")
 
