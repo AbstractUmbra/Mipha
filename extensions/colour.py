@@ -70,7 +70,10 @@ class ColourShitCog(commands.Cog):
         await ctx.reply(file=discord.File(buffer, filename="colour.png"))
 
     async def wait_for_colour_request(self, message: discord.Message) -> None:
-        await message.add_reaction("\N{ARTIST PALETTE}")
+        try:
+            await message.add_reaction("\N{ARTIST PALETTE}")
+        except discord.HTTPException:
+            return  # blocked the bot ig
 
         def check(payload: discord.RawReactionActionEvent) -> bool:
             return (
