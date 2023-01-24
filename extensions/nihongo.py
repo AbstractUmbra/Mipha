@@ -73,15 +73,6 @@ JLPT_LOOKUP = MemeDict(
 LOGGER = logging.getLogger(__name__)
 
 
-def _create_kakasi() -> pykakasi.kakasi:
-    kakasi = pykakasi.kakasi()
-    kakasi.setMode("H", "a")
-    kakasi.setMode("K", "a")
-    kakasi.setMode("J", "a")
-    kakasi.setMode("s", True)
-    return kakasi.getConverter()
-
-
 class JLPTConverter(commands.Converter[list[str]]):
     async def convert(self, _: Context, argument: str) -> list[str]:
         try:
@@ -401,7 +392,7 @@ class Nihongo(commands.Cog):
 
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
-        self.converter = _create_kakasi()
+        self.kakasi = pykakasi.kakasi()
         self.nihongo_study_reminders.start()
 
     def cog_unload(self) -> None:
@@ -410,7 +401,7 @@ class Nihongo(commands.Cog):
     @commands.command()
     async def romaji(self, ctx: Context, *, text: commands.clean_content) -> None:
         """Sends the Romaji version of passed Kana."""
-        ret = await self.bot.loop.run_in_executor(None, self.converter.do, text)
+        ret = await self.bot.loop.run_in_executor(None, self.kakasi.convert, text)
         await ctx.send(ret)
 
     @commands.group(name="kanji", aliases=["かんじ", "漢字"], invoke_without_command=True)
