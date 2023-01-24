@@ -78,7 +78,7 @@ class SourceConverter(commands.Converter[str]):
             "ui",
         ):
             top_level = f"discord.{top_level}"
-        elif top_level in ("commands",):
+        elif top_level in ("commands", "tasks"):
             top_level = f"discord.ext.{top_level}"
 
         if top_level not in RTFS:
