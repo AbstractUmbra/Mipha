@@ -54,6 +54,11 @@ class ColourShitCog(commands.Cog):
         return ret
 
     def _match_factory(self, match_: re.Match[str], /) -> discord.Colour:
+        try:
+            return discord.Colour.from_str(match_[0])
+        except ValueError:
+            pass
+
         if match_.group("RGB"):
             return discord.Colour.from_rgb(*map(int, map(match_.group, "RGB")))
         elif match_.group("HSV"):
