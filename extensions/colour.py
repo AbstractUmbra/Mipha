@@ -67,7 +67,7 @@ class ColourShitCog(commands.Cog):
     async def colour_info(self, ctx: Context, *, colour: discord.Colour) -> None:
         buffer = await self._create_image(colour)
 
-        await ctx.reply(file=discord.File(buffer, filename="colour.png", description="Your requested colour~"))
+        await ctx.reply(file=discord.File(buffer, filename="colour.png"))
 
     async def wait_for_colour_request(self, message: discord.Message) -> None:
         await message.add_reaction("\N{ARTIST PALETTE}")
@@ -92,7 +92,7 @@ class ColourShitCog(commands.Cog):
 
             colour = self._match_factory(match)
             buffer = await self._create_image(colour)
-            await message.reply(file=discord.File(buffer, filename="colour.png", description="Your colour as requested~"))
+            await message.reply(file=discord.File(buffer, filename="colour.png"))
 
 
 async def setup(bot: Mipha) -> None:
