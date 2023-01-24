@@ -393,7 +393,7 @@ VALUES ('boko bow', 343, false) ON CONFLICT DO NOTHING;
 INSERT INTO botw_compendium (entry_name, entry_number, upgradeable)
 VALUES ('spiked boko bow', 344, false) ON CONFLICT DO NOTHING;
 INSERT INTO botw_compendium (entry_name, entry_number, upgradeable)
-VALUES ('wikipedia:sic', 345, false) ON CONFLICT DO NOTHING;
+VALUES ('dragon bone boko bow', 345, false) ON CONFLICT DO NOTHING;
 INSERT INTO botw_compendium (entry_name, entry_number, upgradeable)
 VALUES ('lizal bow', 346, false) ON CONFLICT DO NOTHING;
 INSERT INTO botw_compendium (entry_name, entry_number, upgradeable)
