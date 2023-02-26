@@ -107,6 +107,8 @@ class ConfirmationView(MiphaBaseView):
         await interaction.response.defer()
         if self.delete_after and self.message:
             await interaction.delete_original_response()
+        else:
+            await interaction.edit_original_response(view=None)
 
         self.stop()
 
@@ -116,5 +118,7 @@ class ConfirmationView(MiphaBaseView):
         await interaction.response.defer()
         if self.delete_after and self.message:
             await interaction.delete_original_response()
+        else:
+            await interaction.edit_original_response(view=None)
 
         self.stop()

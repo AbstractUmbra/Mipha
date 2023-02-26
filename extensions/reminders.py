@@ -440,7 +440,7 @@ class Reminder(commands.Cog):
 
         query = """DELETE FROM reminders WHERE event = 'reminder' AND extra #>> '{args,0}' = $1;"""
         await ctx.db.execute(query, author_id)
-        await ctx.send(f"Successfully deleted {formats.plural(total):reminder}.")
+        await ctx.send(f"Successfully deleted {formats.plural(total):reminder}.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_reminder_timer_complete(self, timer: Timer) -> None:

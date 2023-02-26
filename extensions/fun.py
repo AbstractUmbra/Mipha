@@ -7,7 +7,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import asyncio
-import functools
 import inspect
 import io
 import math
@@ -144,7 +143,7 @@ class Fun(commands.Cog):
 
     @commands.group(invoke_without_command=True, skip_extra=False)
     async def abt(self, ctx: Context, *, content: str = commands.param(converter=commands.clean_content)) -> None:
-        """I love this language."""
+        """Translated a string into Al-Bhed."""
         keep = ABT_REG.findall(content)
 
         def trans(m: re.Match[str]) -> str:
@@ -159,7 +158,7 @@ class Fun(commands.Cog):
 
     @abt.command(name="r", aliases=["reverse"])
     async def abt_reverse(self, ctx: Context, *, tr_input: str) -> None:
-        """Uno reverse."""
+        """Reverses Al-Bhed text into English."""
         new_str = ""
         br = True
         for char in tr_input:
@@ -383,7 +382,7 @@ class Fun(commands.Cog):
                     try:
                         discord.utils._get_mime_type_for_image(bytes_)
                     except:
-                        pass
+                        raise commands.BadArgument("Sorry but I'm not sure what this file type is.")
             except aiohttp.ClientError:
                 raise commands.BadArgument("Sorry, this url doesn't appear to be valid.")
 
@@ -396,8 +395,7 @@ class Fun(commands.Cog):
         message = await ctx.send("Generating image...")
 
         async with ctx.typing():
-            func_ = functools.partial(self._handle_image, buffer)
-            output_buffer = await asyncio.to_thread(func_)
+            output_buffer = await asyncio.to_thread(self._handle_image, buffer)
 
         file_ = discord.File(output_buffer, filename="lego.png")
 

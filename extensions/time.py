@@ -7,10 +7,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import asyncio
+import collections
 import datetime
 import difflib
 import zoneinfo
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, overload
 
 import discord
 from discord import app_commands
@@ -18,13 +19,20 @@ from discord.ext import commands
 
 from utilities import time
 from utilities.context import Context, Interaction
+from utilities.formats import random_pastel_colour
 from utilities.fuzzy import extract
+from utilities.paginator import RoboPages, SimpleListSource
 
 
 if TYPE_CHECKING:
     from bot import Mipha
 
 AVAILABLE_TIMEZONES = {zone.replace("_", " "): zone for zone in zoneinfo.available_timezones()}
+
+
+class TimezoneRecord(TypedDict):
+    user_id: int
+    tz: str
 
 
 class TimezoneConverter(commands.Converter[zoneinfo.ZoneInfo]):
@@ -51,6 +59,34 @@ class TimezoneConverter(commands.Converter[zoneinfo.ZoneInfo]):
             return zoneinfo.ZoneInfo(query[int(result.content) - 1][0])
 
         return zoneinfo.ZoneInfo(AVAILABLE_TIMEZONES[argument])
+
+
+class TimezoneSource(SimpleListSource):
+    def format_page(self, _: RoboPages, entries: list[tuple[str, str, datetime.timedelta]]) -> discord.Embed:
+        embed = discord.Embed(title="Dannyware Timezones!", colour=random_pastel_colour())
+        tz_dict = collections.defaultdict(list)
+
+        def to_hour(td: datetime.timedelta) -> int:
+            seconds = round(td.total_seconds())
+            return seconds // (60 * 60)
+
+        for member_str, dt_string, offset in entries:
+            if not offset:
+                offset = datetime.timedelta(0)
+
+            houred_offset = to_hour(offset)
+            tz_dict[houred_offset].append(f"{member_str}: {dt_string}")
+
+        for key, value in sorted(tz_dict.items()):
+            fmt = ""
+            for idx, member in enumerate(value, start=1):
+                fmt += f"{idx}. {member}"
+            name = "UTC" if key == 0 else f"{key} hours from UTC"
+            embed.add_field(name=name, value=fmt, inline=False)
+
+        embed.timestamp = discord.utils.utcnow()
+
+        return embed
 
 
 class Time(commands.Cog):
@@ -249,6 +285,61 @@ class Time(commands.Cog):
         error = getattr(error, "original", error)
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send("How am I supposed to do this if you don't supply the timezone?")
+
+    async def _fetch_time_records(self, guild: discord.Guild, /) -> list[TimezoneRecord]:
+        query = """
+        SELECT user_id, tz
+        FROM tz_store
+        WHERE $1 = ANY(guild_ids);
+        """
+
+        return await self.bot.pool.fetch(query, guild.id)
+
+    def _transform_records(
+        self, records: list[TimezoneRecord], *, guild: discord.Guild
+    ) -> list[tuple[str, str, datetime.timedelta]]:
+        ret: list[tuple[str, str, datetime.timedelta]] = []
+        for record in records:
+            user_id = record["user_id"]
+            user_ = guild.get_member(user_id)
+            if user_:
+                user = f"{user_.name}"
+            else:
+                user = f"Member with the ID {user_id} cannot be found."
+
+            tz = record["tz"]
+            timezone = zoneinfo.ZoneInfo(tz)
+            offset = timezone.utcoffset(datetime.datetime.now(datetime.timezone.utc)) or datetime.timedelta(0)
+            dt = datetime.datetime.now(timezone)
+            ordinal_ = time.ordinal(dt.day)
+            fmt = dt.strftime(f"%A {ordinal_} of %B %Y at %H:%M")
+
+            ret.append((user, fmt, offset))
+
+        ret.sort(key=lambda t: t[2])
+
+        return ret
+
+    @app_commands.command(name="time-board")
+    async def time_board(self, interaction: Interaction) -> None:
+        """This command will show a board of all public timezones in Dannyware."""
+        if not interaction.guild:
+            return await interaction.response.send_message(
+                "Sorry, this command can only be used in a guild!", ephemeral=True
+            )
+
+        await interaction.response.defer(ephemeral=True)
+
+        context = await Context.from_interaction(interaction)
+        records: list[TimezoneRecord] = await self._fetch_time_records(interaction.guild)
+        if not records:
+            return await interaction.followup.send("Sorry but there are no recorded timezones here!", ephemeral=True)
+        transformed = self._transform_records(records, guild=interaction.guild)
+
+        source = TimezoneSource(data=transformed, per_page=10)
+        pages = RoboPages(source=source, ctx=context, check_embeds=True, compact=False)
+
+        await pages.start(content=f"This is the current timezone list for {interaction.guild.name}!", ephemeral=True)
 
 
 async def setup(bot: Mipha) -> None:

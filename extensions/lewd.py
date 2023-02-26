@@ -164,6 +164,9 @@ class Lewd(commands.Cog):
             "https://danbooru.donmai.us/posts.json",
         )
 
+    async def cog_check(self, ctx: Context) -> bool:
+        return await ctx.bot.is_owner(ctx.author)
+
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
 

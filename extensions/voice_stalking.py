@@ -145,6 +145,7 @@ class VoiceStalking(commands.Cog):
 
     @commands.group()
     async def stalking(self, ctx: Context) -> None:
+        """Voice stalking parent command."""
         if ctx.invoked_subcommand is None:
             await ctx.send_help(ctx.command)
 
@@ -152,6 +153,7 @@ class VoiceStalking(commands.Cog):
     @commands.guild_only()
     @has_guild_permissions(manage_channels=True)
     async def exclude(self, ctx: Context, channel: discord.VoiceChannel | discord.StageChannel | discord.Object) -> None:
+        """Exclude a channel from the voice stalking."""
         config = self._config.get(ctx.guild.id, {})  # type: ignore # guarded by decorator
         if not config:
             return

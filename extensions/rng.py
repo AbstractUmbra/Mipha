@@ -19,7 +19,7 @@ from utilities.formats import plural
 if TYPE_CHECKING:
     from bot import Mipha
 
-    from .tags import Tags
+    from ._tags import Tags
 
 
 class RNG(commands.Cog):
