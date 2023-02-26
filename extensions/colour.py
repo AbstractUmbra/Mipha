@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import io
 import re
 from typing import TYPE_CHECKING
@@ -18,8 +17,8 @@ if TYPE_CHECKING:
 
 COLOUR_REGEX = re.compile(
     (
-        r"(?P<RGB>\|(?P<R>\d{1,3})(?:,|\s)+(?P<G>\d{1,3})(?:,?\s?)+(?P<B>\d{1,3}))"
-        r"|(?P<HSV>\*(?P<H>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<S>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<V>\d{1,3}(?:\.\d)?))"
+        r"(?P<RGB>(?P<R>\d{1,3})(?:,|\s)+(?P<G>\d{1,3})(?:,?\s?)+(?P<B>\d{1,3}))"
+        r"|(?P<HSV>(?P<H>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<S>\d{1,3}(?:\.\d)?)(?:,|\s)+(?P<V>\d{1,3}(?:\.\d)?))"
         r"|(?P<Hex>(?<!\<)\#(?:[a-f0-9]{6}|[a-f0-9]{3}\b))"
     ),
     re.IGNORECASE,
@@ -70,39 +69,20 @@ class ColourShitCog(commands.Cog):
 
         raise RuntimeError("Unreachable")
 
-    @commands.command(name="colour", aliases=["cl"])
-    async def colour_info(self, ctx: Context, *, colour: discord.Colour) -> None:
-        buffer = await self._create_image(colour)
+    @commands.hybrid_command(name="colour")
+    async def colour_command(self, ctx: Context, *, colour_input: str | None = None) -> None:
+        """Shows a panel of colour from the input given. Accepts Hex, RGB and HSV codes."""
+        input_ = colour_input or (
+            ctx.replied_reference and ctx.replied_reference.cached_message and ctx.replied_reference.cached_message.content
+        )
+        if not input_:
+            await ctx.send("Sorry I don't see a colour code anywhere?")
+            return
 
-        await ctx.reply(file=discord.File(buffer, filename="colour.png"))
-
-    async def wait_for_colour_request(self, message: discord.Message) -> None:
-        try:
-            await message.add_reaction("\N{ARTIST PALETTE}")
-        except discord.HTTPException:
-            return  # blocked the bot ig
-
-        def check(payload: discord.RawReactionActionEvent) -> bool:
-            return (
-                payload.message_id == message.id
-                and payload.channel_id == message.channel.id
-                and payload.user_id == message.author.id
-                and str(payload.emoji) == "\N{ARTIST PALETTE}"
-            )
-
-        await self.bot.wait_for("raw_reaction_add", check=check, timeout=30.0)
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message) -> None:
-        if match := COLOUR_REGEX.search(message.content):
-            try:
-                await self.wait_for_colour_request(message)
-            except asyncio.TimeoutError:
-                return
-
+        if match := COLOUR_REGEX.search(input_):
             colour = self._match_factory(match)
             buffer = await self._create_image(colour)
-            await message.reply(file=discord.File(buffer, filename="colour.png"))
+            await ctx.reply(file=discord.File(buffer, filename="colour.png"))
 
 
 async def setup(bot: Mipha) -> None:
