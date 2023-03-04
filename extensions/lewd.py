@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict
 import aiohttp
 import asyncpg
 import discord
-import nhentaio
 from discord.ext import commands
 from discord.http import json_or_text
 
@@ -29,7 +28,7 @@ from utilities._types.uploader import AudioPost
 from utilities.cache import cache
 from utilities.context import Context, GuildContext
 from utilities.formats import to_codeblock
-from utilities.paginator import NHentaiEmbed, RoboPages, SimpleListSource
+from utilities.paginator import RoboPages, SimpleListSource
 
 
 if TYPE_CHECKING:
@@ -73,17 +72,6 @@ class BlacklistedBooru(commands.CommandError):
 
     def __str__(self) -> str:
         return f"Found blacklisted tags in query: `{self.blacklist_tags_fmt}`."
-
-
-class BadNHentaiID(commands.CommandError):
-    """Error raised when you request a bad nhentai ID."""
-
-    def __init__(self, hentai_id: int, message: str) -> None:
-        self.nhentai_id: int = hentai_id
-        super().__init__(message)
-
-    def __str__(self) -> str:
-        return f"Invalid NHentai ID: `{self.nhentai_id}`."
 
 
 class BooruConfig:
@@ -530,7 +518,7 @@ class Lewd(commands.Cog):
     @lewd.group(invoke_without_command=True)
     @checks.has_permissions(manage_messages=True)
     async def blacklist(self, ctx: GuildContext) -> None:
-        """Blacklist management for booru command and nhentai auto-six-digits."""
+        """Blacklist management for booru command."""
         if not ctx.invoked_subcommand:
             config = await self.get_booru_config(ctx.guild.id)
             if config.blacklist:
@@ -573,96 +561,6 @@ class Lewd(commands.Cog):
         await self.bot.pool.executemany(query, iterable)
         self.get_booru_config.invalidate(self, ctx.guild.id)
         await ctx.message.add_reaction(ctx.tick(True))
-
-    @commands.group(invoke_without_command=True)
-    @commands.cooldown(1, 10, commands.BucketType.user)
-    @commands.max_concurrency(1, commands.BucketType.user, wait=False)
-    @commands.is_nsfw()
-    async def nhentai(self, ctx: Context, hentai_id: int) -> None:
-        """Naughty. Return info, the cover and links to an nhentai gallery."""
-        gallery = await self.bot.h_client.fetch_gallery(hentai_id)
-
-        if not gallery:
-            raise BadNHentaiID(hentai_id, "Doesn't seem to be a valid ID.")
-
-        embed = NHentaiEmbed.from_gallery(gallery)
-        await ctx.send(embed=embed)
-
-    async def _create_empty_config(self, ctx: Context, /) -> BooruConfig:
-        assert ctx.guild is not None
-
-        query = """
-                INSERT INTO lewd_config (guild_id, blacklist, auto_six_digits)
-                VALUES ($1, $2, $3)
-                RETURNING *;
-                """
-        await self.bot.pool.fetchrow(query, ctx.guild.id, [], False)
-        return BooruConfig(guild_id=ctx.guild.id, bot=ctx.bot, record=None)
-
-    @nhentai.command(name="toggle")
-    @checks.has_guild_permissions(manage_messages=True)
-    async def nhentai_toggle(self, ctx: GuildContext) -> None:
-        """
-        This command will toggle the auto parsing of NHentai IDs in messages in the form of:-
-        `{123456}`
-        Criteria for parsing:
-        - Cannot be done in DM.
-        - Must be in an NSFW channel.
-        - Must be a user or bot that posts it, no webhooks.
-        - If the ID does not match a gallery, it will not respond.
-        Toggle will do as it says, switch between True and False. Only when it is True will it parse and respond.
-        The reaction added will tell you if it is on (check mark), or off (cross).
-        """
-        config: BooruConfig = await self.get_booru_config(ctx.guild.id)
-        if not config:
-            await ctx.send("No recorded config for this guild. Creating one.")
-            self.get_booru_config.invalidate(self, ctx.guild.id)
-            config: BooruConfig = await self._create_empty_config(ctx)
-
-        enabled = config.auto_six_digits
-
-        await ctx.message.add_reaction(ctx.tick(not enabled))
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message) -> None:
-        assert not isinstance(message.channel, (discord.PartialMessageable, discord.GroupChannel))
-        if not message.guild or message.webhook_id:
-            return
-
-        if not isinstance(message.channel, discord.DMChannel) and not message.channel.is_nsfw():
-            return
-
-        config: BooruConfig = await self.get_booru_config(message.guild.id)
-        if config.auto_six_digits is False:
-            return
-
-        if not (match := SIX_DIGITS.match(message.content)):
-            return
-
-        digits = int(match[1])
-
-        try:
-            gallery: nhentaio.Gallery | None = await self.bot.h_client.fetch_gallery(digits)
-        except nhentaio.NHentaiError:
-            await message.channel.send(
-                (
-                    "I would have given you the cum provocation but NHentai is down."
-                    f"\nHave the link in the meantime: https://nhentai.net/g/{digits}"
-                )
-            )
-            return
-
-        if not gallery:
-            return
-
-        tags = set([tag.name for tag in gallery.tags])
-        if bl := config.blacklist & tags:
-            clean = "|".join(bl)
-            await message.reply(f"This gallery has blacklisted tags: `{clean}`.", delete_after=5)
-            return
-
-        embed = NHentaiEmbed.from_gallery(gallery)
-        await message.reply(embed=embed)
 
 
 async def setup(bot: Mipha) -> None:
