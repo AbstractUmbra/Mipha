@@ -24,13 +24,13 @@ import discord
 import hondana
 import jishaku
 import mystbin
-import nhentaio
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
 from typing_extensions import Self
 
 import _bot_config
+from extensions import EXTENSIONS
 from utilities.async_config import Config
 from utilities.context import Context, Interaction
 from utilities.db import db_init
@@ -159,7 +159,6 @@ class Mipha(commands.Bot):
     session: aiohttp.ClientSession
     mb_client: mystbin.Client
     md_client: hondana.Client
-    h_client: nhentaio.Client
     start_time: datetime.datetime
     command_stats: Counter[str]
     socket_stats: Counter[Any]
@@ -170,7 +169,6 @@ class Mipha(commands.Bot):
 
     __slots__ = (
         "session",
-        "h_client",
         "mb_client",
         "md_client",
         "start_time",
@@ -477,7 +475,6 @@ class Mipha(commands.Bot):
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
 
         self.bot_app_info = await self.application_info()
-        # self.owner_id = self.bot_app_info.owner.id
         self.owner_ids = self.config.OWNER_IDS
 
 
@@ -492,30 +489,11 @@ async def main() -> None:
 
         bot.mb_client = mystbin.Client(session=session, token=bot.config.MYSTBIN_TOKEN)
         bot.md_client = hondana.Client(**bot.config.MANGADEX_AUTH, session=session)
-        bot.h_client = nhentaio.Client()
 
         await bot.load_extension("jishaku")
-        path = pathlib.Path("extensions")
-        for file in path.rglob("[!_]*.py"):
-            if (file.is_dir() and file.name.startswith("ext-")) or (
-                file.parent.is_dir() and file.parent.name.startswith("ext-")
-            ):
-                continue
-            ext = ".".join(file.parts).removesuffix(".py")
-            try:
-                await bot.load_extension(ext)
-                bot.log_handler.log.info("Loaded extension: %s", ext)
-            except Exception as error:
-                bot.log_handler.log.exception("Failed to load extension: %s\n\n", ext, exc_info=error)
-        for directory in path.rglob("ext-*"):
-            if not directory.is_dir():
-                return
-            module = ".".join(directory.parts)
-            try:
-                await bot.load_extension(module)
-                bot.log_handler.log.info("Loaded module extension: %s", module)
-            except Exception as error:
-                bot.log_handler.log.exception("Failed to load module extension: %s\n\n", module, exc_info=error)
+        for extension in EXTENSIONS:
+            await bot.load_extension(extension.name)
+            bot.log_handler.log.info("Loaded %sextension: %s", "module " if extension.ispkg else "", extension.name)
 
         await bot.start()
 
