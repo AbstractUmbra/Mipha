@@ -11,7 +11,6 @@ python = "^3.10"
 discord-ext-menus = {git = "https://github.com/Rapptz/discord-ext-menus", rev = "master"}
 jishaku = {git = "git@github.com:Gorialis/jishaku.git", rev = "master"}
 hondana = {git = "https://github.com/AbstractUmbra/Hondana.git", rev = "main"}
-nhentaio = {git = "git@github.com:AbstractUmbra/nhentaio.git", rev = "cum"}
 "mystbin.py" = {git = "git@github.com:AbstractUmbra/mystbin.py.git", rev = "main"}
 asyncpg = "*"
 psutil = "*"
@@ -24,9 +23,8 @@ yt-dlp = "*"
 typing-extensions = "*"
 parsedatetime = "*"
 python-a2s = {git = "https://github.com/Yepoleb/python-a2s.git"}
-tabulate = "^0.8.10"
-lxml = "^4.9.1"
-legofy = "^1.0.0"
+lxml = "*"
+legofy = "*"
 
 [tool.poetry.group.dev]
 optional = true
