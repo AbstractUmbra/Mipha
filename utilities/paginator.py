@@ -8,11 +8,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from textwrap import shorten
-from typing import TYPE_CHECKING, Any, Generic, Type, TypeVar, overload
+from typing import Any, Generic, Type, TypeVar, overload
 
 import discord
 import hondana
-import nhentaio
 from discord.ext import menus
 from discord.ext.commands import Paginator as CommandPaginator
 from typing_extensions import Self
@@ -20,9 +19,6 @@ from typing_extensions import Self
 from utilities.context import Context, Interaction
 from utilities.ui import MiphaBaseView
 
-
-if TYPE_CHECKING:
-    import hondana
 
 T = TypeVar("T")
 SourceT = TypeVar("SourceT", bound="menus.PageSource")
@@ -384,27 +380,5 @@ class MangaDexEmbed(discord.Embed):
             cover = manga.cover_url() or await manga.get_cover()
             if cover:
                 self.set_image(url=manga.cover_url())
-
-        return self
-
-
-class NHentaiEmbed(discord.Embed):
-    @classmethod
-    def from_gallery(cls, gallery: nhentaio.Gallery) -> NHentaiEmbed:
-        self = cls(title=gallery.title, url=gallery.url)
-        self.timestamp = gallery.uploaded
-        self.add_field(name="Page count", value=gallery.page_count)
-        self.add_field(name="Local name", value="N/A")
-        self.add_field(name="# of favourites", value=gallery.favourites)
-        self.set_image(url=gallery.cover.url)
-
-        tags = sorted(gallery.tags, key=lambda t: t.count, reverse=True)
-        gt = True if len(tags) > 25 else False
-        tags = tags[:25]
-        fmt = ", ".join(f"`{tag.name.title()}`" for tag in tags)
-
-        self.description = fmt
-        if gt:
-            self.description += "... (truncated at 25)"
 
         return self
