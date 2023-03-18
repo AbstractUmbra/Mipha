@@ -9,6 +9,7 @@ from __future__ import annotations
 import inspect
 import io
 import json
+import operator
 import os
 import pathlib
 import re
@@ -111,6 +112,10 @@ class SourceConverter(commands.Converter[str]):
         elif inspect.ismemberdescriptor(recur):
             raise BadSource(f"`{current}` seems like it's an instance attribute, can't source those")
 
+        if isinstance(recur, operator.attrgetter):
+            prop = argument.rsplit(".")[-1]
+            return await self.convert(ctx, f"discord.User.{prop}")
+        # ctx.bot.log_handler.log.info("Recur is %s (type %s)", recur, type(recur))
         return inspect.getsource(recur)  # type: ignore # unreachable
 
 
