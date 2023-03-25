@@ -37,8 +37,8 @@ class TimezoneRecord(TypedDict):
 
 class TimezoneConverter(commands.Converter[zoneinfo.ZoneInfo]):
     async def convert(self, ctx: Context, argument: str) -> zoneinfo.ZoneInfo:
-        query = extract(query=argument.lower(), choices=zoneinfo.available_timezones(), limit=5)
-        if argument.lower() not in {timezone.lower() for timezone in zoneinfo.available_timezones()}:
+        query = extract(query=argument.lower(), choices=AVAILABLE_TIMEZONES.values(), limit=5)
+        if argument.lower() not in {timezone.lower() for timezone in AVAILABLE_TIMEZONES}:
             matches = "\n".join([f"`{index}.` {match[0]}" for index, match in enumerate(query, start=1)])
             question = await ctx.send(f"That was not a recognised timezone. Maybe you meant one of these?\n{matches}")
 
@@ -98,23 +98,6 @@ class Time(commands.Cog):
             app_commands.Choice(name=name, value=val) for name, val in AVAILABLE_TIMEZONES.items()
         ]
 
-    @commands.Cog.listener()
-    async def on_guild_remove(self, guild: discord.Guild) -> None:
-        query = """
-        WITH corrected AS (
-            SELECT user_id, array_agg(guild_id) new_guild_ids
-            FROM tz_store, unnest(guild_ids) WITH ORDINALITY guild_id
-            WHERE guild_id != $1
-            GROUP BY user_id
-        )
-        UPDATE tz_store
-        SET guild_ids = new_guild_ids
-        FROM corrected
-        WHERE guild_ids <> new_guild_ids
-        AND tz_store.user_id = corrected.user_id;
-        """
-        await self.bot.pool.execute(query, guild.id)
-
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         """Error handling for Time.py."""
         error = getattr(error, "original", error)
@@ -154,26 +137,21 @@ class Time(commands.Cog):
         if ctx.invoked_subcommand:
             pass
 
-        if not ctx.guild:
-            await ctx.send("Sorry, this command doesn't work in DMs!", ephemeral=True)
-            return
-
         full_member = member or ctx.author
 
         async with ctx.typing(ephemeral=False):
             query = """SELECT *
                     FROM tz_store
-                    WHERE user_id = $1
-                    AND $2 = ANY(guild_ids);
+                    WHERE user_id = $1;
                     """
-            result = await self.bot.pool.fetchrow(query, full_member.id, ctx.guild.id)
+            result = await self.bot.pool.fetchrow(query, full_member.id)
 
             if not result:
-                await ctx.send(f"No timezone for {full_member} set or it's not public in this guild.")
+                await ctx.send(f"No timezone for {full_member} set.")
                 return
 
             member_timezone = result["tz"]
-            tz = await TimezoneConverter().convert(ctx, member_timezone)
+            tz = await TimezoneConverter().convert(ctx, member_timezone.replace("_", " "))
             current_time = self._curr_tz_time(tz, ret_datetime=False)
             embed = discord.Embed(title=f"Time for {full_member}", description=f"```\n{current_time}\n```")
             embed.set_footer(text=member_timezone)
@@ -188,15 +166,20 @@ class Time(commands.Cog):
         *,
         timezone: zoneinfo.ZoneInfo = commands.param(converter=TimezoneConverter),
     ) -> None:
-        """Set your timezone publicly in this guild."""
+        """Set your timezone publicly in this guild. Please use formats like:-
+
+        `America/New York`
+        `Europe/London`
+        `Asia/Tokyo`
+        """
         if not ctx.guild:
             await ctx.send("Sorry, this command only works in DMs!", ephemeral=True)
             return
 
-        query = """ INSERT INTO tz_store(user_id, guild_ids, tz)
-                    VALUES ($1, $2, $3)
+        query = """ INSERT INTO tz_store(user_id, tz)
+                    VALUES ($1, $2)
                     ON CONFLICT (user_id) DO UPDATE
-                    SET guild_ids = tz_store.guild_ids || $2, tz = $3
+                    SET tz = $2
                     WHERE tz_store.user_id = $1;
                 """
         async with ctx.typing(ephemeral=True):
@@ -205,7 +188,7 @@ class Time(commands.Cog):
             if not confirm:
                 return
 
-            await self.bot.pool.execute(query, ctx.author.id, [ctx.guild.id], timezone.key)
+            await self.bot.pool.execute(query, ctx.author.id, timezone.key)
             if ctx.interaction:
                 await ctx.interaction.edit_original_response(content="Done!")
                 return
@@ -220,34 +203,13 @@ class Time(commands.Cog):
             return
 
         query = """
-            WITH corrected AS (
-                SELECT user_id, array_agg(guild_id) new_guild_ids
-                FROM tz_store, unnest(guild_ids) WITH ORDINALITY guild_id
-                WHERE guild_id != $2
-                AND user_id = $1
-                GROUP BY user_id
-            )
-            UPDATE tz_store
-            SET guild_ids = new_guild_ids
-            FROM corrected
-            WHERE guild_ids <> new_guild_ids
-            AND tz_store.user_id = corrected.user_id;
+            DELETE *
+            FROM tz_store
+            WHERE user_id = $1;
             """
         async with ctx.typing(ephemeral=True):
-            await self.bot.pool.execute(query, ctx.author.id, ctx.guild.id)
-
-        await ctx.send("Done!", ephemeral=True)
-
-    @timezone.command(name="clear")
-    async def _clear(self, ctx: Context) -> None:
-        """Clears your timezones from all guilds."""
-        query = "DELETE FROM tz_store WHERE user_id = $1;"
-        confirm = await ctx.prompt("Are you sure you wish to purge your timezone from all guilds?")
-        if not confirm:
-            return
-
-        async with ctx.typing(ephemeral=True):
             await self.bot.pool.execute(query, ctx.author.id)
+
         await ctx.send("Done!", ephemeral=True)
 
     @timezone.command(name="info", aliases=["tz"])

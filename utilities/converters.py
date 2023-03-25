@@ -128,9 +128,7 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
         if ctx.guild is None:
             tz = zoneinfo.ZoneInfo("UTC")
         else:
-            row: str | None = await ctx.bot.pool.fetchval(
-                "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);", ctx.author.id, ctx.guild.id
-            )
+            row: str | None = await ctx.bot.pool.fetchval("SELECT tz FROM tz_store WHERE user_id = $1;", ctx.author.id)
             if row:
                 tz = zoneinfo.ZoneInfo(row)
             else:
@@ -186,7 +184,6 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
 
     @classmethod
     async def convert(cls, ctx: Context, argument: str) -> datetime.datetime:
-
         timezone = await cls.get_timezone(ctx)
         now = ctx.message.created_at.astimezone(tz=timezone)
 
@@ -253,10 +250,8 @@ class DatetimeTransformer(app_commands.Transformer):
         if interaction.guild is None:
             tz = zoneinfo.ZoneInfo("UTC")
         else:
-            row: str | None = await interaction.client.pool.fetchval(  # type: ignore # typevar defaults, sad
-                "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);",
-                interaction.user.id,
-                interaction.guild.id,
+            row: str | None = await interaction.client.pool.fetchval(  # type: ignore # thanks asyncpg
+                "SELECT tz FROM tz_store WHERE user_id = $1;", interaction.user.id
             )
             if row:
                 tz = zoneinfo.ZoneInfo(row)
@@ -333,9 +328,8 @@ class WhenAndWhatTransformer(app_commands.Transformer):
             tz = zoneinfo.ZoneInfo("UTC")
         else:
             row: str | None = await interaction.client.pool.fetchval(  # type: ignore
-                "SELECT tz FROM tz_store WHERE user_id = $1 and $2 = ANY(guild_ids);",
+                "SELECT tz FROM tz_store WHERE user_id = $1;",
                 interaction.user.id,
-                interaction.guild.id,
             )
             if row:
                 tz = zoneinfo.ZoneInfo(row)
