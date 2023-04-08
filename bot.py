@@ -63,7 +63,7 @@ class MiphaCommandTree(app_commands.CommandTree):
         self.client.log_handler.log.exception("Exception occurred in the CommandTree:\n%s", exc_info=error)
 
         e = discord.Embed(title="Command Error", colour=0xA32952)
-        e.add_field(name="Command", value=interaction.command.name)
+        e.add_field(name="Command", value=(interaction.command and interaction.command.name) or "No command found.")
         e.add_field(name="Author", value=interaction.user, inline=False)
         channel = interaction.channel
         guild = interaction.guild
