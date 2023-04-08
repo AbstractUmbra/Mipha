@@ -23,11 +23,12 @@ if TYPE_CHECKING:
 
 
 class HyruleRoleAssignmentView(MiphaBaseView):
-    def __init__(self) -> None:
+    def __init__(self, bot: Mipha, /) -> None:
         super().__init__(timeout=None)
+        self.bot: Mipha = bot
 
-    def sanitise_user(self, bot: Mipha, /, member: discord.Member) -> None:
-        guild = bot.get_guild(_IRL_FRIEND_SERVER)
+    def sanitise_user(self, member: discord.Member) -> None:
+        guild = self.bot.get_guild(_IRL_FRIEND_SERVER)
         assert guild
 
         if guild.get_member(member.id):
@@ -37,7 +38,7 @@ class HyruleRoleAssignmentView(MiphaBaseView):
         assert isinstance(interaction.user, discord.Member)
 
         try:
-            self.sanitise_user(interaction.client, interaction.user)
+            self.sanitise_user(interaction.user)
         except TypeError:
             await interaction.response.send_message("No shitposting you fucks.", ephemeral=True)
             return False
@@ -71,8 +72,16 @@ class HyruleRoleAssignmentView(MiphaBaseView):
 class Hyrule(commands.Cog):
     def __init__(self, bot: Mipha, /) -> None:
         self.bot: Mipha = bot
-        self.view = HyruleRoleAssignmentView()
+        self.view: HyruleRoleAssignmentView = HyruleRoleAssignmentView(self.bot)
         self.bot.add_view(self.view, message_id=ROLE_ASSIGNMENT_MESSAGE_ID)
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member) -> None:
+        if member.guild.id != HYRULE_GUILD_ID:
+            return
+
+        if member.bot:
+            await member.add_roles(discord.Object(id=929886067178504234))
 
     @commands.is_owner()
     @commands.guild_only()
