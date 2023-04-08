@@ -12,6 +12,7 @@ import json
 import random
 import re
 import shlex
+from collections.abc import Callable, Coroutine
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict
 
@@ -35,7 +36,9 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 SIX_DIGITS = re.compile(r"\{(\d{1,6})\}")
-SOUNDGASM_MEDIA_PATTERN = re.compile(r"(https?://media\.soundgasm\.net\/sounds\/(?P<media>[a-f0-9]+)\.(?P<ext>m4a|mp3))")
+MEDIA_PATTERN = re.compile(
+    r"(https?://(?P<host_url>media\.soundgasm\.net|media\d\.vocaroo\.com)(?:\/sounds|\/mp3)\/(?P<media>[a-zA-Z0-9]+)?\.?(?P<ext>m4a|mp3)?)"
+)
 SOUNDGASM_TITLE_PATTERN = re.compile(r"\=\"title\"\>(.*?)\<\/div\>")  # https://regex101.com/r/BJyiGM/1
 SOUNDGASM_AUTHOR_PATTERN = re.compile(r"\<a href\=\"(?:(?:https?://)?soundgasm\.net\/u\/(?:.*)\")\>(.*)\<\/a>")
 CONTENT_TYPE_LOOKUP = {
@@ -273,34 +276,89 @@ class Lewd(commands.Cog):
 
         return audio, data["url"], data["size"]
 
+    async def _cache_vocaroo(self, url: re.Match[str], /, *, media_id: str) -> tuple[bytes, str, int]:
+        actual_url = url[0] + media_id
+        ext: str = url.groupdict().get("ext") or "m4a"
+
+        self.bot.log_handler.log.info("Vocaroo URL: %s", actual_url)
+        headers = {
+            "Accept": "audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,video/*;q=0.6,*/*;q=0.5",
+            "Accept-Encoding": "Identity",
+            "Accept-Language": "en-GB,en,q=0.5",
+            "Connection": "Keep-Alive",
+            "DNT": "1",
+            "Host": "media1.vocaroo.com",
+            "Range": "bytes=0-",
+            "Referer": "https://vocaroo.com/",
+            "Sec-Fetch-Dest": "audio",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "same-site",
+            "Sec-GPC": "1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/112.0",
+        }
+        async with self.bot.session.get(actual_url, timeout=aiohttp.ClientTimeout(total=1800.00), headers=headers) as resp:
+            if not 300 > resp.status > 200:
+                self.bot.log_handler.log.info("Vocaroo status code: %s", resp.status)
+                raise ValueError("Non 200 response code from vocaroo.")
+            audio = await resp.read()
+
+        form_data = aiohttp.FormData()
+        form_data.add_field("image", audio, content_type=CONTENT_TYPE_LOOKUP[ext])
+
+        async with self.bot.session.post(
+            "https://upload.umbra-is.gay/audio", data=form_data, headers={"Authorization": self.bot.config.IMAGE_HOST_AUTH}
+        ) as resp:
+            data: AudioPost | str = await json_or_text(resp)  # type: ignore # this is weird dict narrowing
+
+        if isinstance(data, str):
+            raise ValueError(f"Returned response is not a dict:\n{data}")
+
+        return audio, data["url"], data["size"]
+
+    def _audio_factory(
+        self, match: re.Match[str]
+    ) -> Callable[[re.Match[str], str, str | None], Coroutine[Any, Any, tuple[bytes, str, int]]]:
+        if match.group("host_url") == "media.soundgasm.net":
+            return self._get_soundgasm_data
+        return self._get_vocaroo_data
+
+    def _get_soundgasm_data(
+        self, match: re.Match[str], data: str, _: str | None
+    ) -> Coroutine[Any, Any, tuple[bytes, str, int]]:
+        title_match = SOUNDGASM_TITLE_PATTERN.search(data)
+        title: str | None = None
+        author_match = SOUNDGASM_AUTHOR_PATTERN.search(data)
+        author: str | None = None
+        if title_match:
+            title = re.sub(r"(\s?[\[\(].*?[\]\)]\s?)", "", title_match[1])  # https://regex101.com/r/tFLbEF/2
+        if author_match:
+            author = author_match[1]
+
+        return self._cache_soundgasm(match, title=title, author=author)
+
+    def _get_vocaroo_data(
+        self, match: re.Match[str], data: str, media_id: str | None
+    ) -> Coroutine[Any, Any, tuple[bytes, str, int]]:
+        if not media_id:
+            raise ValueError("Cannot parse Vocaroo media ID from the url.")
+        return self._cache_vocaroo(match, media_id=media_id)
+
     @commands.command(aliases=["sg"])
     @commands.is_owner()
     async def soundgasm(self, ctx: Context, *, url: str) -> None:
         """
         For archiving soundgasm links...
         """
-        assert ctx.guild is not None
-
         await ctx.typing()
         async with ctx.bot.session.get(url) as response:
             data = await response.text()
 
-        if found_url := SOUNDGASM_MEDIA_PATTERN.search(data):
-            title_match = SOUNDGASM_TITLE_PATTERN.search(data)
-            title: str | None = None
-            author_match = SOUNDGASM_AUTHOR_PATTERN.search(data)
-            author: str | None = None
-            fmt = ""
-            if title_match:
-                title = re.sub(r"(\s?[\[\(].*?[\]\)]\s?)", "", title_match[1])  # https://regex101.com/r/tFLbEF/2
-                fmt += f"{title}\n"
-            if author_match:
-                author = author_match[1]
-                fmt += f"By: **{author}**\n"
-            fmt += f"{found_url[1]}"
-
-            await ctx.send(fmt)
-            audio, cache_url, size = await self._cache_soundgasm(found_url, title=title, author=author)
+        if found_url := MEDIA_PATTERN.search(data):
+            callable_ = self._audio_factory(found_url)
+            media_id = None
+            if found_url["host_url"] != "media.soundgasm.net":
+                media_id = url.rsplit("/")[-1]
+            audio, cache_url, size = await callable_(found_url, data, media_id)
         else:
             await ctx.send("Can't find the content within the main url.")
             return
