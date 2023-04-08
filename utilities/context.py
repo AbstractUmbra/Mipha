@@ -237,6 +237,7 @@ class Context(commands.Context["Mipha"]):
         view: discord.ui.View | None = None,
         suppress_embeds: bool = False,
         ephemeral: bool = False,
+        silent: bool = False,
         mystbin: bool = False,
         mystbin_syntax: str = "txt",
     ) -> discord.Message:
@@ -252,7 +253,7 @@ class Context(commands.Context["Mipha"]):
             assert paste.expires
             content = f"Sorry, the output was too large but I posted it to mystb.in for you here: https://mystb.in/{paste.id}\n\nThe password is `{password}` and it expires at {discord.utils.format_dt(paste.expires)}"
 
-        return await super().send(
+        return await super().send(  # type: ignore
             content=content,
             tts=tts,
             embed=embed,
@@ -268,6 +269,7 @@ class Context(commands.Context["Mipha"]):
             view=view,
             suppress_embeds=suppress_embeds,
             ephemeral=ephemeral,
+            silent=silent,
         )
 
 
