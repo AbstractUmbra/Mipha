@@ -57,7 +57,7 @@ class PatchedContext(Context):
         super().__init__(*args, **kwargs)
         self.first_interaction_sent: bool = False
 
-    async def send(self, content: str | None = None, /, **kwargs) -> discord.Message | None:
+    async def send(self, content: str | None = None, **kwargs) -> discord.Message | None:
         if not self.first_interaction_sent:
             self.first_interaction_sent = True
 
@@ -68,7 +68,7 @@ class PatchedContext(Context):
             return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
-    async def typing(self) -> AsyncGenerator[None, None]:
+    async def typing(self, *args, **kwargs) -> AsyncGenerator[None, None]:
         yield
 
 
