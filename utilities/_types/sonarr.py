@@ -1,5 +1,7 @@
 from typing import TypedDict
 
+from typing_extensions import NotRequired
+
 
 __all__ = (
     "SonarrCalendarPayload",
@@ -112,7 +114,7 @@ class SonarrCalendarPayload(TypedDict):
     airDate: str  # UTC Timezone
     airDateUtc: str  # UTC Timezone
     overview: str
-    episodeFile: SonarrEpisodeFilePayload
+    episodeFile: NotRequired[SonarrEpisodeFilePayload]
     hasFile: bool
     monitored: bool
     unverifiedSceneNumbering: bool
