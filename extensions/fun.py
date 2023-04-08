@@ -339,6 +339,22 @@ class Fun(commands.Cog):
         for m in choices:
             await m.move_to(None)
 
+    @commands.command()
+    @commands.guild_only()
+    @commands.has_guild_permissions(manage_guild=True)
+    @commands.bot_has_guild_permissions(manage_guild=True)
+    async def afdicon(self, ctx: GuildContext, *, ping: int = 1) -> None:
+        url = ctx.guild.icon and ctx.guild.icon.url
+        if not url:
+            await ctx.send("Sorry but you don't have a guild icon, lol.")
+            return
+
+        form = aiohttp.FormData({"url": url, "name": "file", "filename": "", "idx": ping})
+        async with ctx.bot.session.post("https://afdicon.poketwo.io/image", data=form) as resp:
+            data = await resp.read()
+
+        await ctx.guild.edit(icon=data)
+
     def _handle_image(self, buffer: io.BytesIO) -> io.BytesIO:
         output_buffer = io.BytesIO()
         with Image.open(buffer) as image, Image.open(resolved_path) as bricks:
