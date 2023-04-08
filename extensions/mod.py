@@ -600,7 +600,7 @@ class Mod(commands.Cog):
     @tasks.loop(seconds=10.0)
     async def bulk_send_messages(self) -> None:
         async with self._batch_message_lock:
-            for ((guild_id, channel_id), messages) in self.message_batches.items():
+            for (guild_id, channel_id), messages in self.message_batches.items():
                 guild = self.bot.get_guild(guild_id)
                 channel: discord.abc.Messageable | None = guild and guild.get_channel(channel_id)  # type: ignore
                 if channel is None:
@@ -650,7 +650,6 @@ class Mod(commands.Cog):
         member: discord.Member,
         multiple: bool = False,
     ) -> None:
-
         if multiple:
             reason = f"Spamming mentions over multiple messages ({mention_count} mentions)"
         else:
@@ -1042,7 +1041,7 @@ class Mod(commands.Cog):
         query = f"UPDATE guild_mod_config SET {updates} WHERE id=$1 RETURNING broadcast_webhook_url"
 
         guild_id = ctx.guild.id
-        record: tuple[str | None] = await self.bot.pool.fetchrow(query, guild_id)
+        record: tuple[str] | None = await ctx.db.fetchrow(query, guild_id)
         self._spam_check.pop(guild_id, None)
         self.get_guild_config.invalidate(self, guild_id)
         if record is not None and record[0] is not None and protection in ("all", "joins"):
@@ -1689,7 +1688,6 @@ class Mod(commands.Cog):
         When the command is done doing its work, you will get a message
         detailing which users got removed and how many messages got removed.
         """
-
         predicates: list[Callable[[discord.Message], Any]] = []
         if flags.bot:
             if flags.webhooks:

@@ -138,7 +138,6 @@ class ScotrailCog(commands.Cog):
     @next_train_callback.autocomplete("from_")
     @next_train_callback.autocomplete("to")
     async def next_train_autocomplete(self, interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
-
         if not current:
             quick = self._generate_autocomplete()
             return quick[:25]
