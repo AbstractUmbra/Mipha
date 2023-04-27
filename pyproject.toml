@@ -27,6 +27,7 @@ python-a2s = { git = "https://github.com/Yepoleb/python-a2s.git" }
 lxml = "*"
 legofy = "*"
 mcrcon = "*"
+numpy = "*"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"
