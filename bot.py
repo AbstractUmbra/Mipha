@@ -449,6 +449,9 @@ class Mipha(commands.Bot):
             if after.author.id == self.owner_id:
                 can_edit = True
 
+        if before.flags.suppress_embeds != after.flags.suppress_embeds:
+            can_edit = False
+
         if can_edit:
             await self.process_commands(after)
 
