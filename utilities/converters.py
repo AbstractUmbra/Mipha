@@ -125,14 +125,11 @@ class RedditMediaURL:
 class DatetimeConverter(commands.Converter[datetime.datetime]):
     @staticmethod
     async def get_timezone(ctx: Context) -> zoneinfo.ZoneInfo | None:
-        if ctx.guild is None:
-            tz = zoneinfo.ZoneInfo("UTC")
+        row: str | None = await ctx.bot.pool.fetchval("SELECT tz FROM tz_store WHERE user_id = $1;", ctx.author.id)
+        if row:
+            tz = zoneinfo.ZoneInfo(row)
         else:
-            row: str | None = await ctx.bot.pool.fetchval("SELECT tz FROM tz_store WHERE user_id = $1;", ctx.author.id)
-            if row:
-                tz = zoneinfo.ZoneInfo(row)
-            else:
-                tz = zoneinfo.ZoneInfo("UTC")
+            tz = zoneinfo.ZoneInfo("UTC")
 
         return tz
 
@@ -247,16 +244,13 @@ class BadDatetimeTransform(app_commands.AppCommandError):
 class DatetimeTransformer(app_commands.Transformer):
     @staticmethod
     async def get_timezone(interaction: Interaction) -> zoneinfo.ZoneInfo | None:
-        if interaction.guild is None:
-            tz = zoneinfo.ZoneInfo("UTC")
+        row: str | None = await interaction.client.pool.fetchval(  # type: ignore # thanks asyncpg
+            "SELECT tz FROM tz_store WHERE user_id = $1;", interaction.user.id
+        )
+        if row:
+            tz = zoneinfo.ZoneInfo(row)
         else:
-            row: str | None = await interaction.client.pool.fetchval(  # type: ignore # thanks asyncpg
-                "SELECT tz FROM tz_store WHERE user_id = $1;", interaction.user.id
-            )
-            if row:
-                tz = zoneinfo.ZoneInfo(row)
-            else:
-                tz = zoneinfo.ZoneInfo("UTC")
+            tz = zoneinfo.ZoneInfo("UTC")
 
         return tz
 
