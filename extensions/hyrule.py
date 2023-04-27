@@ -87,6 +87,7 @@ class Hyrule(commands.Cog):
     @commands.guild_only()
     @commands.command()
     async def setup_role_assignments(self, ctx: GuildContext) -> None:
+        """This command will quickly update the role assignment message with the in-memory View created in this same extension."""
         channel = ctx.guild.get_channel(ROLE_ASSIGNMENT_CHANNEL_ID)
         assert isinstance(channel, discord.TextChannel)
 

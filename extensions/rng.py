@@ -19,8 +19,6 @@ from utilities.formats import plural
 if TYPE_CHECKING:
     from bot import Mipha
 
-    from ._tags import Tags
-
 
 class RNG(commands.Cog):
     """Utilities that provide pseudo-RNG."""
@@ -33,27 +31,6 @@ class RNG(commands.Cog):
         """Displays a random thing you request."""
         if ctx.invoked_subcommand is None:
             await ctx.send(f"Incorrect random subcommand passed. Try {ctx.prefix}help random")
-
-    @random.command()
-    async def tag(self, ctx: Context) -> None:
-        """Displays a random tag.
-
-        A tag showing up in this does not get its usage count increased.
-        """
-        assert ctx.guild is not None
-
-        tags: Tags = self.bot.get_cog("Tags")  # type: ignore # yeah idk???
-
-        if tags is None:
-            await ctx.send("Tag commands currently disabled.")
-            return
-
-        tag = await tags.get_random_tag(ctx.guild, connection=ctx.db)  # type: ignore # yeah idk???
-        if tag is None:
-            await ctx.send("This server has no tags.")
-            return
-
-        await ctx.send(f'Random tag found: {tag["name"]}\n{tag["content"]}')
 
     @random.command()
     async def number(self, ctx: Context, minimum: int = 0, maximum: int = 100) -> None:

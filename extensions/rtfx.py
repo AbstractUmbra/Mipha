@@ -325,6 +325,12 @@ class RTFX(commands.Cog):
     async def rtfs(
         self, ctx: Context, *, target: str | None = commands.param(converter=SourceConverter, default=None)
     ) -> None:
+        """
+        This command will provide the source code of a given entity.
+        If called without an argument it will show all possible sources.
+
+        Note that special dunders and whatnot are not sourceable, nor are any Python objects implemented in C.
+        """
         if target is None:
             await ctx.send(embed=discord.Embed(title="Available sources of rtfs", description="\n".join(RTFS)))
             return

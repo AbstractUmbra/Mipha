@@ -11,6 +11,7 @@ from lru import LRU
 
 R = TypeVar("R")
 
+
 # Can't use ParamSpec due to https://github.com/python/typing/discussions/946
 class CacheProtocol(Protocol[R]):
     cache: MutableMapping[str, asyncio.Task[R]]
@@ -131,11 +132,11 @@ def cache(
                 except KeyError:
                     continue
 
-        wrapper.cache = _internal_cache
-        wrapper.get_key = lambda *args, **kwargs: _make_key(args, kwargs)
-        wrapper.invalidate = _invalidate
-        wrapper.get_stats = _stats
-        wrapper.invalidate_containing = _invalidate_containing
+        wrapper.cache = _internal_cache  # type: ignore
+        wrapper.get_key = lambda *args, **kwargs: _make_key(args, kwargs)  # type: ignore
+        wrapper.invalidate = _invalidate  # type: ignore
+        wrapper.get_stats = _stats  # type: ignore
+        wrapper.invalidate_containing = _invalidate_containing  # type: ignore
         return wrapper  # type: ignore
 
     return decorator

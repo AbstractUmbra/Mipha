@@ -30,7 +30,7 @@ class Admin(commands.Cog):
     """Admin-only commands that make the bot dynamic."""
 
     def __init__(self, bot: Mipha) -> None:
-        self.bot = bot
+        self.bot: Mipha = bot
 
     def cleanup_code(self, content: str) -> str:
         """Automatically removes code blocks from the code."""
