@@ -1,0 +1,3 @@
+ALTER TABLE family RENAME TO money;
+
+ALTER TABLE money ADD COLUMN note TEXT;
