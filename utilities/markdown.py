@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 from functools import wraps
 from typing import Concatenate, ParamSpec, TypeVar
 
@@ -14,8 +15,8 @@ StrOrUrl = TypeVar("StrOrUrl", str, URL)
 __all__ = ("MarkdownBuilder",)
 
 
-def clamp(max_: int, min_: int, /, *, amount: int) -> int:
-    return min(max(min_, amount), max_)
+def clamp(value: int, /, max_: int, min_: int) -> int:
+    return min(max(min_, value), max_)
 
 
 def after_markdown(func: Callable[Concatenate[M, P], None]) -> Callable[Concatenate[M, P], None]:
@@ -35,9 +36,15 @@ class MarkdownBuilder:
     def text(self) -> str:
         return self._inner
 
+    @text.getter
+    def text(self) -> str:
+        c = deepcopy(self._inner)
+        self.clear()
+        return c
+
     @after_markdown
     def add_header(self, *, text: str, depth: int = 1) -> None:
-        depth = clamp(5, 1, amount=depth)
+        depth = clamp(depth, 5, 1)
         self._inner += "#" * depth
         self._inner += " " + text
 
