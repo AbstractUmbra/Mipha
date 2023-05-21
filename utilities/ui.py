@@ -42,6 +42,8 @@ class MiphaBaseModal(discord.ui.Modal):
 
 
 class MiphaBaseView(discord.ui.View):
+    message: discord.Message | discord.PartialMessage
+
     async def on_error(self, interaction: Interaction, error: Exception, item: discord.ui.Item[Self], /) -> None:
         view_name = self.__class__.__name__
         interaction.client.log_handler.log.exception("Exception occurred in View %r:\n%s", view_name, error)
@@ -77,6 +79,10 @@ class MiphaBaseView(discord.ui.View):
         for item in self.children:
             if isinstance(item, discord.ui.Button):
                 item.disabled = True
+
+    async def on_timeout(self) -> None:
+        self._disable_all_buttons()
+        await self.message.edit(view=self)
 
 
 class ConfirmationView(MiphaBaseView):
