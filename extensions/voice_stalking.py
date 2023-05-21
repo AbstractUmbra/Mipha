@@ -10,7 +10,7 @@ from discord.ext import commands
 
 from utilities.async_config import Config
 from utilities.checks import has_guild_permissions
-from utilities.context import Context
+from utilities.context import Context, GuildContext
 
 
 if TYPE_CHECKING:
@@ -57,6 +57,11 @@ class VoiceStalking(commands.Cog):
     async def cog_check(self, ctx: Context) -> bool:
         return await ctx.bot.is_owner(ctx.author)
 
+    def _create_default_config(self) -> VoiceStalkingConfig:
+        ret: VoiceStalkingConfig = {"notification_channel": 0, "excluded_channels": [], "filtered": False}
+
+        return ret
+
     def _is_safe_channel(self, channel: VocalGuildChannel) -> bool:
         config: VoiceStalkingConfig = self._config.get(channel.guild.id, {})  # type: ignore # dumb
         if not config:
@@ -66,7 +71,7 @@ class VoiceStalking(commands.Cog):
             return True
 
         excluded_channels: list[int] = config["excluded_channels"]
-        if channel in excluded_channels:
+        if channel.id in excluded_channels:
             return False
 
         default_role = channel.guild.default_role
@@ -152,14 +157,41 @@ class VoiceStalking(commands.Cog):
     @stalking.command()
     @commands.guild_only()
     @has_guild_permissions(manage_channels=True)
-    async def exclude(self, ctx: Context, channel: discord.VoiceChannel | discord.StageChannel | discord.Object) -> None:
+    async def exclude(
+        self, ctx: GuildContext, channel: discord.VoiceChannel | discord.StageChannel | discord.Object
+    ) -> None:
         """Exclude a channel from the voice stalking."""
-        config = self._config.get(ctx.guild.id, {})  # type: ignore # guarded by decorator
+        config = self._config.get(ctx.guild.id, {})
         if not config:
             return
 
         config["excluded_channels"].append(channel.id)
-        await self._config.put(ctx.guild.id, config)  # type: ignore # guarded by decorator
+        await self._config.put(ctx.guild.id, config)
+
+    @stalking.command()
+    @commands.guild_only()
+    @has_guild_permissions(manage_channels=True)
+    async def create(self, ctx: GuildContext, name: str, exclude: commands.Greedy[discord.Member | discord.Role]) -> None:
+        config = self._config.get(ctx.guild.id, {})
+        if not config:
+            return
+
+        no_perms_overwrite = discord.PermissionOverwrite.from_pair(discord.Permissions.none(), discord.Permissions.all())
+        overwrites = {item: no_perms_overwrite for item in exclude}
+
+        tc = await ctx.guild.create_text_channel(name=name, overwrites=overwrites)
+        vc = await ctx.guild.create_voice_channel(name=name, overwrites=overwrites)
+
+        config["excluded_channels"].append(vc.id)
+        await self._config.put(ctx.guild.id, config)
+
+        try:
+            await ctx.author.send(
+                f"Okay, I have created {tc.mention} and {vc.mention} for you, and excluded the following:-\n\n"
+                + "\n".join([i.mention for i in exclude])
+            )
+        except discord.HTTPException:
+            pass
 
 
 async def setup(bot: Mipha) -> None:
