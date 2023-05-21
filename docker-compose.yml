@@ -1,4 +1,20 @@
+networks:
+  main:
+    external:
+      name: main
+
 services:
+  duckling:
+    build:
+      context: ./duckling
+    container_name: "duckling"
+    image: duckling:latest
+    networks:
+      main:
+        ipv4_address: 172.19.0.20
+    ports:
+      - 127.0.0.1:7731:8000/tcp
+
   synth:
     container_name: synth-engine
     image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
