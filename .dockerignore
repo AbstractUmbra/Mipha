@@ -1,5 +1,6 @@
 extensions/private/*
 configs/**/*
+static/
 *.log*
 _pyright/
 buffer/

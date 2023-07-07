@@ -15,6 +15,7 @@ services:
     volumes:
       - ./_bot_config.py:/app/_bot_config.py:ro
       - ./configs/:/app/configs/:rw
+      - ./static/:/app/static/:ro
 
   duckling:
     build:
