@@ -13,7 +13,8 @@ services:
       main:
     restart: unless-stopped
     volumes:
-      - ./_bot_config.py:/app/_bot_config.py
+      - ./_bot_config.py:/app/_bot_config.py:ro
+      - ./configs/:/app/configs/:rw
 
   duckling:
     build:
