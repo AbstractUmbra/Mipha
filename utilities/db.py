@@ -24,13 +24,13 @@ class MaybeAcquire:
     async def __aenter__(self) -> asyncpg.Connection:
         if self.connection is None:
             self._cleanup = True
-            self.connection = c = await self.pool.acquire()
+            self._connection = c = await self.pool.acquire()
             return c
         return self.connection
 
     async def __aexit__(self, *args: Any) -> None:
         if self._cleanup:
-            await self.pool.release(self.connection)
+            await self.pool.release(self._connection)
 
 
 def _encode_jsonb(value: Any) -> str:

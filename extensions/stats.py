@@ -704,7 +704,7 @@ class Stats(commands.Cog):
         self._logging_queue.put_nowait(record)
 
     async def send_log_record(self, record: logging.LogRecord) -> None:
-        attributes = {"INFO": "\N{INFORMATION SOURCE}", "WARNING": "\N{WARNING SIGN}"}
+        attributes = {"INFO": "\U00002139\U0000fe0f", "WARNING": "\U000026a0\U0000fe0f"}
 
         emoji = attributes.get(record.levelname, "\N{CROSS MARK}")
         dt = datetime.datetime.utcfromtimestamp(record.created)

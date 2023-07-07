@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import textwrap
 from typing import TYPE_CHECKING, TypedDict
 
 import discord
@@ -16,8 +17,8 @@ from discord.ext import commands
 
 from utilities.context import Interaction
 from utilities.converters import DatetimeTransformer
-from utilities.formats import random_pastel_colour
-from utilities.time import human_timedelta
+from utilities.formats import plural, random_pastel_colour
+from utilities.time import format_relative, human_timedelta
 from utilities.ui import MiphaBaseModal, MiphaBaseView
 
 
@@ -60,6 +61,10 @@ class TodoCreateModal(MiphaBaseModal, title="To-do!"):
         required=False,
     )
 
+    def __init__(self, what_prefill: str | None = None) -> None:
+        super().__init__()
+        self.what.default = what_prefill
+
     async def on_submit(self, interaction: Interaction) -> None:
         await interaction.response.send_message("Okay, I have created your To-do!", ephemeral=True)
         self.stop()
@@ -98,6 +103,13 @@ class Todo(commands.Cog):
 
     def __init__(self, bot: Mipha) -> None:
         self.bot: Mipha = bot
+        self.create_todo_context_menu = app_commands.ContextMenu(
+            name="Create To-do!", callback=self.create_todo_context_menu_callback, type=discord.AppCommandType.message
+        )
+        self.bot.tree.add_command(self.create_todo_context_menu)
+
+    async def cog_unload(self) -> None:
+        self.bot.tree.remove_command(self.create_todo_context_menu.name, type=self.create_todo_context_menu.type)
 
     async def get_todos(self, interaction: Interaction) -> list[TodoRecord]:
         query = """
@@ -127,14 +139,19 @@ class Todo(commands.Cog):
         record = await self.bot.pool.fetchrow(query, author_id, channel_id, content, reminder, now)
 
         if reminder is not None:
-            reminder_cog: Reminder | None = self.bot.get_cog("Reminders")  # type: ignore # wtf dpy
+            reminder_cog: Reminder | None = self.bot.get_cog("Reminder")  # type: ignore # wtf dpy
             if reminder_cog is not None:
                 return await reminder_cog.create_timer(
                     reminder, "todo_reminder", channel_id, created=now, todo_record=record[0]
                 )
+            else:
+                LOGGER.warning("Reminder cog is not loaded. Is this an issue?")
 
     async def fetch_todo(self, todo_id: int, /) -> TodoRecord | None:
         return await self.bot.pool.fetchrow("SELECT * FROM todos WHERE todo_id = $1;", todo_id)
+
+    async def delete_todo(self, todo_id: int, /, *, author_id: int) -> bool:
+        ...
 
     def generate_embed(self, record: TodoRecord, /) -> discord.Embed:
         ret = discord.Embed(title="To-do Reminder!", colour=random_pastel_colour())
@@ -150,6 +167,10 @@ class Todo(commands.Cog):
         return ret
 
     todo_group = app_commands.Group(name="todo", description="Commands to create and manage your To-do items!")
+
+    async def create_todo_context_menu_callback(self, interaction: Interaction, message: discord.Message) -> None:
+        create_modal = TodoCreateModal(what_prefill=message.content)
+        await interaction.response.send_modal(create_modal)
 
     @todo_group.command(name="create", description="Create a To-do for later.")
     async def todo_create(self, interaction: Interaction, what: str | None = None, when: str | None = None) -> None:
@@ -177,8 +198,6 @@ class Todo(commands.Cog):
             else:
                 parsed = None
 
-        LOGGER.info("Got this: %s", what)
-
         await self.create_todo(
             author_id=interaction.user.id,
             channel_id=interaction.channel.id,
@@ -199,14 +218,31 @@ class Todo(commands.Cog):
             return await interaction.followup.send("You don't seem to have any recorded things to-do.", ephemeral=True)
 
         embed = discord.Embed(title=f"{interaction.user}'s To-Dos!", colour=random_pastel_colour())
-        description = ""
-        for idx, record in enumerate(records, start=1):
-            description += f"{idx}. {record['todo_content']}\n"
 
-        embed.description = description
+        if len(records) > 10:
+            embed.set_footer(text="Only showing up to 10 to-do items.")
+            records = records[:10]
+        else:
+            embed.set_footer(text=f"{plural(len(records)):record}")
+
+        for record in records:
+            shorten = textwrap.shorten(record["todo_content"], width=512)
+            if record["todo_reminder"]:
+                shorten += f": {format_relative(record['todo_reminder'])}"
+            embed.add_field(name=str(record["todo_id"]) + ".", value=shorten, inline=False)
+
+        await interaction.followup.send(embed=embed)
+
+    @todo_group.command(name="delete", description="Delete one of your to-dos!")
+    async def todo_delete(self, interaction: Interaction, todo: int) -> None:
+        ...
+
+    @todo_delete.autocomplete(name="todo")
+    async def todo_delete_autocomplete(self, interaction: Interaction, current: str) -> list[app_commands.Choice[int]]:
+        ...
 
     @commands.Cog.listener()
-    async def on_todo_reminder(self, timer: Timer, /) -> None:
+    async def on_todo_reminder_timer_complete(self, timer: Timer, /) -> None:
         channel_id: int = timer.args[0]
         todo_id: int = timer.kwargs["todo_record"]
 
@@ -223,7 +259,12 @@ class Todo(commands.Cog):
 
         view = TodoView(bot=self.bot, record=todo_record, cog=self)
         embed = self.generate_embed(todo_record)
-        view.message = await channel.send(embed=embed, view=view)
+        view.message = await channel.send(
+            content=f"<@{todo_record['user_id']}>",
+            embed=embed,
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=True),
+        )
 
 
 async def setup(bot) -> None:

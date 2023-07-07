@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import logging
 import textwrap
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
@@ -26,6 +27,8 @@ from utilities.ui import MiphaBaseView
 
 if TYPE_CHECKING:
     from bot import Mipha
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SnoozeModal(discord.ui.Modal, title="Snooze"):
@@ -196,14 +199,19 @@ class Reminder(commands.Cog):
 
     async def call_timer(self, timer: Timer) -> None:
         # delete the timer
-        query = "DELETE FROM reminders WHERE id=$1;"
+        if timer.event == "todo_reminder":
+            query = "DELETE FROM todos WHERE id=$1;"
+        else:
+            query = "DELETE FROM reminders WHERE id=$1;"
         await self.bot.pool.execute(query, timer.id)
 
         # dispatch the event
         event_name = f"{timer.event}_timer_complete"
+        LOGGER.info("Dispatching: %s", event_name)
         self.bot.dispatch(event_name, timer)
 
     async def dispatch_timers(self) -> None:
+        await self.bot.wait_until_ready()
         try:
             while not self.bot.is_closed():
                 # can only asyncio.sleep for up to ~48 days reliably
@@ -370,7 +378,7 @@ class Reminder(commands.Cog):
 
         e = discord.Embed(colour=discord.Colour.random(), title="Reminders")
 
-        if len(records) == 10:
+        if len(records) > 10:
             e.set_footer(text="Only showing up to 10 reminders.")
         else:
             e.set_footer(text=f"{formats.plural(len(records)):record}")

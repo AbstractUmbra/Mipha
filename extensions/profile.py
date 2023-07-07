@@ -145,6 +145,7 @@ class PromptProfileCreationView(MiphaBaseView):
         super().__init__()
         self.cog: Profile = cog
         self.ctx: Context = ctx
+        self.message = ctx.message
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.ctx.author.id:

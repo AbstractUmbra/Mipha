@@ -47,7 +47,8 @@ jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.NO_DM_TRACEBACK = True
-INTENTS = discord.Intents(_bot_config.INTENTS)
+# INTENTS = discord.Intents(_bot_config.INTENTS)
+INTENTS = discord.Intents.all()
 
 
 class MiphaCommandTree(app_commands.CommandTree):
@@ -211,7 +212,8 @@ class Mipha(commands.Bot):
         )
         self.command_stats = Counter()
         self.socket_stats = Counter()
-        self.owner_ids = self.config.OWNER_IDS
+        self.owner_id: int | None = None
+        self.owner_ids: Iterable[int] = self.config.OWNER_IDS
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
@@ -491,7 +493,9 @@ async def main() -> None:
         bot.session = session
 
         bot.mb_client = mystbin.Client(session=session, token=bot.config.MYSTBIN_TOKEN)
-        bot.md_client = hondana.Client(**bot.config.MANGADEX_AUTH, session=session)
+        bot.md_client = hondana.Client(
+            username=bot.config.MANGADEX_AUTH["username"], password=bot.config.MANGADEX_AUTH["password"], session=session
+        )
 
         await bot.load_extension("jishaku")
         for extension in EXTENSIONS:

@@ -1,4 +1,3 @@
-_bot_config.py
 extensions/private/*
 static/
 configs/**/*
@@ -7,3 +6,7 @@ _pyright/
 buffer/
 *.ipynb
 [!__]_*.py
+duckling/
+LICENSE
+README.md
+_bot_config.py

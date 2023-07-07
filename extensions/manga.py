@@ -77,7 +77,7 @@ class MangaView(MiphaBaseView):
         assert interaction.user is not None
         assert interaction.channel is not None
 
-        is_nsfw = isinstance(interaction.channel, discord.PartialMessageable) or interaction.channel.is_nsfw()
+        is_nsfw = isinstance(interaction.channel, discord.abc.PrivateChannel) or interaction.channel.is_nsfw()
 
         embed = await MangaDexEmbed.from_manga(self._lookup[item.values[0]], nsfw_allowed=is_nsfw)
         self.manga_id = item.values[0]

@@ -395,7 +395,13 @@ class Lewd(commands.Cog):
                 TABLESAMPLE BERNOULLI (20);
                 """
 
-        conn: asyncpg.Connection = await asyncpg.connect(**ctx.bot.config.POSTGRES_AUDIO_DSN)
+        conn: asyncpg.Connection = await asyncpg.connect(
+            host=self.bot.config.POSTGRES_AUDIO_DSN["host"],
+            port=self.bot.config.POSTGRES_AUDIO_DSN["port"],
+            user=self.bot.config.POSTGRES_AUDIO_DSN["user"],
+            password=self.bot.config.POSTGRES_AUDIO_DSN["password"],
+            database=self.bot.config.POSTGRES_AUDIO_DSN["database"],
+        )
 
         rows = await conn.fetch(query)
         await conn.close()

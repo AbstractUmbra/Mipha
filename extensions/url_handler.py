@@ -85,18 +85,16 @@ class URLUnfurlView(MiphaBaseView):
 
         if self.url.query_string:
             self.markdown_handler.add_header(text="URL Query Parameters")
-            self.markdown_handler.add_text(text=f"`{self.url.query_string}`")
+            # self.markdown_handler.add_text(text=f"`{self.url.query_string}`")
             self.markdown_handler.add_bulletpoints(texts=[f"{key} -> {value}" for key, value in self.url.query.items()])
         if self._redirect_url and self._redirect_url.query_string:
             self.markdown_handler.add_header(text="Redirect URL Query Parameters")
-            self.markdown_handler.add_text(text=f"`{self._redirect_url.query_string}`")
+            # self.markdown_handler.add_text(text=f"`{self._redirect_url.query_string}`")
             self.markdown_handler.add_bulletpoints(
                 texts=[f"{key} -> `{value}`" for key, value in self._redirect_url.query.items()]
             )
 
-        await interaction.followup.send(self.markdown_handler.text)
-
-        self.markdown_handler.clear()
+        await interaction.followup.send(self.markdown_handler.text, ephemeral=True)
 
     @ui.button(label="Fragments", emoji="\U0001f9e9")
     async def fragment_button(self, interaction: Interaction, button: ui.Button[Self]) -> None:
@@ -109,9 +107,7 @@ class URLUnfurlView(MiphaBaseView):
             self.markdown_handler.add_header(text="Redirect URL Fragments")
             self.markdown_handler.add_text(text=f"{self._redirect_url.fragment}")
 
-        await interaction.followup.send(self.markdown_handler.text)
-
-        self.markdown_handler.clear()
+        await interaction.followup.send(self.markdown_handler.text, ephemeral=True)
 
     @ui.button(label="Redirect", emoji="\U000021aa\U0000fe0f", disabled=True)
     async def redirect_button(self, interaction: Interaction, button: ui.Button[Self]) -> None:
@@ -124,7 +120,6 @@ class URLUnfurlView(MiphaBaseView):
         self.markdown_handler.add_link(url=self._redirect_url, text="URL Link")
 
         await interaction.followup.send(self.markdown_handler.text, ephemeral=True)
-        self.markdown_handler.clear()
 
 
 class URLChecker(commands.Cog):
