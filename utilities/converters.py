@@ -244,7 +244,7 @@ class BadDatetimeTransform(app_commands.AppCommandError):
 class DatetimeTransformer(app_commands.Transformer):
     @staticmethod
     async def get_timezone(interaction: Interaction) -> zoneinfo.ZoneInfo | None:
-        row: str | None = await interaction.client.pool.fetchval(  # type: ignore # thanks asyncpg
+        row: str | None = await interaction.client.pool.fetchval(
             "SELECT tz FROM tz_store WHERE user_id = $1;", interaction.user.id
         )
         if row:
@@ -321,7 +321,7 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         if interaction.guild is None:
             tz = zoneinfo.ZoneInfo("UTC")
         else:
-            row: str | None = await interaction.client.pool.fetchval(  # type: ignore
+            row: str | None = await interaction.client.pool.fetchval(
                 "SELECT tz FROM tz_store WHERE user_id = $1;",
                 interaction.user.id,
             )
