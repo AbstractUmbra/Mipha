@@ -14,6 +14,10 @@ on:
     branches:
       - main
 
+concurrency:
+  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
