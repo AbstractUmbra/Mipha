@@ -46,7 +46,7 @@ class ShortTime:
 
         data = {k: int(v) for k, v in match.groupdict(default=0).items()}
         now = now or datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
-        self.dt = now + relativedelta(**data)
+        self.dt = now + relativedelta(**data)  # type: ignore # pyright dict expansion sadness
 
     @classmethod
     async def convert(cls, ctx: Context, argument: str) -> ShortTime:
@@ -152,7 +152,7 @@ class UserFriendlyTime(commands.Converter):
             if match is not None and match.group(0):
                 data = {k: int(v) for k, v in match.groupdict(default=0).items()}
                 remaining = argument[match.end() :].strip()
-                result.dt = now + relativedelta(**data)
+                result.dt = now + relativedelta(**data)  # type: ignore # pyright dict expansion sadness
                 return await result.check_constraints(ctx, now, remaining)
 
             # apparently nlp does not like "from now"

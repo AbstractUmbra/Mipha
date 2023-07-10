@@ -25,6 +25,9 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
+BUFFER_PATH = pathlib.Path("./buffer/")
+BUFFER_PATH.mkdir(exist_ok=True, mode=770)
+
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
 
 MOBILE_PATTERN: re.Pattern[str] = re.compile(

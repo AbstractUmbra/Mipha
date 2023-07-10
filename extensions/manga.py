@@ -72,7 +72,7 @@ class MangaView(MiphaBaseView):
         super().__init__()
         self.select.options = options
 
-    @discord.ui.select(min_values=1, max_values=1, options=[])
+    @discord.ui.select(min_values=1, max_values=1, options=[])  # type: ignore # pyright bug
     async def select(self, interaction: Interaction, item: discord.ui.Select[Self]) -> None:
         assert interaction.user is not None
         assert interaction.channel is not None

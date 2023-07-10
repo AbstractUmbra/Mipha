@@ -16,12 +16,11 @@ services:
       - ./_bot_config.py:/app/_bot_config.py:ro
       - ./configs/:/app/configs/:rw
       - ./static/:/app/static/:ro
+      - ./extensions/private/:/app/extensions/private/:ro
 
   duckling:
-    build:
-      context: ./duckling
     container_name: "duckling"
-    image: duckling:latest
+    image: ghcr.io/abstractumbra/duckling:latest
     networks:
       main:
         ipv4_address: 172.19.0.20
