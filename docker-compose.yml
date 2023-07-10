@@ -5,7 +5,7 @@ networks:
 
 services:
   bot:
-    container_name: Mipha
+    container_name: mipha
     extra_hosts:
       - "database:host-gateway"
     image: ghcr.io/abstractumbra/mipha:latest
