@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 
-LOG = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hondana.Author]):
@@ -115,9 +115,13 @@ class MangaCog(commands.Cog, name="Manga"):
     Cog to assist with Mangadex related things.
     """
 
-    def __init__(self, bot: Mipha) -> None:
+    def __init__(self, bot: Mipha, /, *, webhook_url: str | None = None) -> None:
         self.bot: Mipha = bot
-        self.webhook: discord.Webhook = discord.Webhook.from_url(bot.config.MANGADEX_WEBHOOK, session=bot.session)
+        if not webhook_url:
+            LOGGER.warning("No webhook defined for MangaDex logging. Skipping.")
+            return
+
+        self.webhook: discord.Webhook = discord.Webhook.from_url(webhook_url, session=bot.session)
         self.get_personal_feed.add_exception_type(hondana.APIException)
         self.get_personal_feed.start()
 
@@ -317,4 +321,5 @@ class MangaCog(commands.Cog, name="Manga"):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(MangaCog(bot))
+    mangadex_webhook = bot.config["webhooks"].get("mangadex")
+    await bot.add_cog(MangaCog(bot, webhook_url=mangadex_webhook))

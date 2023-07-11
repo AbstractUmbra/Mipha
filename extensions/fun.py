@@ -30,6 +30,10 @@ from utilities.context import Context, GuildContext
 from utilities.formats import plural
 
 
+if TYPE_CHECKING:
+    from discord.ext.commands._types import Check
+
+
 path_ = inspect.getabsfile(legofy.main)
 resolved_path = pathlib.Path(path_).parent / "assets" / "bricks" / "1x1.png"
 
@@ -73,6 +77,13 @@ AL_BHED_CHARACTER_MAP = {
     "y": "o",
     "z": "w",
 }
+
+
+def has_deepl_key() -> Check[Context]:
+    def predicate(ctx: Context) -> bool:
+        return bool(ctx.bot.config.get("deepl"))
+
+    return commands.check(predicate)
 
 
 class Fun(commands.Cog):
@@ -171,6 +182,7 @@ class Fun(commands.Cog):
         await ctx.send(new_str.replace("~", "").capitalize())
 
     @commands.command()
+    @has_deepl_key()
     async def translate(
         self,
         ctx: Context,
@@ -191,7 +203,7 @@ class Fun(commands.Cog):
 
         url = "https://api-free.deepl.com/v2/translate"
         form = aiohttp.FormData()
-        form.add_field("auth_key", value=self.bot.config.DEEPL_KEY)
+        form.add_field("auth_key", value=self.bot.config["deepl"]["api_key"])  # type: ignore # guarded by check
         form.add_field("text", value=new_content)
         form.add_field("target_lang", value="EN")
 

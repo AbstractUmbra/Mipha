@@ -22,8 +22,13 @@ if TYPE_CHECKING:
 
     from aiohttp import ClientSession
     from asyncpg import Connection
+    from typing_extensions import TypeVar
 
     from bot import Mipha
+
+    CogT = TypeVar("CogT", bound=commands.Cog, covariant=True, default=commands.Cog)
+else:
+    CogT = TypeVar("CogT", bound=commands.Cog, covariant=True)
 
 
 __all__ = (
@@ -125,10 +130,11 @@ class SupportsStr(Protocol):
         ...
 
 
-class Context(commands.Context["Mipha"]):
+class Context(commands.Context["Mipha"], Generic[CogT]):
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
     bot: Mipha
     command: commands.Command[Any, ..., Any]
+    cog: CogT
 
     __slots__ = ("pool",)
 

@@ -6,15 +6,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
-import argparse
-import datetime
-import json
+import logging
 import random
 import re
-import shlex
 from collections.abc import Callable, Coroutine
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import asyncpg
@@ -22,20 +19,14 @@ import discord
 from discord.ext import commands
 from discord.http import json_or_text
 
-from utilities import checks
-from utilities._types.danbooru import DanbooruPayload
-from utilities._types.gelbooru import GelbooruPayload, GelbooruPostPayload
-from utilities._types.uploader import AudioPost
-from utilities.cache import cache
 from utilities.context import Context, GuildContext
-from utilities.formats import to_codeblock
-from utilities.paginator import RoboPages, SimpleListSource
 
 
 if TYPE_CHECKING:
+    from discord.ext.commands._types import Check
+
     from bot import Mipha
 
-SIX_DIGITS = re.compile(r"\{(\d{1,6})\}")
 MEDIA_PATTERN = re.compile(
     r"(https?://(?P<host_url>media\.soundgasm\.net|media\d\.vocaroo\.com)(?:\/sounds|\/mp3)\/(?P<media>[a-zA-Z0-9]+)?\.?(?P<ext>m4a|mp3)?)"
 )
@@ -45,115 +36,30 @@ CONTENT_TYPE_LOOKUP = {
     "m4a": "audio/mp4",
     "mp3": "audio/mp3",
 }
-RATING = {"e": "explicit", "q": "questionable", "s": "safe", "g": "general"}
-RATING_LOOKUP = {v: k for k, v in RATING.items()}
+LOGGER = logging.getLogger(__name__)
 
 
-def _reverse_rating_repl(match: re.Match[str]) -> str:
-    key = RATING_LOOKUP.get(match.group(1), "N/A")
-    return f"rating:{key}"
+def require_secure_keys() -> Check[Context[Lewd]]:
+    def predicate(ctx: Context[Lewd]) -> bool:
+        return ctx.cog._audio_enabled and ctx.cog._audio_enabled
 
-
-class _LewdTableData(TypedDict):
-    guild_id: int
-    blacklist: list[str]
-    auto_six_digits: bool
-
-
-class BooruData(NamedTuple):
-    auth: aiohttp.BasicAuth
-    endpoint: str
-
-
-class BlacklistedBooru(commands.CommandError):
-    """Error raised when you request a blacklisted tag."""
-
-    def __init__(self, tags: set[str]) -> None:
-        self.blacklisted_tags: set[str] = tags
-        self.blacklist_tags_fmt: str = " | ".join(tags)
-        super().__init__("Bad Booru tags.")
-
-    def __str__(self) -> str:
-        return f"Found blacklisted tags in query: `{self.blacklist_tags_fmt}`."
-
-
-class BooruConfig:
-    """Config object per guild."""
-
-    __slots__ = (
-        "guild_id",
-        "bot",
-        "record",
-        "blacklist",
-        "auto_six_digits",
-    )
-
-    def __init__(self, *, guild_id: int, bot: Mipha, record: _LewdTableData | None = None) -> None:
-        self.guild_id: int = guild_id
-        self.bot: Mipha = bot
-        self.record: _LewdTableData | None = record
-
-        if record:
-            self.blacklist = set(record["blacklist"])
-            self.auto_six_digits = record["auto_six_digits"]
-        else:
-            self.blacklist = set()
-            self.auto_six_digits = False
-
-
-class GelbooruEntry:
-    """Quick object namespace."""
-
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self.image: bool = True if (payload["width"] != 0) else False
-        self.source: str | None = payload.get("source")
-        self.gb_id: str | None = payload.get("id")
-        self.rating: str = payload.get("rating", "N/A")
-        self.score: int | None = payload.get("score")
-        self.url: str | None = payload.get("file_url")
-        self.raw_tags: str = payload["tags"]
-
-    @property
-    def tags(self) -> list[str]:
-        return self.raw_tags.split(" ")
-
-
-class DanbooruEntry:
-    """Quick object namespace."""
-
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self.ext: str = payload.get("file_ext", "none")
-        self.image: bool = True if self.ext in ("png", "jpg", "jpeg", "gif") else False
-        self.video: bool = True if self.ext in ("mp4", "gifv", "webm") else False
-        self.source: str | None = payload.get("source")
-        self.db_id: int | None = payload.get("id")
-        self.rating: str | None = RATING.get(payload.get("rating", "fail"))
-        self.score: int | None = payload.get("score")
-        self.large: bool | None = payload.get("has_large", False)
-        self.file_url: str | None = payload.get("file_url")
-        self.large_url: str | None = payload.get("large_file_url")
-        self.raw_tags: str = payload["tag_string"]
-
-    @property
-    def tags(self) -> list[str]:
-        return self.raw_tags.split(" ")
-
-    @property
-    def url(self) -> str | None:
-        return self.large_url if self.large else self.file_url
+    return commands.check(predicate)
 
 
 class Lewd(commands.Cog):
-    def __init__(self, bot: Mipha, /) -> None:
+    def __init__(self, bot: Mipha, /, *, uploader_token: str | None = None, audio_dsn: str | None = None) -> None:
         self.bot: Mipha = bot
-        self.gelbooru_config = BooruData(
-            aiohttp.BasicAuth(bot.config.GELBOORU_AUTH["user_id"], bot.config.DANBOORU_AUTH["api_key"]),
-            "https://gelbooru.com/index.php?page=dapi&s=post&q=index",
-        )
-        self.danbooru_config = BooruData(
-            aiohttp.BasicAuth(bot.config.DANBOORU_AUTH["user_id"], bot.config.DANBOORU_AUTH["api_key"]),
-            "https://danbooru.donmai.us/posts.json",
-        )
+        self.uploader_token: str | None = uploader_token
+        self._uploader_enabled: bool = True
+        self.audio_dsn: str | None = audio_dsn
+        self._audio_enabled: bool = True
+
+        if self.uploader_token is None:
+            self._uploader_enabled = False
+            LOGGER.warning("No token for the uploader set. Disabling all actions that require it.")
+        if self.audio_dsn is None:
+            self._audio_enabled = False
+            LOGGER.warning("No dsn for the audio db provided.. Disabling all actions that require it.")
 
     async def cog_check(self, ctx: Context) -> bool:
         return await ctx.bot.is_owner(ctx.author)
@@ -161,10 +67,7 @@ class Lewd(commands.Cog):
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
 
-        if isinstance(error, BlacklistedBooru):
-            await ctx.send(str(error))
-            return
-        elif isinstance(error, commands.BadArgument):
+        if isinstance(error, commands.BadArgument):
             await ctx.send(str(error))
             return
         elif isinstance(error, commands.NSFWChannelRequired):
@@ -175,82 +78,6 @@ class Lewd(commands.Cog):
                 return await ctx.reinvoke()
             await ctx.send(f"Stop being horny. You're on cooldown for {error.retry_after:.02f}s.")
             return
-
-    @cache()
-    async def get_booru_config(
-        self,
-        guild_id: int,
-        *,
-        connection: asyncpg.Connection | asyncpg.Pool | None = None,
-    ) -> BooruConfig:
-        connection = connection or self.bot.pool
-        query = """
-                SELECT *
-                FROM lewd_config
-                WHERE guild_id = $1;
-                """
-        record = await connection.fetchrow(query, guild_id)
-        return BooruConfig(guild_id=guild_id, bot=self.bot, record=record)
-
-    def _gelbooru_embeds(self, payloads: list[GelbooruPostPayload], config: BooruConfig) -> list[discord.Embed]:
-        source: list[discord.Embed] = []
-
-        for payload in payloads:
-            tags_ = set(payload["tags"].split())
-            if tags_ & config.blacklist:
-                continue
-
-            if not payload["image"]:
-                continue
-
-            if payload["image"].partition(".")[2] not in ("png", "jpg", "jpeg", "webm", "gif"):
-                continue
-
-            created_at = datetime.datetime.strptime(payload["created_at"], "%a %b %d %H:%M:%S %z %Y")
-            embed = discord.Embed(colour=discord.Colour.red(), timestamp=created_at.astimezone(datetime.timezone.utc))
-
-            if payload["source"]:
-                embed.title = "See Source"
-                embed.url = payload["source"]
-
-            embed.set_footer(text=f"Rating: {payload['rating'].title()}")
-            embed.set_image(url=payload["file_url"])
-
-            source.append(embed)
-
-        return source
-
-    def _danbooru_embeds(self, payloads: list[DanbooruPayload], config: BooruConfig) -> list[discord.Embed]:
-        source: list[discord.Embed] = []
-
-        for payload in payloads:
-            tags_ = set(payload["tag_string"].split())
-            if tags_ & config.blacklist:
-                continue
-
-            if not payload["file_ext"] in ("jpg", "jpeg", "png", "gif", "webm"):
-                continue
-
-            created_at = datetime.datetime.fromisoformat(payload["created_at"])
-            embed = discord.Embed(colour=discord.Colour.red(), timestamp=created_at.astimezone(datetime.timezone.utc))
-
-            if payload["source"]:
-                embed.title = "See Source"
-                embed.url = payload["source"]
-
-            embed.set_footer(text=f"Rating: {RATING[payload['rating']].title()}")
-            if "file_url" in payload:
-                embed.set_image(url=payload["file_url"])
-                if payload["has_large"]:
-                    embed.description = f"[See the large image.]({payload['large_file_url']})"
-            elif payload["pixiv_id"] and payload["source"]:
-                embed.set_image(url=payload["source"])
-            else:
-                continue
-
-            source.append(embed)
-
-        return source
 
     async def _cache_soundgasm(
         self, url: re.Match[str], /, *, title: str | None, author: str | None
@@ -267,7 +94,9 @@ class Lewd(commands.Cog):
         form_data.add_field("soundgasm_author", author if author else "", content_type="text/plain")
 
         async with self.bot.session.post(
-            "https://upload.umbra-is.gay/audio", data=form_data, headers={"Authorization": self.bot.config.IMAGE_HOST_AUTH}
+            "https://upload.umbra-is.gay/audio",
+            data=form_data,
+            headers={"Authorization": self.uploader_token},
         ) as resp:
             data: AudioPost | str = await json_or_text(resp)  # type: ignore # this is weird dict narrowing
 
@@ -306,7 +135,9 @@ class Lewd(commands.Cog):
         form_data.add_field("image", audio, content_type=CONTENT_TYPE_LOOKUP[ext])
 
         async with self.bot.session.post(
-            "https://upload.umbra-is.gay/audio", data=form_data, headers={"Authorization": self.bot.config.IMAGE_HOST_AUTH}
+            "https://upload.umbra-is.gay/audio",
+            data=form_data,
+            headers={"Authorization": self.uploader_token},
         ) as resp:
             data: AudioPost | str = await json_or_text(resp)  # type: ignore # this is weird dict narrowing
 
@@ -345,6 +176,7 @@ class Lewd(commands.Cog):
 
     @commands.command(aliases=["sg"])
     @commands.is_owner()
+    @require_secure_keys()
     async def soundgasm(self, ctx: Context, *, url: str) -> None:
         """
         For archiving soundgasm links...
@@ -388,6 +220,7 @@ class Lewd(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
+    @require_secure_keys()
     async def asmr(self, ctx: Context) -> None:
         query = """
                 SELECT *
@@ -395,13 +228,7 @@ class Lewd(commands.Cog):
                 TABLESAMPLE BERNOULLI (20);
                 """
 
-        conn: asyncpg.Connection = await asyncpg.connect(
-            host=self.bot.config.POSTGRES_AUDIO_DSN["host"],
-            port=self.bot.config.POSTGRES_AUDIO_DSN["port"],
-            user=self.bot.config.POSTGRES_AUDIO_DSN["user"],
-            password=self.bot.config.POSTGRES_AUDIO_DSN["password"],
-            database=self.bot.config.POSTGRES_AUDIO_DSN["database"],
-        )
+        conn: asyncpg.Connection = await asyncpg.connect(dsn=self.audio_dsn)
 
         rows = await conn.fetch(query)
         await conn.close()
@@ -417,215 +244,9 @@ class Lewd(commands.Cog):
         if ctx.guild:
             await self._play_asmr(url, ctx=ctx, v_client=ctx.guild.voice_client)  # type: ignore # did a dummy break voice
 
-    @commands.command(usage="<flags>+ | subcommand", cooldown_after_parsing=True)
-    @commands.cooldown(1, 10, commands.BucketType.user)
-    @commands.max_concurrency(1, commands.BucketType.user, wait=False)
-    @commands.is_nsfw()
-    async def gelbooru(self, ctx: Context, *, params: str) -> None:
-        """Gelbooru command! Access gelbooru searches.
-        This command uses a flag style syntax.
-        The following options are valid.
-        `*` denotes it is a mandatory argument.
-        `+t | ++tags`: The tags to search Gelbooru for. `*` (uses logical AND per tag)
-        `+l | ++limit`: The maximum amount of posts to show. Cannot be higher than 30.
-        `+p | ++pid`: Page ID to search. Handy when posts begin to repeat.
-        `+c | ++cid`: Change ID of the post to search for(?)
-        Examples:
-        ```
-        !gelbooru ++tags lemon
-            - search for the 'lemon' tag.
-            - NOTE: if your tag has a space in it, replace it with '_'
-        !gelbooru ++tags melon -rating:explicit
-            - search for the 'melon' tag, removing posts marked as 'explicit`
-        !gelbooru ++tags apple orange rating:safe ++pid 2
-            - Search for the 'apple' AND 'orange' tags, with only 'safe' results, but on Page 2.
-            - NOTE: if not enough searches are returned, page 2 will cause an empty response.
-        ```
-        Possible ratings are: `general`, `sensitive`, `questionable` and `explicit`.
-        """
-        aiohttp_params = {}
-        aiohttp_params.update({"json": 1})
-        parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False, prefix_chars="+")
-        parser.add_argument("+l", "++limit", type=int, default=40)
-        parser.add_argument("+p", "++pid", type=int)
-        parser.add_argument("+t", "++tags", nargs="+", required=True)
-        parser.add_argument("+c", "++cid", type=int)
-        try:
-            real_args = parser.parse_args(shlex.split(params))
-        except SystemExit as fuck:
-            raise commands.BadArgument("Your flags could not be parsed.") from fuck
-        except Exception as err:
-            await ctx.send(f"Parsing your args failed: {err}")
-            return
-
-        id_: int = getattr(ctx.guild, "id", -1)
-        current_config = await self.get_booru_config(id_)
-
-        limit = max(min(0, real_args.limit), 100)
-        aiohttp_params.update({"limit": limit})
-        if real_args.pid:
-            aiohttp_params.update({"pid": real_args.pid})
-        if real_args.cid:
-            aiohttp_params.update({"cid": real_args.cid})
-        lowered_tags = [tag.lower() for tag in real_args.tags]
-        tags_set = set(lowered_tags)
-        common_elems = tags_set & current_config.blacklist
-        if common_elems:
-            raise BlacklistedBooru(common_elems)
-        aiohttp_params.update({"tags": " ".join(lowered_tags)})
-
-        async with ctx.typing():
-            async with self.bot.session.get(
-                self.gelbooru_config.endpoint,
-                params=aiohttp_params,
-                auth=self.gelbooru_config.auth,
-            ) as resp:
-                data = await resp.text()
-                if not data:
-                    ctx.command.reset_cooldown(ctx)
-                    raise commands.BadArgument("Got an empty response... bad search?")
-                json_data: GelbooruPayload = json.loads(data)
-
-            if not json_data:
-                ctx.command.reset_cooldown(ctx)
-                raise commands.BadArgument("The specified query returned no results.")
-
-            embeds = self._gelbooru_embeds(json_data["post"], current_config)
-            if not embeds:
-                raise commands.BadArgument("Your search had results but all of them contain blacklisted tags.")
-            pages = RoboPages(source=SimpleListSource(embeds[:30]), ctx=ctx)
-            await pages.start()
-
-    @commands.command(usage="<flags>+ | subcommand", cooldown_after_parsing=True)
-    @commands.cooldown(1, 10, commands.BucketType.user)
-    @commands.max_concurrency(1, commands.BucketType.user, wait=False)
-    @commands.is_nsfw()
-    async def danbooru(self, ctx: Context, *, params: str) -> None:
-        """Danbooru command. Access danbooru commands.
-        This command uses a flag style syntax.
-        The following options are valid.
-        `*` denotes it is a mandatory argument.
-        `+t | ++tags`: The tags to search Gelbooru for. `*` (uses logical AND per tag)
-        `+l | ++limit`: The maximum amount of posts to show. Cannot be higher than 30.
-        Examples:
-        ```
-        !gelbooru ++tags lemon
-            - search for the 'lemon' tag.
-            - NOTE: if your tag has a space in it, replace it with '_'.
-        !danbooru ++tags melon -rating:explicit
-            - search for the 'melon' tag, removing posts marked as 'explicit`.
-        !danbooru ++tags apple orange rating:safe
-            - Search for the 'apple' AND 'orange' tags, with only 'safe' results.
-        Possible tags are: `general`, `safe`, `questionable` and `explicit`.
-        ```
-        """
-        aiohttp_params = {}
-        parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False, prefix_chars="+")
-        parser.add_argument("+t", "++tags", nargs="+", required=True)
-        parser.add_argument("+l", "++limit", type=int, default=40)
-        try:
-            real_args = parser.parse_args(shlex.split(params))
-        except SystemExit as fuck:
-            raise commands.BadArgument("Your flags could not be parsed.") from fuck
-        except Exception as err:
-            await ctx.send(f"Parsing your args failed: {err}.")
-            return
-
-        id_: int = getattr(ctx.guild, "id", -1)
-        current_config = await self.get_booru_config(id_)
-
-        limit = max(min(0, real_args.limit), 100)
-        aiohttp_params.update({"limit": limit})
-        lowered_tags = [
-            re.sub(r"rating\:(safe|questionable|explicit)", _reverse_rating_repl, tag.lower()) for tag in real_args.tags
-        ]
-        tags = set(lowered_tags)
-        common_elems = tags & current_config.blacklist
-        if common_elems:
-            raise BlacklistedBooru(common_elems)
-        aiohttp_params.update({"tags": " ".join(tags)})
-
-        async with ctx.typing():
-            async with self.bot.session.get(
-                self.danbooru_config.endpoint,
-                params=aiohttp_params,
-                auth=self.danbooru_config.auth,
-            ) as resp:
-                data = await resp.text()
-                if not data:
-                    ctx.command.reset_cooldown(ctx)
-                    raise commands.BadArgument("Got an empty response... bad search?")
-                json_data: list[DanbooruPayload] = json.loads(data)
-
-            if not json_data:
-                ctx.command.reset_cooldown(ctx)
-                raise commands.BadArgument("The specified query returned no results.")
-
-            embeds = self._danbooru_embeds(json_data, current_config)
-            if not embeds:
-                fmt = "Your search had results but all of them contained blacklisted tags"
-                if "loli" in lowered_tags:
-                    fmt += "\nPlease note that Danbooru does not support 'loli'."
-                raise commands.BadArgument(fmt)
-
-            pages = RoboPages(source=SimpleListSource(embeds[:30]), ctx=ctx)
-            await pages.start()
-
-    @commands.group(invoke_without_command=True, name="lewd", aliases=["booru", "naughty"])
-    @checks.has_permissions(manage_messages=True)
-    @commands.is_nsfw()
-    async def lewd(self, ctx: GuildContext) -> None:
-        """Naughty commands! Please see the subcommands."""
-        if not ctx.invoked_subcommand:
-            return await ctx.send_help(ctx.command)
-
-    @lewd.group(invoke_without_command=True)
-    @checks.has_permissions(manage_messages=True)
-    async def blacklist(self, ctx: GuildContext) -> None:
-        """Blacklist management for booru command."""
-        if not ctx.invoked_subcommand:
-            config = await self.get_booru_config(ctx.guild.id)
-            if config.blacklist:
-                fmt = "\n".join(config.blacklist)
-            else:
-                fmt = "No blacklist recorded."
-            embed = discord.Embed(
-                description=to_codeblock(fmt, language=""),
-                colour=discord.Colour.dark_magenta(),
-            )
-            await ctx.send(embed=embed, delete_after=6.0)
-
-    @blacklist.command()
-    @checks.has_permissions(manage_messages=True)
-    async def add(self, ctx: GuildContext, *tags: str) -> None:
-        """Add an item to the blacklist."""
-        query = """
-                --begin-sql
-                INSERT INTO lewd_config (guild_id, blacklist)
-                VALUES ($1, $2)
-                ON CONFLICT (guild_id)
-                DO UPDATE SET blacklist = lewd_config.blacklist || $2;
-                """
-        iterable = [(ctx.guild.id, [tag.lower()]) for tag in tags]
-        await self.bot.pool.executemany(query, iterable)
-        self.get_booru_config.invalidate(self, ctx.guild.id)
-        await ctx.message.add_reaction(ctx.tick(True))
-
-    @blacklist.command()
-    @checks.has_permissions(manage_messages=True)
-    async def remove(self, ctx: GuildContext, *tags: str) -> None:
-        """Remove an item from the blacklist."""
-        query = """
-                --begin-sql
-                UPDATE lewd_config
-                SET blacklist = array_remove(lewd_config.blacklist, $2)
-                WHERE guild_id = $1;
-                """
-        iterable = [(ctx.guild.id, tag) for tag in tags]
-        await self.bot.pool.executemany(query, iterable)
-        self.get_booru_config.invalidate(self, ctx.guild.id)
-        await ctx.message.add_reaction(ctx.tick(True))
-
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(Lewd(bot))
+    uploader_key: str | None = bot.config.get("uploader", {}).get("token")
+    audio_dsn: str | None = bot.config["postgresql"].get("audio_dsn")
+
+    await bot.add_cog(Lewd(bot, uploader_token=uploader_key, audio_dsn=audio_dsn))

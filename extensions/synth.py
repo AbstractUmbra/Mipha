@@ -52,12 +52,16 @@ class SynthCog(commands.Cog, name="Synth"):
         "api19-normal-useast1a.tiktokv.com",
     }
 
-    def __init__(self, bot: Mipha) -> None:
+    def __init__(self, bot: Mipha, /, *, session_id: str | None = None) -> None:
         self.bot: Mipha = bot
         self._engine_autocomplete: list[app_commands.Choice[int]] = []
         self._tiktok_voice_choices: list[app_commands.Choice] = [
             app_commands.Choice(name=voice["name"], value=voice["value"]) for voice in _VOICE_DATA
         ]
+        self.tiktok_session_id: str | None = session_id
+
+    def has_session_id(self) -> bool:
+        return self.tiktok_session_id is not None
 
     async def _get_engine_choices(self) -> list[app_commands.Choice[int]]:
         if self._engine_autocomplete:
@@ -105,7 +109,7 @@ class SynthCog(commands.Cog, name="Synth"):
         parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0", "aid": "1233"}
         headers: dict[str, str] = {
             "User-Agent": "com.zhiliaoapp.musically/2022600030 (Linux; U; Android 7.1.2; es_ES; SM-G988N; Build/NRD90M;tt-ok/3.12.13.1)",
-            "Cookie": f"sessionid={self.bot.config.TIKTOK_SESSION_ID}",
+            "Cookie": f"sessionid={self.tiktok_session_id}",
         }
 
         for url in self._tiktok_urls:
@@ -142,6 +146,9 @@ class SynthCog(commands.Cog, name="Synth"):
     @app_commands.describe(engine="Which voice engine to use", text="What do you want the voice engine to say?")
     async def tiktok_callback(self, itx: Interaction, engine: str, text: str) -> None:
         await itx.response.defer(thinking=True)
+
+        if not self.has_session_id():
+            return await itx.followup.send("Sorry, this feature is currently disabled.")
 
         data = await self._get_tiktok_response(engine=engine, text=text)
 
@@ -215,4 +222,5 @@ class SynthCog(commands.Cog, name="Synth"):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(SynthCog(bot))
+    session_id: str | None = bot.config.get("tokens", {}).get("tiktok")
+    await bot.add_cog(SynthCog(bot, session_id=session_id))

@@ -1,0 +1,46 @@
+{
+    "$schema": "https://static.abstractumbra.dev/schemas/mipha-schema.json",
+    "bot": {
+        "token": ""
+    },
+    "owner_ids": [
+        ""
+    ],
+    "intents": 3258111,
+    "postgresql": {
+        "dsn": "",
+        "host": "",
+        "port": 0,
+        "user": "",
+        "password": "",
+        "database": ""
+    },
+    "webhooks": {
+        "logging": "",
+        "mangadex": ""
+    },
+    "tokens": {
+        "mystbin": "",
+        "github": "",
+        "wanikani": "",
+        "sonarr": "",
+        "tiktok": ""
+    },
+    "mangadex": {
+        "username": "",
+        "password": ""
+    },
+    "uploader": {
+        "token": ""
+    },
+    "deepl": {
+        "api_key": ""
+    },
+    "rcon": {
+        "ftbskies": {
+            "host": "",
+            "password": "",
+            "port": 25575
+        }
+    }
+}

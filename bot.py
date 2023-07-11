@@ -29,7 +29,6 @@ from discord.ext import commands
 from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
 from typing_extensions import Self
 
-import _bot_config
 from extensions import EXTENSIONS
 from utilities.async_config import Config
 from utilities.context import Context, Interaction
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
 
     from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
+    from utilities._types.config import RootConfig
 
 jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
@@ -49,6 +49,8 @@ jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.NO_DM_TRACEBACK = True
 # INTENTS = discord.Intents(_bot_config.INTENTS)
 INTENTS = discord.Intents.all()
+
+CONFIG_PATH = pathlib.Path("configs/bot.json")
 
 
 class MiphaCommandTree(app_commands.CommandTree):
@@ -187,7 +189,7 @@ class Mipha(commands.Bot):
         "_stats_cog_gateway_handler",
     )
 
-    def __init__(self) -> None:
+    def __init__(self, config: RootConfig) -> None:
         super().__init__(
             command_prefix=_callable_prefix,
             tree_cls=MiphaCommandTree,
@@ -195,6 +197,8 @@ class Mipha(commands.Bot):
             intents=INTENTS,
             allowed_mentions=discord.AllowedMentions.none(),
         )
+
+        self.config: RootConfig = config
 
         self._prefix_data: Config[list[str]] = Config(pathlib.Path("configs/prefixes.json"))
         self._blacklist_data: Config[list[str]] = Config(pathlib.Path("configs/blacklist.json"))
@@ -213,7 +217,7 @@ class Mipha(commands.Bot):
         self.command_stats = Counter()
         self.socket_stats = Counter()
         self.owner_id: int | None = None
-        self.owner_ids: Iterable[int] = self.config.OWNER_IDS
+        self.owner_ids: Iterable[int] = self.config["owner_ids"]
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
@@ -221,10 +225,6 @@ class Mipha(commands.Bot):
     @property
     def owner(self) -> discord.User:
         return self.bot_app_info.owner
-
-    @property
-    def config(self) -> _bot_config:  # type: ignore # this actually can be used a type but I guess it's not correct practice.
-        return __import__("_bot_config")
 
     @property
     def reminder(self) -> Reminder | None:
@@ -236,7 +236,7 @@ class Mipha(commands.Bot):
 
     @discord.utils.cached_property
     def logging_webhook(self) -> discord.Webhook:
-        return discord.Webhook.from_url(self.config.LOGGING_WEBHOOK_URL, session=self.session)
+        return discord.Webhook.from_url(self.config["webhooks"]["logging"], session=self.session)
 
     async def on_socket_response(self, message: Any) -> None:
         """Quick override to log websocket events."""
@@ -464,7 +464,7 @@ class Mipha(commands.Bot):
 
     async def start(self) -> None:
         try:
-            await super().start(token=self.config.TOKEN, reconnect=True)
+            await super().start(token=self.config["bot"]["token"], reconnect=True)
         finally:
             path = pathlib.Path("logs/prev_events.log")
             with path.open("w+", encoding="utf-8") as f:
@@ -480,21 +480,24 @@ class Mipha(commands.Bot):
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
 
         self.bot_app_info = await self.application_info()
-        self.owner_ids = self.config.OWNER_IDS
+        self.owner_ids = self.config["owner_ids"]
 
 
 async def main() -> None:
-    async with Mipha() as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
-        dsn=bot.config.POSTGRESQL_DSN, command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
+    config = CONFIG_PATH.read_text("utf-8")
+    raw_cfg: RootConfig = discord.utils._from_json(config)
+
+    async with Mipha(raw_cfg) as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
+        dsn=bot.config["postgresql"]["dsn"], command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
     ) as pool, LogHandler() as log_handler:
         bot.log_handler = log_handler
         bot.pool = pool
 
         bot.session = session
 
-        bot.mb_client = mystbin.Client(session=session, token=bot.config.MYSTBIN_TOKEN)
+        bot.mb_client = mystbin.Client(session=session, token=bot.config["tokens"]["mystbin"])
         bot.md_client = hondana.Client(
-            username=bot.config.MANGADEX_AUTH["username"], password=bot.config.MANGADEX_AUTH["password"], session=session
+            username=bot.config["mangadex"]["username"], password=bot.config["mangadex"]["password"], session=session
         )
 
         await bot.load_extension("jishaku")

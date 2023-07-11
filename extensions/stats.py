@@ -193,7 +193,7 @@ class Stats(commands.Cog):
 
     @discord.utils.cached_property
     def webhook(self) -> discord.Webhook:
-        hook = discord.Webhook.from_url(self.bot.config.LOGGING_WEBHOOK_URL, session=self.bot.session)
+        hook = discord.Webhook.from_url(self.bot.config["webhooks"]["logging"], session=self.bot.session)
         return hook
 
     @commands.command(hidden=True)
