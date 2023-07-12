@@ -52,6 +52,11 @@ class RCONConfig(TypedDict):
     port: int
 
 
+class DucklingConfig(TypedDict):
+    host: str
+    port: int
+
+
 class _BooruConfig(TypedDict):
     api_key: str
     user_id: str
@@ -73,5 +78,6 @@ class RootConfig(TypedDict, total=False):
     uploader: UploaderConfig
     deepl: DeeplConfig
     rcon: RCONConfig
+    duckling: DucklingConfig
     lewd: LewdConfig
     logging_webhooks: list[str]

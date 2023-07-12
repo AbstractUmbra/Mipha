@@ -142,13 +142,14 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
         ctx: Context,
         timezone: datetime.tzinfo | None = datetime.timezone.utc,
         now: datetime.datetime | None = None,
+        duckling_url: yarl.URL,
     ) -> list[tuple[datetime.datetime, int, int]]:
         now = now or datetime.datetime.now(datetime.timezone.utc)
 
         times: list[tuple[datetime.datetime, int, int]] = []
 
         async with ctx.bot.session.post(
-            "http://127.0.0.1:7731/parse",
+            duckling_url,
             data={
                 "locale": "en_US",
                 "text": argument,
@@ -184,7 +185,13 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
         timezone = await cls.get_timezone(ctx)
         now = ctx.message.created_at.astimezone(tz=timezone)
 
-        parsed_times = await cls.parse(argument, ctx=ctx, timezone=timezone, now=now)
+        duckling_key = ctx.bot.config.get("duckling")
+        if not duckling_key:
+            raise RuntimeError("No Duckling instance available to perform this action.")
+
+        duckling_url = yarl.URL.build(scheme="http", host=duckling_key["host"], port=duckling_key["port"], path="/parse")
+
+        parsed_times = await cls.parse(argument, ctx=ctx, timezone=timezone, now=now, duckling_url=duckling_url)
 
         if len(parsed_times) == 0:
             raise commands.BadArgument("Could not parse time.")
@@ -212,8 +219,16 @@ class WhenAndWhatConverter(commands.Converter[tuple[datetime.datetime, str]]):
 
         argument = argument.strip()
 
+        duckling_key = ctx.bot.config.get("duckling")
+        if not duckling_key:
+            raise RuntimeError("No Duckling instance available to perform this action.")
+
+        duckling_url = yarl.URL.build(scheme="http", host=duckling_key["host"], port=duckling_key["port"], path="/parse")
+
         # Determine the date argument
-        parsed_times = await DatetimeConverter.parse(argument, ctx=ctx, timezone=timezone, now=now)
+        parsed_times = await DatetimeConverter.parse(
+            argument, ctx=ctx, timezone=timezone, now=now, duckling_url=duckling_url
+        )
 
         if len(parsed_times) == 0:
             raise commands.BadArgument("Could not parse time.")
@@ -263,13 +278,14 @@ class DatetimeTransformer(app_commands.Transformer):
         interaction: Interaction,
         timezone: datetime.tzinfo | None = datetime.timezone.utc,
         now: datetime.datetime | None = None,
+        duckling_url: yarl.URL,
     ) -> list[tuple[datetime.datetime, int, int]]:
         now = now or datetime.datetime.now(datetime.timezone.utc)
 
         times: list[tuple[datetime.datetime, int, int]] = []
 
         async with interaction.client.session.post(
-            "http://127.0.0.1:7731/parse",
+            duckling_url,
             data={
                 "locale": "en_US",
                 "text": argument,
@@ -305,7 +321,15 @@ class DatetimeTransformer(app_commands.Transformer):
         timezone = await cls.get_timezone(interaction)
         now = interaction.created_at.astimezone(tz=timezone)
 
-        parsed_times = await cls.parse(argument, interaction=interaction, timezone=timezone, now=now)
+        duckling_key = interaction.client.config.get("duckling")
+        if not duckling_key:
+            raise RuntimeError("No Duckling instance available to perform this action.")
+
+        duckling_url = yarl.URL.build(scheme="http", host=duckling_key["host"], port=duckling_key["port"], path="/parse")
+
+        parsed_times = await cls.parse(
+            argument, interaction=interaction, timezone=timezone, now=now, duckling_url=duckling_url
+        )
 
         if len(parsed_times) == 0:
             raise BadDatetimeTransform("Could not parse time.")
@@ -347,7 +371,7 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         times: list[tuple[datetime.datetime, int, int]] = []
 
         async with interaction.client.session.post(
-            "http://127.0.0.1:7731/parse",
+            "http://duckling:7731/parse",
             data={
                 "locale": "en_US",
                 "text": argument,

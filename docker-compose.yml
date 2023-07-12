@@ -24,15 +24,11 @@ services:
     networks:
       main:
         ipv4_address: 172.19.0.20
-    ports:
-      - 127.0.0.1:7731:8000/tcp
     restart: unless-stopped
 
   synth:
     container_name: synth-engine
     image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
-    ports:
-      - "127.0.0.1:50021:50021"
     restart: unless-stopped
 
 version: "3"

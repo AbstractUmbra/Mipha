@@ -67,7 +67,7 @@ class SynthCog(commands.Cog, name="Synth"):
         if self._engine_autocomplete:
             return self._engine_autocomplete
 
-        async with self.bot.session.get("http://127.0.0.1:50021/speakers") as resp:
+        async with self.bot.session.get("http://synth:50021/speakers") as resp:
             data: list[SpeakersResponse] = await resp.json()
 
         ret: list[app_commands.Choice[int]] = []
@@ -83,7 +83,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
     async def _get_kana_from_input(self, input_: str, speaker_id: int) -> KanaResponse:
         async with self.bot.session.post(
-            "http://localhost:50021/audio_query",
+            "http://synth:50021/audio_query",
             params={"speaker": speaker_id, "text": input_},
         ) as resp:
             data: KanaResponse = await resp.json()
@@ -91,9 +91,7 @@ class SynthCog(commands.Cog, name="Synth"):
         return data
 
     async def _get_audio_from_kana(self, kana: KanaResponse, speaker_id: int) -> BytesIO:
-        async with self.bot.session.post(
-            "http://localhost:50021/synthesis", params={"speaker": speaker_id}, json=kana
-        ) as resp:
+        async with self.bot.session.post("http://synth:50021/synthesis", params={"speaker": speaker_id}, json=kana) as resp:
             data = await resp.read()
 
         clean = BytesIO(data)

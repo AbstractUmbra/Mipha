@@ -4,7 +4,7 @@
         "token": ""
     },
     "owner_ids": [
-        ""
+        0
     ],
     "intents": 3258111,
     "postgresql": {
@@ -36,11 +36,13 @@
     "deepl": {
         "api_key": ""
     },
+    "duckling": {
+        "host": "",
+        "port": 0
+    },
     "rcon": {
-        "ftbskies": {
-            "host": "",
-            "password": "",
-            "port": 25575
-        }
+        "host": "",
+        "password": "",
+        "port": 25575
     }
 }
