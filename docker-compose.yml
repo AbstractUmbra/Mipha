@@ -16,7 +16,7 @@ services:
       - ./configs/:/app/configs/:rw
       - ./logs/:/app/logs/:rw
       - ./static/:/app/static/:ro
-      - ./extensions/private/:/app/extensions/private/:ro
+      - ./extensions/:/app/extensions/:ro
 
   duckling:
     container_name: "duckling"
