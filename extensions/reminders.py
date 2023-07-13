@@ -199,10 +199,11 @@ class Reminder(commands.Cog):
 
     async def call_timer(self, timer: Timer) -> None:
         # delete the timer
-        if timer.event == "todo_reminder":
-            query = "DELETE FROM todos WHERE todo_id=$1;"
-        else:
-            query = "DELETE FROM reminders WHERE id=$1;"
+        query = "DELETE FROM reminders WHERE id=$1;"
+        todo_id = timer.kwargs.get("todo_id", None)
+        if todo_id:
+            todo_query = "DELETE FROM todos WHERE todo_id=$2;"
+            await self.bot.pool.execute(todo_query, todo_id)
         await self.bot.pool.execute(query, timer.id)
 
         # dispatch the event
