@@ -39,7 +39,8 @@ RUN apt-get update \
     build-essential \
     libcurl4-gnutls-dev \
     gnutls-dev \
-    libmagic-dev
+    libmagic-dev \
+    ffmpeg
 
 RUN curl -sSL https://install.python-poetry.org | python -
 
