@@ -357,18 +357,22 @@ class Meta(commands.Cog):
 
     @commands.command(aliases=["guildinfo"], usage="")
     @commands.guild_only()
-    async def serverinfo(self, ctx: GuildContext, *, guild: discord.Guild | None = None) -> None:
+    async def serverinfo(self, ctx: GuildContext, *, guild_id: int | None = None):
         """Shows info about the current server."""
 
-        if await self.bot.is_owner(ctx.author):
-            guild = guild or ctx.guild
+        if guild_id is not None and await self.bot.is_owner(ctx.author):
+            guild = self.bot.get_guild(guild_id)
+            if guild is None:
+                await ctx.send(f"Invalid Guild ID given.")
+                return
         else:
             guild = ctx.guild
 
-        assert guild is not None
+        roles = [role.name.replace("@", "@\u200b") for role in guild.roles]
 
-        roles = [role.mention for role in guild.roles[1:]]
-        roles = roles or ["No extra roles"]
+        if not guild.chunked:
+            async with ctx.typing():
+                await guild.chunk(cache=True)
 
         # figure out what channels are 'secret'
         everyone = guild.default_role
@@ -384,8 +388,6 @@ class Meta(commands.Cog):
                 secret[channel_type] += 1
             elif isinstance(channel, discord.VoiceChannel) and (not perms.connect or not perms.speak):
                 secret[channel_type] += 1
-
-        member_by_status = Counter(str(m.status) for m in guild.members)
 
         e = discord.Embed()
         e.title = guild.name
@@ -412,9 +414,26 @@ class Meta(commands.Cog):
 
         info = []
         features = set(guild.features)
+        all_features = {
+            "PARTNERED": "Partnered",
+            "VERIFIED": "Verified",
+            "DISCOVERABLE": "Server Discovery",
+            "COMMUNITY": "Community Server",
+            "FEATURABLE": "Featured",
+            "WELCOME_SCREEN_ENABLED": "Welcome Screen",
+            "INVITE_SPLASH": "Invite Splash",
+            "VIP_REGIONS": "VIP Voice Servers",
+            "VANITY_URL": "Vanity Invite",
+            "COMMERCE": "Commerce",
+            "LURKABLE": "Lurkable",
+            "NEWS": "News Channels",
+            "ANIMATED_ICON": "Animated Icon",
+            "BANNER": "Banner",
+        }
 
-        for feature in features:
-            info.append(f"{ctx.tick(True)}: {feature.replace('_', ' ').title()}")
+        for feature, label in all_features.items():
+            if feature in features:
+                info.append(f"{ctx.tick(True)}: {label}")
 
         if info:
             e.add_field(name="Features", value="\n".join(info))
@@ -423,25 +442,16 @@ class Meta(commands.Cog):
 
         if guild.premium_tier != 0:
             boosts = f"Level {guild.premium_tier}\n{guild.premium_subscription_count} boosts"
-            last_boost = max(guild.members, key=lambda m: m.premium_since or guild.created_at)  # type: ignore # hmm
+            last_boost = max(guild.members, key=lambda m: m.premium_since or guild.created_at)
             if last_boost.premium_since is not None:
-                boosts = f"{boosts}\nLast Boost: {last_boost} ({time.human_timedelta(last_boost.premium_since, accuracy=2)})"
+                boosts = f"{boosts}\nLast Boost: {last_boost} ({time.format_relative(last_boost.premium_since)})"
             e.add_field(name="Boosts", value=boosts, inline=False)
 
         bots = sum(m.bot for m in guild.members)
-        fmt = (
-            f'<:Online:745077502740791366> {member_by_status["online"]} '
-            f'<:Idle:745077548379013193> {member_by_status["idle"]} '
-            f'<:DnD:745077524446314507> {member_by_status["dnd"]} '
-            f'<:Offline:745077513826467991> {member_by_status["offline"]}\n'
-            f"Total: {guild.member_count} ({formats.plural(bots):bot})"
-        )
+        fmt = f"Total: {guild.member_count} ({formats.plural(bots):bot})"
 
         e.add_field(name="Members", value=fmt, inline=False)
-        e.add_field(
-            name="Roles",
-            value=", ".join(roles) if len(roles) < 10 else f"{len(roles)} roles",
-        )
+        e.add_field(name="Roles", value=", ".join(roles) if len(roles) < 10 else f"{len(roles)} roles")
 
         emoji_stats = Counter()
         for emoji in guild.emojis:

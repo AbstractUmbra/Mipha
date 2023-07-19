@@ -11,7 +11,6 @@ import yarl
 import yt_dlp
 from discord import app_commands, ui
 from discord.ext import commands
-from jishaku.shell import ShellReader
 
 from utilities.cache import ExpiringCache
 from utilities.context import Interaction
@@ -212,11 +211,9 @@ class MediaReposter(commands.Cog):
             file_loc.unlink(missing_ok=True)
             raise FilesizeLimitExceeded(post=False)
 
-        with ShellReader(
-            f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null', timeout=300
-        ) as reader:
-            async for line in reader:
-                LOGGER.debug(line)
+        await asyncio.subprocess.create_subprocess_exec(
+            f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null'
+        )
 
         if fixed_file_loc.stat().st_size > filesize_limit:
             file_loc.unlink(missing_ok=True)
