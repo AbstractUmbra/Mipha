@@ -442,7 +442,7 @@ class Meta(commands.Cog):
 
         if guild.premium_tier != 0:
             boosts = f"Level {guild.premium_tier}\n{guild.premium_subscription_count} boosts"
-            last_boost = max(guild.members, key=lambda m: m.premium_since or guild.created_at)
+            last_boost = max(guild.members, key=lambda m: m.premium_since or guild.created_at)  # type: ignore # pyright bug
             if last_boost.premium_since is not None:
                 boosts = f"{boosts}\nLast Boost: {last_boost} ({time.format_relative(last_boost.premium_since)})"
             e.add_field(name="Boosts", value=boosts, inline=False)

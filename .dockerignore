@@ -1,6 +1,7 @@
-**/__pycache__
-**/*.py[cod]
+__pycache__/
+*.py[cod]
 _pyright/
+.git/
 .github/
 .venv/
 .vscode/
@@ -8,7 +9,6 @@ botw/
 buffer/
 configs/
 duckling/
-[!__]_*.py
 extensions/
 logs/
 schemas/
