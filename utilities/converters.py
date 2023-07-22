@@ -5,6 +5,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import datetime
+import logging
 import re
 import zoneinfo
 from typing import Any, Literal, Sequence, Type, TypedDict
@@ -18,6 +19,7 @@ from utilities.context import Context, GuildContext, Interaction
 
 
 MYSTBIN_REGEX = re.compile(r"(?:(?:https?://)?(?:beta\.)?(?:mystb\.in\/))?(?P<id>(?:[A-Z]{1}[a-z]+)*)(?P<ext>\.\w+)?")
+LOGGER = logging.getLogger(__name__)
 
 __all__ = (
     "RedditMediaURL",
@@ -365,13 +367,14 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         interaction: Interaction,
         timezone: datetime.tzinfo | None = datetime.timezone.utc,
         now: datetime.datetime | None = None,
+        duckling_url: yarl.URL,
     ) -> list[tuple[datetime.datetime, int, int]]:
         now = now or datetime.datetime.now(datetime.timezone.utc)
 
         times: list[tuple[datetime.datetime, int, int]] = []
 
         async with interaction.client.session.post(
-            "http://duckling:7731/parse",
+            duckling_url,
             data={
                 "locale": "en_US",
                 "text": argument,
@@ -419,7 +422,13 @@ class WhenAndWhatTransformer(app_commands.Transformer):
 
         value = value.strip()
 
-        parsed_times = await cls.parse(value, interaction=interaction, timezone=timezone, now=now)
+        duckling_key = interaction.client.config.get("duckling")
+        if not duckling_key:
+            raise RuntimeError("No Duckling instance available to perform this action.")
+
+        duckling_url = yarl.URL.build(scheme="http", host=duckling_key["host"], port=duckling_key["port"], path="/parse")
+
+        parsed_times = await cls.parse(value, interaction=interaction, timezone=timezone, now=now, duckling_url=duckling_url)
 
         if len(parsed_times) == 0:
             raise BadDatetimeTransform("Could not parse time.")
