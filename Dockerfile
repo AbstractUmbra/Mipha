@@ -49,7 +49,7 @@ WORKDIR /app
 COPY poetry.lock pyproject.toml ./
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --only=main
+RUN poetry install --without=dev
 
 COPY . /app/
 ENTRYPOINT poetry run python -O bot.py

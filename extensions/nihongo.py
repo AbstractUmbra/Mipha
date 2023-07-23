@@ -496,7 +496,8 @@ class Nihongo(commands.Cog):
         images = [Image.new("RGBA", (1, 1), color=0) for _ in range(2)]
         for index, (image, colour) in enumerate(zip(images, ((47, 49, 54), "white"))):
             draw = ImageDraw.Draw(image)
-            w, h = draw.multiline_textsize(text, font=font)
+            left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
+            w, h = right - left, bottom - top
             images[index] = image = image.resize((w + padding, h + padding))
             draw = ImageDraw.Draw(image)
             draw.multiline_text((padding / 2, padding / 2), text=text, fill=colour, font=font)
