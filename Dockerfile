@@ -44,6 +44,12 @@ RUN apt-get update \
 
 RUN curl -sSL https://install.python-poetry.org | python -
 
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt install -y --no-install-recommends \
+    nodejs
+
+RUN npm install -g pyright@latest
+
 # copy project requirement files here to ensure they will be cached.
 WORKDIR /app
 COPY poetry.lock pyproject.toml ./
