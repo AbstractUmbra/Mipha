@@ -182,7 +182,7 @@ class MediaReposter(commands.Cog):
         await interaction.followup.send(content=content, file=file)
 
     async def _cleanup_paths(self, *args: pathlib.Path) -> None:
-        await asyncio.sleep(20)
+        await asyncio.sleep(60)
 
         for path in args:
             path.unlink(missing_ok=True)
@@ -211,9 +211,13 @@ class MediaReposter(commands.Cog):
             file_loc.unlink(missing_ok=True)
             raise FilesizeLimitExceeded(post=False)
 
-        await asyncio.subprocess.create_subprocess_exec(
-            f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning 2>&1 >/dev/null'
+        proc = await asyncio.subprocess.create_subprocess_shell(
+            f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+
+        _, _ = await proc.communicate()
 
         if fixed_file_loc.stat().st_size > filesize_limit:
             file_loc.unlink(missing_ok=True)
