@@ -2,16 +2,19 @@
 name = "Mipha"
 version = "2.0.0"
 description = "A fun and lightweight Discord bot for personal use."
-authors = ["Alex Nørgaard <Umbra@AbstractUmbra.dev>"]
+authors = ["Alex Nørgaard <umbra@abstractumbra.dev>"]
 license = "MPL 2.0"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-"discord.py" = { git = "https://github.com/Rapptz/discord.py.git", extras = [ "voice", "speedup" ], rev = "master" }
+"discord.py" = { git = "https://github.com/Rapptz/discord.py.git", extras = [
+    "voice",
+    "speedup",
+], rev = "master" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
-jishaku = { git = "https://github.com/Gorialis/jishaku.git", rev = "master" }
-hondana = { git = "https://github.com/AbstractUmbra/Hondana.git", tag = "3.4.7" }
-"mystbin.py" = { git = "https://github.com/PythonistaGuild/mystbin.py.git", rev = "main" }
+jishaku = "*"
+hondana = "*"
+"mystbin.py" = "*"
 asyncpg = "*"
 psutil = "*"
 lru_dict = "*"
@@ -23,7 +26,7 @@ yt-dlp = "*"
 typing-extensions = "*"
 parsedatetime = "*"
 python-dateutil = "*"
-python-a2s = { git = "https://github.com/Yepoleb/python-a2s.git" }
+python-a2s = "*"
 lxml = "*"
 legofy = "*"
 mcrcon = "*"
@@ -32,9 +35,6 @@ numpy = "*"
 [tool.poetry.group.dev.dependencies]
 black = "*"
 isort = "*"
-
-[tool.poetry.group.private.dependencies]
-pygsheets = "^2.0.6"
 
 [tool.black]
 line-length = 125
@@ -51,7 +51,9 @@ combine_star = true
 useLibraryCodeForTypes = true
 typeCheckingMode = "basic"
 pythonVersion = "3.11"
-ignore = ["extensions/_old_lewd.py"]  # let's keep files but ignore their diagnostics
+ignore = [
+    "extensions/_old_lewd.py",
+] # let's keep files but ignore their diagnostics
 strictListInference = true
 strictDictionaryInference = true
 strictSetInference = true
