@@ -372,7 +372,7 @@ class Fun(commands.Cog):
         output_buffer = io.BytesIO()
         with Image.open(buffer) as image, Image.open(resolved_path) as bricks:
             new_size = legofy.get_new_size(image, bricks, None)
-            image = image.resize(new_size, Image.ANTIALIAS)
+            image = image.resize(new_size, Image.LANCZOS)
 
             pil_image = legofy.make_lego_image(image, bricks)
             pil_image.save(output_buffer, "png")
