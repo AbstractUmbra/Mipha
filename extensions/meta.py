@@ -556,8 +556,16 @@ class Meta(commands.Cog):
 
     @commands.command(name="msgraw", aliases=["msgr", "rawm"])
     @commands.cooldown(1, 15, commands.BucketType.user)
-    async def raw_message(self, ctx: Context, message: discord.Message) -> None:
+    async def raw_message(self, ctx: Context, message: discord.Message | None = None) -> None:
         """Quickly return the raw content of the specific message."""
+        if message is None:
+            ref = ctx.message.reference
+            if ref and isinstance(ref.resolved, discord.Message):
+                message = ref.resolved
+            else:
+                await ctx.send("Missing a message to fetch information from.")
+                return
+
         assert message.channel is not None
         assert isinstance(message.channel, MessageableGuildChannel)
 
