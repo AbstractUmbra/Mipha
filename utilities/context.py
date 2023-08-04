@@ -257,7 +257,11 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
                 expires=(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)),
             )
             assert paste.expires
-            content = f"Sorry, the output was too large but I posted it to mystb.in for you here: https://mystb.in/{paste.id}\n\nThe password is `{password}` and it expires at {discord.utils.format_dt(paste.expires)}"
+            content = (
+                "Sorry, the output was too large but I posted it to mystb.in for you here:"
+                f" https://mystb.in/{paste.id}\n\nThe password is `{password}` and it expires at"
+                f" {discord.utils.format_dt(paste.expires)}"
+            )
 
         return await super().send(  # type: ignore
             content=content,

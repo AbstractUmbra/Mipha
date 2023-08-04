@@ -45,7 +45,7 @@ class HyruleRoleAssignmentView(MiphaBaseView):
         return True
 
     @discord.ui.button(
-        label="Hondana", custom_id="HyruleHondana__", style=discord.ButtonStyle.blurple, emoji="\U0001F4DA", row=0
+        label="Hondana", custom_id="HyruleHondana__", style=discord.ButtonStyle.blurple, emoji="\U0001f4da", row=0
     )
     async def add_hondana_role(self, interaction: Interaction, item: discord.ui.Button[Self]) -> None:
         assert isinstance(interaction.user, discord.Member)

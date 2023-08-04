@@ -34,7 +34,10 @@ class TrainTime:
         self.detail: str = detail
 
     def __repr__(self) -> str:
-        return f"<TrainTime departs={self.departs!r} final_destination={self.final_destination!r} platform={self.platform!r} detail={self.detail!r}>"
+        return (
+            "<TrainTime"
+            f" departs={self.departs!r} final_destination={self.final_destination!r} platform={self.platform!r} detail={self.detail!r}>"
+        )
 
     def __str__(self) -> str:
         delayed = self.detail != "On time"

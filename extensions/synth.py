@@ -106,7 +106,10 @@ class SynthCog(commands.Cog, name="Synth"):
     async def _get_tiktok_response(self, *, engine: str, text: str) -> TikTokSynth | None:
         parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0", "aid": "1233"}
         headers: dict[str, str] = {
-            "User-Agent": "com.zhiliaoapp.musically/2022600030 (Linux; U; Android 7.1.2; es_ES; SM-G988N; Build/NRD90M;tt-ok/3.12.13.1)",
+            "User-Agent": (
+                "com.zhiliaoapp.musically/2022600030 (Linux; U; Android 7.1.2; es_ES; SM-G988N;"
+                " Build/NRD90M;tt-ok/3.12.13.1)"
+            ),
             "Cookie": f"sessionid={self.tiktok_session_id}",
         }
 

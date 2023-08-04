@@ -212,7 +212,7 @@ class LockdownPermissionIssueView(MiphaBaseView):
             await self.channel.set_permissions(self.me, overwrite=ow)
         except discord.HTTPException:
             await interaction.response.send_message(
-                f"Could not successfully edit permissions, please give the bot Send Messages "
+                "Could not successfully edit permissions, please give the bot Send Messages "
                 f"and Send Messages in Threads in {self.channel.mention}"
             )
         else:
@@ -2161,7 +2161,7 @@ class Mod(commands.Cog):
         async with ctx.typing():
             success, failure, skipped = await self.update_mute_role_permissions(role, ctx.guild, ctx.author)
             await ctx.send(
-                "Mute role successfully created. Overwrites: " f"[Updated: {success}, Failed: {failure}, Skipped: {skipped}]"
+                f"Mute role successfully created. Overwrites: [Updated: {success}, Failed: {failure}, Skipped: {skipped}]"
             )
 
     @_mute_role.command(name="unbind")
@@ -2430,8 +2430,8 @@ class Mod(commands.Cog):
         if failures:
             await ctx.send(
                 f"Successfully locked down {len(success)}/{len(failures)} channels.\n"
-                f'Failed channels: {", ".join(c.mention for c in failures)}\n\n'
-                f"Give the bot Manage Roles permissions in those channels and try again."
+                f"Failed channels: {', '.join(c.mention for c in failures)}\n\n"
+                "Give the bot Manage Roles permissions in those channels and try again."
             )
         else:
             await ctx.send(f"Successfully locked down {plural(len(success)):channel}")
@@ -2515,7 +2515,7 @@ class Mod(commands.Cog):
         if failures:
             await ctx.send(
                 f"Successfully locked down {len(success)}/{len(channels)} channels until {formatted_time}.\n"
-                f'Failed channels: {", ".join(c.mention for c in failures)}\n'
+                f"Failed channels: {', '.join(c.mention for c in failures)}\n"
                 f"Give the bot Manage Roles permissions in {plural(len(failures)):the channel|those channels} and try "
                 f"the lockdown command on the failed {plural(len(failures)):channel} again."
             )

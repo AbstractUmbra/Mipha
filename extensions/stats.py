@@ -575,8 +575,7 @@ class Stats(commands.Cog):
 
         e = discord.Embed(title="Last 24 Hour Command Stats", colour=discord.Colour.blurple())
         e.description = (
-            f"{failed + success + question} commands used today. "
-            f"({success} succeeded, {failed} failed, {question} unknown)"
+            f"{failed + success + question} commands used today. ({success} succeeded, {failed} failed, {question} unknown)"
         )
 
         lookup = (

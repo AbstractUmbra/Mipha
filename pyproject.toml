@@ -39,6 +39,7 @@ isort = "*"
 
 [tool.black]
 line-length = 125
+preview = true
 
 [tool.isort]
 profile = "black"
