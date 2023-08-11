@@ -43,6 +43,8 @@ GUILDS: list[discord.Object] = [
     discord.Object(id=149998214810959872),
 ]
 
+GUILD_IDS: set[int] = {guild.id for guild in GUILDS}
+
 
 class RepostView(MiphaBaseView):
     message: discord.InteractionMessage
@@ -129,7 +131,7 @@ class MediaReposter(commands.Cog):
         self.media_context_menu = app_commands.ContextMenu(
             name="Process media links",
             callback=self.media_context_menu_callback,
-            guild_ids=[174702278673039360, 149998214810959872],
+            guild_ids=[guild.id for guild in GUILDS],
         )
         self.media_context_menu.error(self.media_context_menu_error)
         self.bot.tree.add_command(self.media_context_menu)
@@ -252,7 +254,7 @@ class MediaReposter(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if not message.guild:
             return
-        if message.guild.id not in {174702278673039360, 149998214810959872}:
+        if message.guild.id not in GUILD_IDS:
             return
 
         matches: list[re.Match[str]] = (
