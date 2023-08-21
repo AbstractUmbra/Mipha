@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import NotRequired, Required, TypedDict
 
-
 __all__ = ("RootConfig",)
 
 
@@ -42,6 +41,10 @@ class UploaderConfig(TypedDict):
     token: str
 
 
+class CurrencyConfig(TypedDict):
+    api_key: str
+
+
 class DeeplConfig(TypedDict):
     api_key: str
 
@@ -77,6 +80,7 @@ class RootConfig(TypedDict, total=False):
     mangadex: MangaDexConfig
     uploader: UploaderConfig
     deepl: DeeplConfig
+    currency: CurrencyConfig
     rcon: RCONConfig
     duckling: DucklingConfig
     lewd: LewdConfig

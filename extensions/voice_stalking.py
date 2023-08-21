@@ -10,11 +10,10 @@ from discord.ext import commands
 
 from utilities.async_config import Config
 from utilities.checks import has_guild_permissions
-from utilities.context import Context, GuildContext
-
 
 if TYPE_CHECKING:
     from bot import Mipha
+    from utilities.context import Context, GuildContext
 
     VocalGuildChannel = discord.VoiceChannel | discord.StageChannel
 

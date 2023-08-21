@@ -1,6 +1,5 @@
 from typing import TypedDict
 
-
 __all__ = (
     "AudioPost",
     "ImagePost",

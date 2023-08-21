@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-import datetime
 import inspect
 import json
 import os
@@ -25,8 +24,9 @@ from utilities import checks, formats, time
 from utilities._types.discord_ import MessageableGuildChannel
 from utilities.context import Context, GuildContext, Interaction
 
-
 if TYPE_CHECKING:
+    import datetime
+
     from bot import Mipha
 
 GuildChannel = (
@@ -53,11 +53,11 @@ _current = contextvars.ContextVar[Interaction]("_current")
 
 
 class PatchedContext(Context):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN003, ANN002
         super().__init__(*args, **kwargs)
         self.first_interaction_sent: bool = False
 
-    async def send(self, content: str | None = None, **kwargs) -> discord.Message | None:
+    async def send(self, content: str | None = None, **kwargs) -> discord.Message | None:  # noqa: ANN003
         if not self.first_interaction_sent:
             self.first_interaction_sent = True
 
@@ -68,7 +68,7 @@ class PatchedContext(Context):
             return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
-    async def typing(self, *args, **kwargs) -> AsyncGenerator[None, None]:
+    async def typing(self, *args, **kwargs) -> AsyncGenerator[None, None]:  # noqa: ANN003, ANN002
         yield
 
 
@@ -138,7 +138,7 @@ class Meta(commands.Cog):
         Only up to 25 characters at a time.
         """
 
-        def to_string(c) -> str:
+        def to_string(c: str) -> str:
             digit = f"{ord(c):x}"
             name = unicodedata.name(c, "Name not found.")
             return f"`\\U{digit:>08}`: {name} - {c} \N{EM DASH} <http://www.fileformat.info/info/unicode/char/{digit}>"
@@ -357,13 +357,13 @@ class Meta(commands.Cog):
 
     @commands.command(aliases=["guildinfo"], usage="")
     @commands.guild_only()
-    async def serverinfo(self, ctx: GuildContext, *, guild_id: int | None = None):
+    async def serverinfo(self, ctx: GuildContext, *, guild_id: int | None = None) -> None:
         """Shows info about the current server."""
 
         if guild_id is not None and await self.bot.is_owner(ctx.author):
             guild = self.bot.get_guild(guild_id)
             if guild is None:
-                await ctx.send(f"Invalid Guild ID given.")
+                await ctx.send("Invalid Guild ID given.")
                 return
         else:
             guild = ctx.guild
@@ -384,9 +384,11 @@ class Meta(commands.Cog):
             perms = discord.Permissions((everyone_perms & ~deny.value) | allow.value)
             channel_type = type(channel)
             totals[channel_type] += 1
-            if not perms.read_messages:
-                secret[channel_type] += 1
-            elif isinstance(channel, discord.VoiceChannel) and (not perms.connect or not perms.speak):
+            if (
+                not perms.read_messages
+                or isinstance(channel, discord.VoiceChannel)
+                and (not perms.connect or not perms.speak)
+            ):
                 secret[channel_type] += 1
 
         e = discord.Embed()
@@ -544,7 +546,7 @@ class Meta(commands.Cog):
         ctx: Context,
         channel: MessageableGuildChannel = commands.param(converter=GuildChannel),
         author: discord.Member | None = None,
-    ):
+    ) -> None:
         """Shows permission resolution for a channel and an optional author."""
 
         person = author or ctx.author
@@ -575,6 +577,8 @@ class Meta(commands.Cog):
             raise commands.BadArgument(
                 f"Message with the ID of {message.id} cannot be found in {message.channel.mention}."
             ) from err
+
+        msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")
 
         await ctx.send(
             f"```json\n{formats.clean_triple_backtick(formats.escape_invis_chars(json.dumps(msg, indent=2, ensure_ascii=False, sort_keys=True)))}\n```"

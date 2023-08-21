@@ -7,10 +7,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import asyncpg
-
+if TYPE_CHECKING:
+    import asyncpg
 
 __all__ = ("MaybeAcquire", "db_init")
 

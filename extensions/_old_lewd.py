@@ -12,7 +12,6 @@ import json
 import random
 import re
 import shlex
-from collections.abc import Callable, Coroutine
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict
 
@@ -23,17 +22,18 @@ from discord.ext import commands
 from discord.http import json_or_text
 
 from utilities import checks
-from utilities._types.danbooru import DanbooruPayload
-from utilities._types.gelbooru import GelbooruPayload, GelbooruPostPayload
-from utilities._types.uploader import AudioPost
 from utilities.cache import cache
-from utilities.context import Context, GuildContext
 from utilities.formats import to_codeblock
 from utilities.paginator import RoboPages, SimpleListSource
 
-
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
     from bot import Mipha
+    from utilities._types.danbooru import DanbooruPayload
+    from utilities._types.gelbooru import GelbooruPayload, GelbooruPostPayload
+    from utilities._types.uploader import AudioPost
+    from utilities.context import Context, GuildContext
 
 SIX_DIGITS = re.compile(r"\{(\d{1,6})\}")
 MEDIA_PATTERN = re.compile(
@@ -105,7 +105,7 @@ class GelbooruEntry:
     """Quick object namespace."""
 
     def __init__(self, payload: dict[str, Any]) -> None:
-        self.image: bool = True if (payload["width"] != 0) else False
+        self.image: bool = payload["width"] != 0
         self.source: str | None = payload.get("source")
         self.gb_id: str | None = payload.get("id")
         self.rating: str = payload.get("rating", "N/A")
@@ -123,8 +123,8 @@ class DanbooruEntry:
 
     def __init__(self, payload: dict[str, Any]) -> None:
         self.ext: str = payload.get("file_ext", "none")
-        self.image: bool = True if self.ext in ("png", "jpg", "jpeg", "gif") else False
-        self.video: bool = True if self.ext in ("mp4", "gifv", "webm") else False
+        self.image: bool = self.ext in ("png", "jpg", "jpeg", "gif")
+        self.video: bool = self.ext in ("mp4", "gifv", "webm")
         self.source: str | None = payload.get("source")
         self.db_id: int | None = payload.get("id")
         self.rating: str | None = RATING.get(payload.get("rating", "fail"))
@@ -161,10 +161,7 @@ class Lewd(commands.Cog):
     async def cog_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
 
-        if isinstance(error, BlacklistedBooru):
-            await ctx.send(str(error))
-            return
-        elif isinstance(error, commands.BadArgument):
+        if isinstance(error, (BlacklistedBooru, commands.BadArgument)):
             await ctx.send(str(error))
             return
         elif isinstance(error, commands.NSFWChannelRequired):
@@ -585,10 +582,7 @@ class Lewd(commands.Cog):
         """Blacklist management for booru command."""
         if not ctx.invoked_subcommand:
             config = await self.get_booru_config(ctx.guild.id)
-            if config.blacklist:
-                fmt = "\n".join(config.blacklist)
-            else:
-                fmt = "No blacklist recorded."
+            fmt = "\n".join(config.blacklist) if config.blacklist else "No blacklist recorded."
             embed = discord.Embed(
                 description=to_codeblock(fmt, language=""),
                 colour=discord.Colour.dark_magenta(),

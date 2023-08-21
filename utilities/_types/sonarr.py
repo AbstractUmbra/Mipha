@@ -2,7 +2,6 @@ from typing import TypedDict
 
 from typing_extensions import NotRequired
 
-
 __all__ = (
     "SonarrCalendarPayload",
     "SonarrSeriesPayload",

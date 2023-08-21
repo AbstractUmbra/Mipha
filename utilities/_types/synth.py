@@ -1,6 +1,5 @@
 from typing import Any, TypedDict
 
-
 __all__ = (
     "SpeakersResponse",
     "KanaResponse",

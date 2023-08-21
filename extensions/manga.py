@@ -18,16 +18,16 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from discord.utils import as_chunks
 from hondana.query import FeedOrderQuery, MangaListOrderQuery, Order
-from typing_extensions import Self
 
 from utilities import formats
-from utilities.context import Context, Interaction
 from utilities.paginator import MangaDexEmbed
 from utilities.ui import MiphaBaseView
 
-
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from bot import Mipha
+    from utilities.context import Context, Interaction
 
 
 LOGGER = logging.getLogger(__name__)

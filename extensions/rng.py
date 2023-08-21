@@ -5,12 +5,12 @@ from collections import Counter
 from typing import TYPE_CHECKING
 
 from discord.ext import commands
-from typing_extensions import Annotated
 
 from utilities.formats import plural
 
-
 if TYPE_CHECKING:
+    from typing_extensions import Annotated
+
     from bot import Mipha
     from utilities.context import Context
 
@@ -22,13 +22,13 @@ class RNG(commands.Cog):
         self.bot: Mipha = bot
 
     @commands.group()
-    async def random(self, ctx: Context):
+    async def random(self, ctx: Context) -> None:
         """Displays a random thing you request."""
         if ctx.invoked_subcommand is None:
             await ctx.send(f"Incorrect random subcommand passed. Try {ctx.prefix}help random")
 
     @random.command()
-    async def number(self, ctx: Context, minimum: int = 0, maximum: int = 100):
+    async def number(self, ctx: Context, minimum: int = 0, maximum: int = 100) -> None:
         """Displays a random number within an optional range.
 
         The minimum must be smaller than the maximum and the maximum number
@@ -43,7 +43,7 @@ class RNG(commands.Cog):
         await ctx.send(str(rng.randint(minimum, maximum)))
 
     @random.command()
-    async def lenny(self, ctx: Context):
+    async def lenny(self, ctx: Context) -> None:
         """Displays a random lenny face."""
         lenny = rng.choice(
             [
@@ -61,7 +61,7 @@ class RNG(commands.Cog):
         await ctx.send(lenny)
 
     @commands.command()
-    async def choose(self, ctx: Context, *choices: Annotated[str, commands.clean_content]):
+    async def choose(self, ctx: Context, *choices: Annotated[str, commands.clean_content]) -> None:
         """Chooses between multiple choices.
 
         To denote multiple choices, you should use double quotes.
@@ -177,7 +177,9 @@ class RNG(commands.Cog):
         return to_send
 
     @commands.command()
-    async def choosebestof(self, ctx: Context, *choices: Annotated[str, commands.clean_content(escape_markdown=True)]):
+    async def choosebestof(
+        self, ctx: Context, *choices: Annotated[str, commands.clean_content(escape_markdown=True)]
+    ) -> None:
         """Chooses between multiple choices in a tournament style."""
         if len(choices) < 2:
             return await ctx.send("Not enough choices to pick from.")

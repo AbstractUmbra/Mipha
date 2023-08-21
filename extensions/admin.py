@@ -13,17 +13,16 @@ from typing import TYPE_CHECKING, Literal
 
 import discord
 from discord.ext import commands
-from discord.ext.commands import Greedy
 
 from utilities import formats
-from utilities.context import Context, GuildContext
 from utilities.converters import MystbinPasteConverter
-
 
 if TYPE_CHECKING:
     from asyncpg import Record
+    from discord.ext.commands import Greedy
 
     from bot import Mipha
+    from utilities.context import Context, GuildContext
 
 
 class Admin(commands.Cog):
@@ -102,11 +101,7 @@ class Admin(commands.Cog):
         query = self.cleanup_code(query)
 
         is_multistatement = query.count(";") > 1
-        if is_multistatement:
-            # fetch does not support multiple statements
-            strategy = ctx.db.execute
-        else:
-            strategy = ctx.db.fetch
+        strategy = ctx.db.execute if is_multistatement else ctx.db.fetch
 
         try:
             start = time.perf_counter()

@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import io
-import math
+import itertools
 import pathlib
 import random
 import re
@@ -26,12 +26,12 @@ from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from utilities import checks
-from utilities.context import Context, GuildContext
 from utilities.formats import plural
-
 
 if TYPE_CHECKING:
     from discord.ext.commands._types import Check
+
+    from utilities.context import Context, GuildContext
 
 
 path_ = inspect.getabsfile(legofy.main)
@@ -97,7 +97,7 @@ class Fun(commands.Cog):
         if message.author.bot or message.embeds or message.guild is None:
             return
 
-        if not message.guild or not message.guild.id == 149998214810959872:
+        if not message.guild or message.guild.id != 149998214810959872:
             return
 
         assert isinstance(message.channel, discord.TextChannel)
@@ -176,7 +176,7 @@ class Fun(commands.Cog):
             if char == "~":
                 br = not br
             if br and (char.lower() in ascii_lowercase):
-                new_str += [key for key, val in AL_BHED_CHARACTER_MAP.items() if val == char.lower()][0]
+                new_str += next(key for key, val in AL_BHED_CHARACTER_MAP.items() if val == char.lower())
             else:
                 new_str += char
         await ctx.send(new_str.replace("~", "").capitalize())
@@ -243,7 +243,7 @@ class Fun(commands.Cog):
         return buf
 
     def random_words(self, amount: int) -> list[str]:
-        with open("static/words.txt", "r") as fp:
+        with open("static/words.txt") as fp:  # noqa: PTH123
             words = fp.readlines()
 
         return random.sample(words, amount)
@@ -272,7 +272,7 @@ class Fun(commands.Cog):
         file = discord.File(fp=image, filename="typerace.png")
         await ctx.send(file=file)
 
-        winners = dict()
+        winners = {}
         is_ended = asyncio.Event()
 
         start = time.time()
@@ -308,11 +308,11 @@ class Fun(commands.Cog):
         finally:
             task.cancel()
 
-    def safe_chan(self, member: discord.Member, channels: list[discord.VoiceChannel]) -> discord.VoiceChannel | None:
-        """ """
+    def _safe_chan(self, member: discord.Member, channels: list[discord.VoiceChannel]) -> discord.VoiceChannel | None:
         random.shuffle(channels)
         for channel in channels:
-            if channel.permissions_for(member).connect:
+            perms = channel.permissions_for(member)
+            if perms.connect and perms.view_channel:
                 return channel
         return None
 
@@ -320,13 +320,7 @@ class Fun(commands.Cog):
     @checks.has_guild_permissions(administrator=True)
     async def scatter(self, ctx: GuildContext, voice_channel: discord.VoiceChannel | None = None) -> None:
         assert isinstance(ctx.author, discord.Member)
-        if voice_channel:
-            channel = voice_channel
-        else:
-            if ctx.author.voice:
-                channel = ctx.author.voice.channel
-            else:
-                channel = None
+        channel = voice_channel if voice_channel else ctx.author.voice.channel if ctx.author.voice else None
 
         if channel is None:
             await ctx.send("No voice channel.")
@@ -334,7 +328,7 @@ class Fun(commands.Cog):
 
         members = channel.members
         for member in members:
-            target = self.safe_chan(member, ctx.guild.voice_channels)
+            target = self._safe_chan(member, ctx.guild.voice_channels)
             if target is None:
                 continue
             await member.move_to(target)
@@ -342,11 +336,9 @@ class Fun(commands.Cog):
     @commands.command(hidden=True, name="snap")
     @checks.has_guild_permissions(administrator=True)
     async def snap(self, ctx: GuildContext) -> None:
-        members: list[discord.Member] = []
-        for vc in ctx.guild.voice_channels:
-            members.extend(vc.members)
+        members = list(itertools.chain.from_iterable([c.members for c in ctx.guild.voice_channels]))
 
-        upper = math.ceil(len(members) / 2)
+        upper = len(members) // 2
         choices = random.choices(members, k=upper)
 
         for m in choices:
@@ -421,7 +413,7 @@ class Fun(commands.Cog):
         buffer = io.BytesIO(bytes_)
         buffer.seek(0)
 
-        message = await ctx.send("Generating image...")
+        message = await ctx.send("Generating image...", wait=True)
 
         async with ctx.typing():
             output_buffer = await asyncio.to_thread(self._handle_image, buffer)
@@ -431,7 +423,7 @@ class Fun(commands.Cog):
         await message.edit(content=None, attachments=[file_])
 
     @lego_command.error
-    async def lego_error_handler(self, ctx: Context, error: commands.CommandError):
+    async def lego_error_handler(self, ctx: Context, error: commands.CommandError) -> None:
         error = getattr(error, "original", error)
 
         if isinstance(error, commands.BadArgument):

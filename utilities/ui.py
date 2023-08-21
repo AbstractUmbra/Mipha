@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 
-
 if TYPE_CHECKING:
     from typing_extensions import Self
 
+    from extensions.stats import Stats
     from utilities.context import Interaction
 
 __all__ = ("MiphaBaseView", "ConfirmationView")
@@ -34,7 +34,7 @@ class MiphaBaseModal(discord.ui.Modal):
         e.add_field(name="Error", value=f"```py\n{trace}\n```")
         e.timestamp = datetime.datetime.now(datetime.timezone.utc)
 
-        stats: Stats = client.get_cog("Stats")  # type: ignore
+        stats: Stats = interaction.client.get_cog("Stats")  # type: ignore
         try:
             await stats.webhook.send(embed=e)
         except discord.HTTPException:

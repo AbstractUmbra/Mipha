@@ -8,14 +8,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities.context import Interaction
 from utilities.formats import plural
 from utilities.ui import MiphaBaseView
 
-
 if TYPE_CHECKING:
     from bot import Mipha
-    from utilities.context import Context
+    from utilities.context import Context, Interaction
 
 
 class DisambiguateMember(commands.IDConverter, app_commands.Transformer):
@@ -89,7 +87,7 @@ def valid_nnid(argument: str) -> str:
 _friend_code = re.compile(r"^(?:(?:SW|3DS)[- _]?)?(?P<one>[0-9]{4})[- _]?(?P<two>[0-9]{4})[- _]?(?P<three>[0-9]{4})$")
 
 
-def valid_fc(argument: str, *, _fc=_friend_code) -> str:
+def valid_fc(argument: str, *, _fc: re.Pattern[str] = _friend_code) -> str:
     fc = argument.upper().strip('"')
     m = _fc.match(fc)
     if m is None:
@@ -175,7 +173,7 @@ class Profile(commands.Cog):
         ctx: Context,
         *,
         member: discord.Member | discord.User = commands.param(converter=DisambiguateMember, default=None),
-    ):
+    ) -> None:
         """Retrieves a member's profile.
 
         All commands will create a profile for you.

@@ -16,7 +16,6 @@ import re
 import sys
 import zlib
 from textwrap import dedent
-from types import ModuleType
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import asyncpg  # type: ignore # rtfs
@@ -30,12 +29,13 @@ from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
 
 from utilities import fuzzy
-from utilities.context import Context
 from utilities.formats import to_codeblock
 
-
 if TYPE_CHECKING:
+    from types import ModuleType
+
     from bot import Mipha
+    from utilities.context import Context
 
 RTFS = (
     "discord",
@@ -98,10 +98,7 @@ class SourceConverter(commands.Converter[str]):
             if item == "":
                 raise BadSource("Don't even try.")
 
-            if recur:
-                recur = inspect.getattr_static(recur, item, None)
-            else:
-                recur = inspect.getattr_static(module, item, None)
+            recur = inspect.getattr_static(recur, item, None) if recur else inspect.getattr_static(module, item, None)
             current += f".{item}"
 
             if recur is None:
@@ -213,7 +210,7 @@ class RTFX(commands.Cog):
             elif projname == "Hondana":
                 key = key.replace("hondana.", "")
 
-            result[f"{prefix}{key}"] = os.path.join(url, location)
+            result[f"{prefix}{key}"] = os.path.join(url, location)  # noqa: PTH118
 
         return result
 
@@ -366,7 +363,7 @@ class RTFX(commands.Cog):
             pyright_dump.mkdir(mode=0o0755, parents=True, exist_ok=True)
             conf = pyright_dump / "pyrightconfig.json"
             conf.touch()
-            with open(conf, "w") as f:
+            with conf.open("w") as f:
                 f.write(
                     json.dumps(
                         {
@@ -383,7 +380,7 @@ class RTFX(commands.Cog):
         with_file = pyright_dump / f"{rand}_tmp_pyright.py"
         with_file.touch(mode=0o0777, exist_ok=True)
 
-        with open(with_file, "w") as f:
+        with with_file.open("w") as f:
             f.write(code)
 
         output: str = ""
@@ -421,5 +418,5 @@ class RTFX(commands.Cog):
         await ctx.send(fmt)
 
 
-async def setup(bot) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(RTFX(bot))

@@ -16,17 +16,17 @@ import asyncpg
 import discord
 from discord import app_commands
 from discord.ext import commands
-from typing_extensions import Self
 
 from utilities import formats, time
-from utilities.context import Context, Interaction
 from utilities.converters import BadDatetimeTransform, DatetimeTransformer, WhenAndWhatConverter, WhenAndWhatTransformer
 from utilities.db import MaybeAcquire
 from utilities.ui import MiphaBaseView
 
-
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from bot import Mipha
+    from utilities.context import Context, Interaction
 
 LOGGER = logging.getLogger(__name__)
 
@@ -356,7 +356,7 @@ class Reminder(commands.Cog):
         await interaction.response.send_message(f"Alright {interaction.user.mention}, in {delta}: {text}")
 
     @reminder_set.error
-    async def reminder_set_error(self, interaction: Interaction, error: app_commands.AppCommandError):
+    async def reminder_set_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         if isinstance(error, BadDatetimeTransform):
             await interaction.response.send_message(str(error), ephemeral=True)
 

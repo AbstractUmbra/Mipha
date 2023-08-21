@@ -14,7 +14,6 @@ from ._types.nihongo import (
     _KanjiDevVariants,
 )
 
-
 __all__ = (
     "KanjiDevKanji",
     "KanjiDevWords",
@@ -87,9 +86,7 @@ class KanjiDevWords:
         return self._data["variants"]
 
     def str_variants(self) -> str:
-        fmt = []
-        for variant in self._data["variants"]:
-            fmt.append(f"{variant['written']} ({variant['pronounced']})")
+        fmt = [f"{variant['written']} ({variant['pronounced']})" for variant in self._data["variants"]]
 
         return "\n".join(fmt)
 

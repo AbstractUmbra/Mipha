@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import pathlib
 from collections.abc import Callable
-from typing import Any, Generic, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, overload
 
+if TYPE_CHECKING:
+    import pathlib
 
 ObjectHook: TypeAlias = Callable[[dict[str, Any]], Any]
 _T = TypeVar("_T")
@@ -44,7 +44,7 @@ class Config(Generic[_T]):
 
     def load_from_file(self) -> None:
         try:
-            with open(self.name, "r") as f:
+            with self.name.open() as f:
                 self._db = json.load(f, object_hook=self.object_hook)
         except FileNotFoundError:
             self._db = {}
@@ -55,7 +55,7 @@ class Config(Generic[_T]):
 
     def _dump(self) -> None:
         temp = self.name.with_suffix(".tmp")
-        with open(temp, "w", encoding="utf-8") as tmp:
+        with temp.open("w", encoding="utf-8") as tmp:
             json.dump(
                 self._db.copy(),
                 tmp,
@@ -66,7 +66,7 @@ class Config(Generic[_T]):
             )
 
         # atomically move the file
-        os.replace(temp, self.name)
+        temp.replace(self.name)
 
     async def save(self) -> None:
         async with self.lock:

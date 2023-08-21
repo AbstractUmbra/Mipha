@@ -13,15 +13,14 @@ from discord import app_commands, ui
 from discord.ext import commands
 
 from utilities.cache import ExpiringCache
-from utilities.context import Interaction
 from utilities.time import ordinal
 from utilities.ui import MiphaBaseView
-
 
 if TYPE_CHECKING:
     from typing_extensions import Self
 
     from bot import Mipha
+    from utilities.context import Interaction
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 BUFFER_PATH = pathlib.Path("./buffer/")

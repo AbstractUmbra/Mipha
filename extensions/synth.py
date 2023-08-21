@@ -6,19 +6,18 @@ import json
 import logging
 import pathlib
 from io import BytesIO
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities._types.synth import KanaResponse, SpeakersResponse, TikTokSynth
-from utilities.context import Interaction
 from utilities.fuzzy import extract
-
 
 if TYPE_CHECKING:
     from bot import Mipha
+    from utilities._types.synth import KanaResponse, SpeakersResponse, TikTokSynth
+    from utilities.context import Interaction
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ class BadTikTokData(Exception):
 
 
 class SynthCog(commands.Cog, name="Synth"):
-    _tiktok_urls: set[str] = {
+    _tiktok_urls: ClassVar[set[str]] = {
         "api22-normal-c-useast1a.tiktokv.com",
         "api16-normal-useast5.us.tiktokv.com",
         "api16-normal-c-alisg.tiktokv.com",
@@ -72,10 +71,10 @@ class SynthCog(commands.Cog, name="Synth"):
 
         ret: list[app_commands.Choice[int]] = []
         for speaker in data:
-            for style in speaker["styles"]:
-                ret.append(
-                    app_commands.Choice(name=f"[{style['id']}] {speaker['name']} ({style['name']})", value=style["id"])
-                )
+            ret.extend(
+                app_commands.Choice(name=f"[{style['id']}] {speaker['name']} ({style['name']})", value=style["id"])
+                for style in speaker["styles"]
+            )
 
         ret.sort(key=lambda c: c.value)
         self._engine_autocomplete = ret

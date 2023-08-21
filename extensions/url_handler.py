@@ -3,19 +3,18 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from discord import ui
+from discord import app_commands, ui
 from discord.ext import commands, tasks
 from yarl import URL
 
-from utilities.context import Context, Interaction
 from utilities.markdown import MarkdownBuilder
 from utilities.ui import MiphaBaseView
-
 
 if TYPE_CHECKING:
     from typing_extensions import Self
 
     from bot import Mipha
+    from utilities.context import Context, Interaction
 
 LOGGER = logging.getLogger(__name__)
 AD_LISTS: list[str] = [
@@ -138,9 +137,11 @@ class URLChecker(commands.Cog):
         self.update_adlist_master.cancel()
 
     @commands.hybrid_command(name="check-url", aliases=["url"])
+    @app_commands.describe(url="The URL to check against.")
     async def url_checker(
-        self, ctx: Context, *, url: URL = commands.param(converter=URLConverter, description="The url we're checking")
+        self, ctx: Context, *, url: URL = commands.param(converter=URLConverter, description="The URL to check against.")
     ) -> None:
+        """Checks a URL against known adlists and for redirects, query parameters and fragments."""
         if ctx.guild and ctx.channel.permissions_for(ctx.me).manage_messages:  # type: ignore # guarded
             await ctx.message.edit(suppress=True)
 

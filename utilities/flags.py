@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
-from typing_extensions import Self
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
+    from typing_extensions import Self
 
 T = TypeVar("T", bound="BaseFlags")
 

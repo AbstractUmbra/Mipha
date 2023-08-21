@@ -7,16 +7,15 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import datetime
 import logging
 import re
-import zoneinfo
 from typing import Any, Literal, Sequence, Type, TypedDict
 
 import yarl
+import zoneinfo
 from discord import app_commands
 from discord.ext import commands
 from typing_extensions import NotRequired, Self
 
 from utilities.context import Context, GuildContext, Interaction
-
 
 MYSTBIN_REGEX = re.compile(r"(?:(?:https?://)?(?:beta\.)?(?:mystb\.in\/))?(?P<id>(?:[A-Z]{1}[a-z]+)*)(?P<ext>\.\w+)?")
 LOGGER = logging.getLogger(__name__)
@@ -128,10 +127,7 @@ class DatetimeConverter(commands.Converter[datetime.datetime]):
     @staticmethod
     async def get_timezone(ctx: Context) -> zoneinfo.ZoneInfo | None:
         row: str | None = await ctx.bot.pool.fetchval("SELECT tz FROM tz_store WHERE user_id = $1;", ctx.author.id)
-        if row:
-            tz = zoneinfo.ZoneInfo(row)
-        else:
-            tz = zoneinfo.ZoneInfo("UTC")
+        tz = zoneinfo.ZoneInfo(row) if row else zoneinfo.ZoneInfo("UTC")
 
         return tz
 
@@ -242,10 +238,7 @@ class WhenAndWhatConverter(commands.Converter[tuple[datetime.datetime, str]]):
         if begin != 0 and end != len(argument):
             raise commands.BadArgument("Could not distinguish time from argument.")
 
-        if begin == 0:
-            what = argument[end + 1 :].lstrip(" ,.!:;")
-        else:
-            what = argument[:begin].strip()
+        what = argument[end + 1 :].lstrip(" ,.!:;") if begin == 0 else argument[:begin].strip()
 
         for prefix in ("to ",):
             if what.startswith(prefix):
@@ -264,10 +257,7 @@ class DatetimeTransformer(app_commands.Transformer):
         row: str | None = await interaction.client.pool.fetchval(
             "SELECT tz FROM tz_store WHERE user_id = $1;", interaction.user.id
         )
-        if row:
-            tz = zoneinfo.ZoneInfo(row)
-        else:
-            tz = zoneinfo.ZoneInfo("UTC")
+        tz = zoneinfo.ZoneInfo(row) if row else zoneinfo.ZoneInfo("UTC")
 
         return tz
 
@@ -351,10 +341,7 @@ class WhenAndWhatTransformer(app_commands.Transformer):
                 "SELECT tz FROM tz_store WHERE user_id = $1;",
                 interaction.user.id,
             )
-            if row:
-                tz = zoneinfo.ZoneInfo(row)
-            else:
-                tz = zoneinfo.ZoneInfo("UTC")
+            tz = zoneinfo.ZoneInfo(row) if row else zoneinfo.ZoneInfo("UTC")
 
         return tz
 
@@ -440,10 +427,7 @@ class WhenAndWhatTransformer(app_commands.Transformer):
         if begin != 0 and end != len(value):
             raise BadDatetimeTransform("Could not distinguish time from argument.")
 
-        if begin == 0:
-            what = value[end + 1 :].lstrip(" ,.!:;")
-        else:
-            what = value[:begin].strip()
+        what = value[end + 1 :].lstrip(" ,.!:;") if begin == 0 else value[:begin].strip()
 
         for prefix in ("to ",):
             if what.startswith(prefix):

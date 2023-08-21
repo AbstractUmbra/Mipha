@@ -8,15 +8,17 @@ from __future__ import annotations
 
 import datetime
 import re
+from typing import TYPE_CHECKING
 
 import parsedatetime as pdt
 from dateutil.relativedelta import relativedelta
 from discord.ext import commands
 from discord.utils import format_dt
 
-from .context import Context
 from .formats import human_join, plural
 
+if TYPE_CHECKING:
+    from .context import Context
 
 # Monkey patch mins and secs into the units
 units = pdt.pdtLocales["en_US"].units
@@ -160,10 +162,9 @@ class UserFriendlyTime(commands.Converter):
             if argument.endswith("from now"):
                 argument = argument[:-8].strip()
 
-            if argument[0:2] == "me":
+            if argument[0:2] == "me" and argument[0:6] in ("me to ", "me in ", "me at "):
                 # starts with "me to", "me in", or "me at "
-                if argument[0:6] in ("me to ", "me in ", "me at "):
-                    argument = argument[6:]
+                argument = argument[6:]
 
             elements = calendar.nlp(argument, sourceTime=now)
             if elements is None or len(elements) == 0:

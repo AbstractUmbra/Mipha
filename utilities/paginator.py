@@ -6,9 +6,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from textwrap import shorten
-from typing import Any, Generic, Type, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 import discord
 import hondana
@@ -16,9 +15,12 @@ from discord.ext import menus
 from discord.ext.commands import Paginator as CommandPaginator
 from typing_extensions import Self
 
-from utilities.context import Context, Interaction
 from utilities.ui import MiphaBaseView
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from utilities.context import Context, Interaction
 
 T = TypeVar("T")
 SourceT = TypeVar("SourceT", bound="menus.PageSource")
@@ -49,7 +51,7 @@ class RoboPages(MiphaBaseView):
         ctx: Context,
         check_embeds: bool = True,
         compact: bool = False,
-    ):
+    ) -> None:
         super().__init__()
         self.source: menus.PageSource = source
         self.check_embeds: bool = check_embeds
@@ -265,7 +267,7 @@ class FieldPageSource(menus.ListPageSource, Generic[RoboPagesT]):
 
 
 class TextPageSource(menus.ListPageSource, Generic[RoboPagesT]):
-    def __init__(self, text, *, prefix="```", suffix="```", max_size=2000) -> None:
+    def __init__(self, text: str, *, prefix: str = "```", suffix: str = "```", max_size: int = 2000) -> None:
         pages = CommandPaginator(prefix=prefix, suffix=suffix, max_size=max_size - 200)
         for line in text.split("\n"):
             pages.add_line(line)
@@ -300,7 +302,7 @@ class SimplePages(RoboPages):
     Basically an embed with some normal formatting.
     """
 
-    def __init__(self, entries, *, ctx: Context, per_page: int = 12) -> None:
+    def __init__(self, entries: Any, *, ctx: Context, per_page: int = 12) -> None:
         super().__init__(SimplePageSource(entries, per_page=per_page), ctx=ctx)
         self.embed = discord.Embed(colour=discord.Colour.blurple())
 
@@ -324,7 +326,7 @@ class SimpleListSource(menus.ListPageSource, Generic[T]):
 
 class MangaDexEmbed(discord.Embed):
     @classmethod
-    async def from_chapter(cls: Type[Self], chapter: hondana.Chapter, *, nsfw_allowed: bool = False) -> Self:
+    async def from_chapter(cls: type[Self], chapter: hondana.Chapter, *, nsfw_allowed: bool = False) -> Self:
         parent = chapter.manga
         assert parent is not None
 
@@ -355,7 +357,7 @@ class MangaDexEmbed(discord.Embed):
         return self
 
     @classmethod
-    async def from_manga(cls: Type[Self], manga: hondana.Manga, *, nsfw_allowed: bool = False) -> Self:
+    async def from_manga(cls: type[Self], manga: hondana.Manga, *, nsfw_allowed: bool = False) -> Self:
         self = cls(title=manga.title, colour=discord.Colour.blue(), url=manga.url)
         if manga.description:
             self.description = shorten(manga.description, width=2000)

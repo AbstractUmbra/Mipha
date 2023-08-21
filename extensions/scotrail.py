@@ -12,7 +12,6 @@ from discord.ext import commands
 
 from utilities import formats, fuzzy
 
-
 if TYPE_CHECKING:
     from bot import Mipha
     from utilities._types.scotrail import ScotrailData
@@ -145,7 +144,7 @@ class ScotrailCog(commands.Cog):
             quick = self._generate_autocomplete()
             return quick[:25]
 
-        keys = [key.lower() for key in self._station_data["stations"].keys()]
+        keys = [key.lower() for key in self._station_data["stations"]]
 
         attempt = fuzzy.extract(current.lower(), keys, score_cutoff=20, limit=5)
 

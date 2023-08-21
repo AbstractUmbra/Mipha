@@ -9,11 +9,9 @@ from discord.ext import commands
 from jishaku.functools import executor_function
 from PIL import Image
 
-from utilities.context import Context
-
-
 if TYPE_CHECKING:
     from bot import Mipha
+    from utilities.context import Context
 
 COLOUR_REGEX = re.compile(
     (
@@ -63,7 +61,7 @@ class ColourShitCog(commands.Cog):
         elif match_.group("Hex"):
             group = match_["Hex"]
             if len(group) == 4:
-                group = "#" + f"".join(character * 2 for character in group.removeprefix("#"))
+                group = "#" + "".join(character * 2 for character in group.removeprefix("#"))
 
             return discord.Colour(int(group.lstrip("#"), 16))
 

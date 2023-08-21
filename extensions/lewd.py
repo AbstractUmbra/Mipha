@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import random
 import re
-from collections.abc import Callable, Coroutine
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
@@ -19,13 +18,14 @@ import discord
 from discord.ext import commands
 from discord.http import json_or_text
 
-from utilities.context import Context, GuildContext
-
-
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
     from discord.ext.commands._types import Check
 
     from bot import Mipha
+    from utilities._types.uploader import AudioPost
+    from utilities.context import Context, GuildContext
 
 MEDIA_PATTERN = re.compile(
     r"(https?://(?P<host_url>media\.soundgasm\.net|media\d\.vocaroo\.com)(?:\/sounds|\/mp3)\/(?P<media>[a-zA-Z0-9]+)?\.?(?P<ext>m4a|mp3)?)"

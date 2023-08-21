@@ -6,14 +6,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 from discord import app_commands
 from discord.ext import commands
 
-
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from discord.ext.commands._types import Check
 
     from utilities.context import GuildContext
@@ -57,7 +57,7 @@ async def check_guild_permissions(
     return check(getattr(resolved, name, None) == value for name, value in perms.items())
 
 
-def has_guild_permissions(*, check: Callable[[Iterable[Any]], bool] = all, **perms) -> Callable[[T], T]:
+def has_guild_permissions(*, check: Callable[[Iterable[Any]], bool] = all, **perms: bool) -> Callable[[T], T]:
     async def pred(ctx: GuildContext) -> bool:
         return await check_guild_permissions(ctx, perms, check=check)
 
@@ -98,7 +98,7 @@ def is_in_guilds(*guild_ids: int) -> Check[GuildContext]:
     return commands.check(predicate)
 
 
-def mod_or_permissions(**perms) -> Callable[[T], T]:
+def mod_or_permissions(**perms: bool) -> Callable[[T], T]:
     perms["manage_guild"] = True
 
     async def predicate(ctx: GuildContext) -> bool:
@@ -107,7 +107,7 @@ def mod_or_permissions(**perms) -> Callable[[T], T]:
     return commands.check(predicate)
 
 
-def admin_or_permissions(**perms) -> Callable[[T], T]:
+def admin_or_permissions(**perms: bool) -> Callable[[T], T]:
     perms["administrator"] = True
 
     async def predicate(ctx: GuildContext) -> bool:

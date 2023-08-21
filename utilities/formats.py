@@ -17,7 +17,6 @@ from typing import Any, SupportsAbs
 import discord
 from discord.utils import escape_markdown
 
-
 CONTROL_CHARS = re.compile(
     "[%s]" % re.escape("".join(chr(i) for i in range(sys.maxunicode) if unicodedata.category(chr(i)).startswith("C")))
 )
@@ -112,8 +111,7 @@ class TabularData:
         to_draw.append(get_entry(self._columns))
         to_draw.append(sep)
 
-        for row in self._rows:
-            to_draw.append(get_entry(row))
+        to_draw.extend(get_entry(row) for row in self._rows)
 
         to_draw.append(sep)
         return "\n".join(to_draw)

@@ -26,12 +26,10 @@ import pykakasi
 from discord.ext import commands, tasks
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from utilities.context import Context
 from utilities.converters import MemeDict
 from utilities.formats import plural, to_codeblock
 from utilities.nihongo import JishoWord, KanjiDevKanji, KanjiDevWords
 from utilities.paginator import RoboPages, SimpleListSource
-
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -43,6 +41,7 @@ if TYPE_CHECKING:
         KanjiDevWordsPayload,
         _JishoJapanesePayload,
     )
+    from utilities.context import Context
 
 BASE_URL = "https://kanjiapi.dev/v1"
 HIRAGANA = "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよらりるれろわを"
@@ -55,11 +54,11 @@ JISHO_REPLACEMENTS = {
     "tags": "Notes",
     "see_also": "See Also",
 }
-JLPT_N1 = list(csv.reader(open("static/jlpt/n1.csv", "r", encoding="utf-8")))
-JLPT_N2 = list(csv.reader(open("static/jlpt/n2.csv", "r", encoding="utf-8")))
-JLPT_N3 = list(csv.reader(open("static/jlpt/n3.csv", "r", encoding="utf-8")))
-JLPT_N4 = list(csv.reader(open("static/jlpt/n4.csv", "r", encoding="utf-8")))
-JLPT_N5 = list(csv.reader(open("static/jlpt/n5.csv", "r", encoding="utf-8")))
+JLPT_N1 = list(csv.reader(open("static/jlpt/n1.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
+JLPT_N2 = list(csv.reader(open("static/jlpt/n2.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
+JLPT_N3 = list(csv.reader(open("static/jlpt/n3.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
+JLPT_N4 = list(csv.reader(open("static/jlpt/n4.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
+JLPT_N5 = list(csv.reader(open("static/jlpt/n5.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
 JLPT_LOOKUP = MemeDict(
     {
         ("n1", "ｎ１", "1", "１"): JLPT_N1,
@@ -393,10 +392,11 @@ class Nihongo(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.kakasi = pykakasi.kakasi()
-        self.nihongo_study_reminders.start()
+        # self.nihongo_study_reminders.start()
 
     def cog_unload(self) -> None:
-        self.nihongo_study_reminders.cancel()
+        # self.nihongo_study_reminders.cancel()
+        pass
 
     @commands.command()
     async def romaji(self, ctx: Context, *, text: commands.clean_content) -> None:
@@ -548,7 +548,7 @@ class Nihongo(commands.Cog):
         file = discord.File(fp=image, filename="kanarace.png")
         await ctx.send(file=file)
 
-        winners = dict()
+        winners = {}
         is_ended = asyncio.Event()
 
         start = time.time()

@@ -13,20 +13,19 @@ import asyncpg
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from typing_extensions import Annotated, Self
 
 from utilities import cache, checks, flags, time
-from utilities.converters import Snowflake
 from utilities.formats import human_join, plural
 from utilities.paginator import SimplePages
 from utilities.ui import MiphaBaseView
 
-
 if TYPE_CHECKING:
     from discord.ext.commands._types import Check
+    from typing_extensions import Annotated, Self
 
     from bot import Mipha
     from utilities.context import GuildContext, Interaction
+    from utilities.converters import Snowflake
 
     from .reminders import Timer
 
@@ -987,7 +986,7 @@ class Mod(commands.Cog):
         try:
             webhook = await channel.create_webhook(name="RoboMod Join Logs", avatar=self._avatar, reason=reason)
         except discord.Forbidden:
-            raise RuntimeError(f"The bot does not have permissions to create webhooks.") from None
+            raise RuntimeError("The bot does not have permissions to create webhooks.") from None
         except discord.HTTPException:
             raise RuntimeError(
                 "An error occurred while creating the webhook. Note you can only have 10 webhooks per channel."
@@ -1120,7 +1119,7 @@ class Mod(commands.Cog):
     @app_commands.describe(entities="Space separated list of roles, members, or channels to ignore")
     async def robomod_ignore(
         self, ctx: GuildContext, entities: Annotated[list[IgnoreableEntity], commands.Greedy[IgnoreEntity]]
-    ):
+    ) -> None:
         """Specifies what roles, members, or channels ignore RoboMod auto-bans.
 
         To use this command you must have the Ban Members permission.
@@ -1149,7 +1148,7 @@ class Mod(commands.Cog):
     @app_commands.describe(entities="Space separated list of roles, members, or channels to take off the ignore list")
     async def robomod_unignore(
         self, ctx: GuildContext, entities: Annotated[list[IgnoreableEntity], commands.Greedy[IgnoreEntity]]
-    ):
+    ) -> None:
         """Specifies what roles, members, or channels to take off the RoboMod ignore list.
 
         To use this command you must have the Ban Members permission.
@@ -1182,7 +1181,7 @@ class Mod(commands.Cog):
             await ctx.send("Nothing is ignored!")
             return
 
-        def resolve_entity_id(x: int, *, guild=ctx.guild) -> str:
+        def resolve_entity_id(x: int, *, guild: discord.Guild = ctx.guild) -> str:
             if guild.get_role(x):
                 return f"<@&{x}>"
             if guild.get_channel_or_thread(x):
@@ -1238,15 +1237,9 @@ class Mod(commands.Cog):
         strategy = self._basic_cleanup_strategy
         is_mod = ctx.channel.permissions_for(ctx.author).manage_messages
         if ctx.channel.permissions_for(ctx.me).manage_messages:
-            if is_mod:
-                strategy = self._complex_cleanup_strategy
-            else:
-                strategy = self._regular_user_cleanup_strategy
+            strategy = self._complex_cleanup_strategy if is_mod else self._regular_user_cleanup_strategy
 
-        if is_mod:
-            search = min(max(2, search), 1000)
-        else:
-            search = min(max(2, search), 25)
+        search = min(max(2, search), 1000) if is_mod else min(max(2, search), 25)
 
         spammers = await strategy(ctx, search)
         deleted = sum(spammers.values())
@@ -1267,7 +1260,7 @@ class Mod(commands.Cog):
         member: Annotated[discord.abc.Snowflake, MemberID],
         *,
         reason: Annotated[str, ActionReason] | None = None,
-    ):
+    ) -> None:
         """Kicks a member from the server.
 
         In order for this to work, the bot must have Kick Member permissions.
@@ -1316,7 +1309,7 @@ class Mod(commands.Cog):
         members: Annotated[list[discord.abc.Snowflake], commands.Greedy[MemberID]],
         *,
         reason: Annotated[str, ActionReason] | None = None,
-    ):
+    ) -> None:
         """Bans multiple members from the server.
 
         This only works through banning via ID.
@@ -1412,7 +1405,7 @@ class Mod(commands.Cog):
 
             async for message in args.channel.history(limit=args.search, before=before, after=after):
                 if all(p(message) for p in predicates):
-                    members.append(message.author)
+                    members.append(message.author)  # noqa: PERF401
         else:
             if ctx.guild.chunked:
                 members = ctx.guild.members
@@ -1734,9 +1727,8 @@ class Mod(commands.Cog):
             r = op(p(m) for p in predicates)
             return r
 
-        if flags.after:
-            if search is None:
-                search = 2000
+        if flags.after and search is None:
+            search = 2000
 
         if search is None:
             search = 100
@@ -1759,7 +1751,7 @@ class Mod(commands.Cog):
 
         try:
             deleted = await ctx.channel.purge(limit=search, before=before, after=after, check=predicate)
-        except discord.Forbidden as e:
+        except discord.Forbidden:
             await ctx.send("I do not have permissions to delete messages.")
             return
         except discord.HTTPException as e:
@@ -1817,7 +1809,7 @@ class Mod(commands.Cog):
         else:
             members = set()
 
-        members.update(map(lambda m: m.id, role.members))
+        members.update((m.id for m in role.members))
         query = """INSERT INTO guild_mod_config (id, mute_role_id, muted_members)
                    VALUES ($1, $2, $3::bigint[]) ON CONFLICT (id)
                    DO UPDATE SET
@@ -1863,7 +1855,7 @@ class Mod(commands.Cog):
         members: commands.Greedy[discord.Member],
         *,
         reason: Annotated[str, ActionReason] | None = None,
-    ):
+    ) -> None:
         """Mutes members using the configured mute role.
 
         The bot must have Manage Roles permission and be
@@ -1903,7 +1895,7 @@ class Mod(commands.Cog):
         members: commands.Greedy[discord.Member],
         *,
         reason: Annotated[str, ActionReason] | None = None,
-    ):
+    ) -> None:
         """Unmutes members using the configured mute role.
 
         The bot must have Manage Roles permission and be
@@ -1973,7 +1965,7 @@ class Mod(commands.Cog):
         await ctx.send(f"Muted {discord.utils.escape_mentions(str(member))} for {time.format_relative(duration.dt)}.")
 
     @commands.Cog.listener()
-    async def on_tempmute_timer_complete(self, timer) -> None:
+    async def on_tempmute_timer_complete(self, timer: Timer) -> None:
         guild_id, mod_id, member_id, role_id = timer.args
         await self.bot.wait_until_ready()
 
@@ -2026,7 +2018,7 @@ class Mod(commands.Cog):
         role = config and config.mute_role
         if role is not None:
             members = config.muted_members.copy()  # type: ignore  # This is already narrowed
-            members.update(map(lambda r: r.id, role.members))
+            members.update((r.id for r in role.members))
             total = len(members)
             role = f"{role} (ID: {role.id})"
         else:
@@ -2070,7 +2062,7 @@ class Mod(commands.Cog):
             )
 
             view = PreExistingMuteRoleView(ctx.author)
-            view.message = await ctx.send(msg, view=view)
+            view.message = await ctx.send(msg, view=view, wait=True)
             await view.wait()
             if view.merge is None:
                 return
@@ -2123,7 +2115,7 @@ class Mod(commands.Cog):
 
     @_mute_role.command(name="create")
     @checks.has_guild_permissions(moderate_members=True, manage_roles=True)
-    async def mute_role_create(self, ctx: GuildContext, *, name) -> None:
+    async def mute_role_create(self, ctx: GuildContext, *, name: str) -> None:
         """Creates a mute role with the given name.
 
         This also updates the channel overwrites accordingly
@@ -2418,9 +2410,12 @@ class Mod(commands.Cog):
 
             view = LockdownPermissionIssueView(ctx.me, parent)
             view.message = await ctx.send(
-                "\N{WARNING SIGN} This will potentially lock the bot from sending messages.\n"
-                "Would you like to resolve the permission issue?",
+                (
+                    "\N{WARNING SIGN} This will potentially lock the bot from sending messages.\n"
+                    "Would you like to resolve the permission issue?"
+                ),
                 view=view,
+                wait=True,
             )
             await view.wait()
             if view.abort:
@@ -2492,9 +2487,12 @@ class Mod(commands.Cog):
 
             view = LockdownPermissionIssueView(ctx.me, parent)
             view.message = await ctx.send(
-                "\N{WARNING SIGN} This will potentially lock the bot from sending messages.\n"
-                "Would you like to resolve the permission issue?",
+                (
+                    "\N{WARNING SIGN} This will potentially lock the bot from sending messages.\n"
+                    "Would you like to resolve the permission issue?"
+                ),
                 view=view,
+                wait=True,
             )
             await view.wait()
             if view.abort:
@@ -2555,10 +2553,7 @@ class Mod(commands.Cog):
             return
 
         member = await self.bot.get_or_fetch_member(guild, mod_id)
-        if member is None:
-            moderator = f"Mod ID {mod_id}"
-        else:
-            moderator = f"{member} (ID: {mod_id})"
+        moderator = f"Mod ID {mod_id}" if member is None else f"{member} (ID: {mod_id})"
 
         reason = f"Automatic lockdown ended from timer made on {timer.created_at} by {moderator}"
         failures = await self.end_lockdown(guild, channel_ids=channel_ids, reason=reason)
@@ -2580,4 +2575,4 @@ class Mod(commands.Cog):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(Mod(bot))
+    await bot.add_cog(Mod(bot), guilds=[discord.Object(id=0)])

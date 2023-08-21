@@ -8,21 +8,20 @@ from __future__ import annotations
 
 import datetime
 import secrets
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, Iterable, Protocol, Sequence, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Iterable, Literal, Protocol, Sequence, TypeAlias, overload
 
 import discord
 from discord.ext import commands
+from typing_extensions import TypeVar
 
 from .ui import ConfirmationView, MiphaBaseView
 
-
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
 
     from aiohttp import ClientSession
     from asyncpg import Connection
-    from typing_extensions import TypeVar
 
     from bot import Mipha
 
@@ -138,7 +137,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
 
     __slots__ = ("pool",)
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:  # noqa: ANN003
         super().__init__(**kwargs)
         self.pool = self.bot.pool
 
@@ -171,7 +170,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
 
         view = DisambiguatorView[T](self, matches, entry)
         view.message = await self.send(
-            "There are too many matches... Which one did you mean?", view=view, ephemeral=ephemeral
+            "There are too many matches... Which one did you mean?", view=view, ephemeral=ephemeral, wait=True
         )
         await view.wait()
         return view.selected
@@ -225,6 +224,84 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
             return f"{emoji}: {label}"
         return emoji
 
+    @overload
+    async def send(
+        self,
+        content: SupportsStr | None = None,
+        *,
+        tts: bool = ...,
+        embed: discord.Embed | None = ...,
+        embeds: Sequence[discord.Embed] | None = ...,
+        file: discord.File | None = ...,
+        files: Sequence[discord.File] | None = ...,
+        stickers: Sequence[discord.GuildSticker | discord.StickerItem] | None = ...,
+        delete_after: float | None = ...,
+        nonce: str | int | None = ...,
+        allowed_mentions: discord.AllowedMentions | None = ...,
+        reference: discord.Message | discord.MessageReference | discord.PartialMessage | None = ...,
+        mention_author: bool | None = ...,
+        view: discord.ui.View | None = ...,
+        suppress_embeds: bool = ...,
+        ephemeral: bool = ...,
+        silent: bool = ...,
+        mystbin: bool = ...,
+        mystbin_syntax: str = "txt",
+        wait: Literal[True],
+    ) -> discord.Message:
+        ...
+
+    @overload
+    async def send(
+        self,
+        content: SupportsStr | None = None,
+        *,
+        tts: bool = ...,
+        embed: discord.Embed | None = ...,
+        embeds: Sequence[discord.Embed] | None = ...,
+        file: discord.File | None = ...,
+        files: Sequence[discord.File] | None = ...,
+        stickers: Sequence[discord.GuildSticker | discord.StickerItem] | None = ...,
+        delete_after: float | None = ...,
+        nonce: str | int | None = ...,
+        allowed_mentions: discord.AllowedMentions | None = ...,
+        reference: discord.Message | discord.MessageReference | discord.PartialMessage | None = ...,
+        mention_author: bool | None = ...,
+        view: discord.ui.View | None = ...,
+        suppress_embeds: bool = ...,
+        ephemeral: bool = ...,
+        silent: bool = ...,
+        mystbin: bool = ...,
+        mystbin_syntax: str = "txt",
+        wait: Literal[False],
+    ) -> None:
+        ...
+
+    @overload
+    async def send(
+        self,
+        content: SupportsStr | None = None,
+        *,
+        tts: bool = ...,
+        embed: discord.Embed | None = ...,
+        embeds: Sequence[discord.Embed] | None = ...,
+        file: discord.File | None = ...,
+        files: Sequence[discord.File] | None = ...,
+        stickers: Sequence[discord.GuildSticker | discord.StickerItem] | None = ...,
+        delete_after: float | None = ...,
+        nonce: str | int | None = ...,
+        allowed_mentions: discord.AllowedMentions | None = ...,
+        reference: discord.Message | discord.MessageReference | discord.PartialMessage | None = ...,
+        mention_author: bool | None = ...,
+        view: discord.ui.View | None = ...,
+        suppress_embeds: bool = ...,
+        ephemeral: bool = ...,
+        silent: bool = ...,
+        mystbin: bool = ...,
+        mystbin_syntax: str = "txt",
+        wait: bool = ...,
+    ) -> None:
+        ...
+
     async def send(
         self,
         content: SupportsStr | None = None,
@@ -246,7 +323,8 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         silent: bool = False,
         mystbin: bool = False,
         mystbin_syntax: str = "txt",
-    ) -> discord.Message:
+        wait: bool = False,
+    ) -> discord.Message | None:
         content = str(content) if content is not None else None
         if (mystbin and content) or (content and len(content) >= 2000):
             password = secrets.token_urlsafe(10)
@@ -263,7 +341,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
                 f" {discord.utils.format_dt(paste.expires)}"
             )
 
-        return await super().send(  # type: ignore
+        sent = await super().send(  # type: ignore
             content=content,
             tts=tts,
             embed=embed,
@@ -281,6 +359,9 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
             ephemeral=ephemeral,
             silent=silent,
         )
+
+        if wait is True:
+            return sent
 
 
 class GuildContext(Context):

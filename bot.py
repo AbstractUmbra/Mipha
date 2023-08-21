@@ -27,7 +27,6 @@ import mystbin
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
-from typing_extensions import Self
 
 from extensions import EXTENSIONS
 from utilities.async_config import Config
@@ -35,9 +34,9 @@ from utilities.context import Context, Interaction
 from utilities.db import db_init
 from utilities.prefix import callable_prefix as _callable_prefix
 
-
 if TYPE_CHECKING:
     from discord.ext.commands._types import ContextT
+    from typing_extensions import Self
 
     from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
@@ -95,7 +94,7 @@ class RemoveNoise(logging.Filter):
     def __init__(self) -> None:
         super().__init__(name="discord.state")
 
-    def filter(self, record) -> bool:
+    def filter(self, record: logging.LogRecord) -> bool:
         if record.levelname == "WARNING" and "referencing an unknown" in record.msg:
             return False
         return True

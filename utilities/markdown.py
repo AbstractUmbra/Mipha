@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from copy import deepcopy
 from functools import wraps
-from typing import Concatenate, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Concatenate, ParamSpec, TypeVar
 
 from yarl import URL
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 M = TypeVar("M", bound="MarkdownBuilder")
 P = ParamSpec("P")
@@ -30,7 +31,7 @@ def after_markdown(func: Callable[Concatenate[M, P], None]) -> Callable[Concaten
 
 class MarkdownBuilder:
     def __init__(self) -> None:
-        self._inner: str = str()
+        self._inner: str = ""
 
     @property
     def text(self) -> str:
@@ -69,4 +70,4 @@ class MarkdownBuilder:
         self._inner += "\n" * amount
 
     def clear(self) -> None:
-        self._inner = str()
+        self._inner = ""

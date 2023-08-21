@@ -4,11 +4,8 @@ from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
-from typing_extensions import Self
 
-from utilities.context import GuildContext, Interaction
 from utilities.ui import MiphaBaseView
-
 
 HYRULE_GUILD_ID = 705500489248145459
 _IRL_FRIEND_SERVER = 174702278673039360
@@ -19,7 +16,10 @@ ROLE_ASSIGNMENT_MESSAGE_ID = 1086545767356977173
 
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from bot import Mipha
+    from utilities.context import GuildContext, Interaction
 
 
 class HyruleRoleAssignmentView(MiphaBaseView):

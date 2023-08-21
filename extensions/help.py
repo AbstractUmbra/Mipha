@@ -11,12 +11,11 @@ from typing import TYPE_CHECKING, AsyncGenerator, Mapping
 import discord
 from discord.ext import commands
 
-from utilities.context import Context
 from utilities.paginator import RoboPages, SimpleListSource
-
 
 if TYPE_CHECKING:
     from bot import Mipha
+    from utilities.context import Context
 
 
 class PaginatedHelpCommand(commands.HelpCommand):

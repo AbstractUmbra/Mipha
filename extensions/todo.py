@@ -15,18 +15,17 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities.context import Interaction
 from utilities.converters import DatetimeTransformer
 from utilities.formats import plural, random_pastel_colour
 from utilities.time import format_relative, human_timedelta
 from utilities.ui import MiphaBaseModal, MiphaBaseView
-
 
 if TYPE_CHECKING:
     from typing_extensions import Self
 
     from bot import Mipha
     from extensions.reminders import Reminder, Timer
+    from utilities.context import Interaction
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ class TodoCreateModal(MiphaBaseModal, title="To-do!"):
 class TodoView(MiphaBaseView):
     message: discord.Message
 
-    def __init__(self, *, bot: Mipha, record: TodoRecord, cog: Todo, timeout: float | None = 180):
+    def __init__(self, *, bot: Mipha, record: TodoRecord, cog: Todo, timeout: float | None = 180) -> None:
         super().__init__(timeout=timeout)
         self.bot: Mipha = bot
         self.cog: Todo = cog
@@ -137,6 +136,8 @@ class Todo(commands.Cog):
                      """
 
         record = await self.bot.pool.fetchrow(query, author_id, channel_id, content, reminder, now)
+
+        assert record
 
         if reminder is not None:
             reminder_cog: Reminder | None = self.bot.get_cog("Reminder")  # type: ignore # wtf dpy
@@ -267,5 +268,5 @@ class Todo(commands.Cog):
         )
 
 
-async def setup(bot) -> None:
+async def setup(bot: Mipha) -> None:
     await bot.add_cog(Todo(bot))

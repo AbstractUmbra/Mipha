@@ -1,32 +1,34 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
 import logging
 import re
 import time
 import weakref
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 import asyncpg
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from typing_extensions import Annotated
 
 from utilities import cache, checks
 from utilities.formats import plural
 from utilities.paginator import SimplePages
 
-
 if TYPE_CHECKING:
+    import datetime
+
+    from discord.ext.commands._types import Check
+    from typing_extensions import Annotated
+
     from bot import Mipha
     from utilities.context import GuildContext
 
     class StarboardContext(GuildContext):
         starboard: CompleteStarboardConfig
 
-    StarableChannel = Union[discord.TextChannel, discord.VoiceChannel, discord.Thread]
+    StarableChannel = discord.TextChannel | discord.VoiceChannel | discord.Thread
 
 
 log = logging.getLogger(__name__)
@@ -36,7 +38,7 @@ class StarError(commands.CheckFailure):
     pass
 
 
-def requires_starboard():
+def requires_starboard() -> Check[StarboardContext]:
     async def predicate(ctx: StarboardContext) -> bool:
         if ctx.guild is None:
             return False
@@ -62,12 +64,12 @@ def MessageID(argument: str) -> int:
 class StarboardConfig:
     __slots__ = ("bot", "id", "channel_id", "threshold", "locked", "needs_migration", "max_age")
 
-    def __init__(self, *, guild_id: int, bot: Mipha, record: Optional[asyncpg.Record] = None):
+    def __init__(self, *, guild_id: int, bot: Mipha, record: asyncpg.Record | None = None) -> None:
         self.id: int = guild_id
         self.bot: Mipha = bot
 
         if record:
-            self.channel_id: Optional[int] = record["channel_id"]
+            self.channel_id: int | None = record["channel_id"]
             self.threshold: int = record["threshold"]
             self.locked: bool = record["locked"]
             self.needs_migration: bool = self.locked is None
@@ -79,7 +81,7 @@ class StarboardConfig:
             self.channel_id = None
 
     @property
-    def channel(self) -> Optional[discord.TextChannel]:
+    def channel(self) -> discord.TextChannel | None:
         guild = self.bot.get_guild(self.id)
         return guild and guild.get_channel(self.channel_id)  # type: ignore
 
@@ -102,7 +104,7 @@ class Stars(commands.Cog):
     and using the star/unstar commands.
     """
 
-    def __init__(self, bot: Mipha):
+    def __init__(self, bot: Mipha) -> None:
         self.bot: Mipha = bot
 
         # cache message objects to save Discord some HTTP requests.
@@ -119,16 +121,16 @@ class Stars(commands.Cog):
     def display_emoji(self) -> discord.PartialEmoji:
         return discord.PartialEmoji(name="\N{WHITE MEDIUM STAR}")
 
-    def cog_unload(self):
+    def cog_unload(self) -> None:
         self.clean_message_cache.cancel()
         self.update_star_givers.stop()
 
-    async def cog_command_error(self, ctx: StarboardContext, error: commands.CommandError):
+    async def cog_command_error(self, ctx: StarboardContext, error: commands.CommandError) -> None:
         if isinstance(error, StarError):
             await ctx.send(str(error), ephemeral=True)
 
     @tasks.loop(hours=1.0)
-    async def clean_message_cache(self):
+    async def clean_message_cache(self) -> None:
         self._message_cache.clear()
 
     async def _update_star_givers(self) -> None:
@@ -151,12 +153,12 @@ class Stars(commands.Cog):
         self._stale_star_givers.clear()
 
     @tasks.loop(minutes=30.0)
-    async def update_star_givers(self):
+    async def update_star_givers(self) -> None:
         await self._update_star_givers()
 
     @cache.cache()
     async def get_starboard(
-        self, guild_id: int, *, connection: Optional[asyncpg.Pool | asyncpg.Connection] = None
+        self, guild_id: int, *, connection: asyncpg.Pool | asyncpg.Connection | None = None
     ) -> StarboardConfig:
         connection = connection or self.bot.pool
         query = "SELECT * FROM starboard WHERE id=$1;"
@@ -192,10 +194,7 @@ class Stars(commands.Cog):
 
     def is_url_spoiler(self, text: str, url: str) -> bool:
         spoilers = self.spoilers.findall(text)
-        for spoiler in spoilers:
-            if url in spoiler:
-                return True
-        return False
+        return any(url in spoiler for spoiler in spoilers)
 
     def get_emoji_message(self, message: discord.Message, stars: int) -> tuple[str, discord.Embed]:
         assert isinstance(message.channel, (discord.abc.GuildChannel, discord.Thread))
@@ -232,7 +231,7 @@ class Stars(commands.Cog):
         embed.colour = self.star_gradient_colour(stars)
         return content, embed
 
-    async def get_message(self, channel: discord.abc.Messageable, message_id: int) -> Optional[discord.Message]:
+    async def get_message(self, channel: discord.abc.Messageable, message_id: int) -> discord.Message | None:
         try:
             return self._message_cache[message_id]
         except KeyError:
@@ -361,19 +360,18 @@ class Stars(commands.Cog):
         if lock is None:
             self._locks[guild_id] = lock = asyncio.Lock()
 
-        async with lock:
-            async with self.bot.pool.acquire(timeout=300.0) as con:
-                if verify:
-                    config = self.bot.config_cog
-                    if config:
-                        plonked = await config.is_plonked(guild_id, starrer_id, channel=channel, connection=con)
-                        if plonked:
-                            return
-                        perms = await config.get_command_permissions(guild_id, connection=con)
-                        if perms.is_command_blocked("star", channel.id):
-                            return
+        async with lock, self.bot.pool.acquire(timeout=300.0) as con:
+            if verify:
+                config = self.bot.config_cog
+                if config:
+                    plonked = await config.is_plonked(guild_id, starrer_id, channel=channel, connection=con)
+                    if plonked:
+                        return
+                    perms = await config.get_command_permissions(guild_id, connection=con)
+                    if perms.is_command_blocked("star", channel.id):
+                        return
 
-                await self._star_message(channel, message_id, starrer_id, connection=con)
+            await self._star_message(channel, message_id, starrer_id, connection=con)
 
     async def _star_message(
         self,
@@ -528,19 +526,18 @@ class Stars(commands.Cog):
         if lock is None:
             self._locks[guild_id] = lock = asyncio.Lock()
 
-        async with lock:
-            async with self.bot.pool.acquire(timeout=300.0) as con:
-                if verify:
-                    config = self.bot.config_cog
-                    if config:
-                        plonked = await config.is_plonked(guild_id, starrer_id, channel=channel, connection=con)
-                        if plonked:
-                            return
-                        perms = await config.get_command_permissions(guild_id, connection=con)
-                        if perms.is_command_blocked("star", channel.id):
-                            return
+        async with lock, self.bot.pool.acquire(timeout=300.0) as con:
+            if verify:
+                config = self.bot.config_cog
+                if config:
+                    plonked = await config.is_plonked(guild_id, starrer_id, channel=channel, connection=con)
+                    if plonked:
+                        return
+                    perms = await config.get_command_permissions(guild_id, connection=con)
+                    if perms.is_command_blocked("star", channel.id):
+                        return
 
-                await self._unstar_message(channel, message_id, starrer_id, connection=con)
+            await self._unstar_message(channel, message_id, starrer_id, connection=con)
 
     async def _unstar_message(
         self,
@@ -641,7 +638,7 @@ class Stars(commands.Cog):
     @commands.hybrid_group(fallback="create")
     @checks.is_manager()
     @app_commands.describe(name="The starboard channel name")
-    async def starboard(self, ctx: GuildContext, *, name: str = "starboard"):
+    async def starboard(self, ctx: GuildContext, *, name: str = "starboard") -> None:
         """Sets up the starboard for this server.
 
         This creates a new channel with the specified name
@@ -674,12 +671,14 @@ class Stars(commands.Cog):
                 if confirm:
                     await ctx.db.execute("DELETE FROM starboard WHERE id=$1;", ctx.guild.id)
                 else:
-                    return await ctx.send("Aborting starboard creation. Join the bot support server for more questions.")
+                    await ctx.send("Aborting starboard creation. Join the bot support server for more questions.")
+                    return
 
         perms = ctx.channel.permissions_for(ctx.me)
 
         if not perms.manage_roles or not perms.manage_channels:
-            return await ctx.send("\N{NO ENTRY SIGN} I do not have proper permissions (Manage Roles and Manage Channel)")
+            await ctx.send("\N{NO ENTRY SIGN} I do not have proper permissions (Manage Roles and Manage Channel)")
+            return
 
         overwrites = {
             ctx.me: discord.PermissionOverwrite(
@@ -695,9 +694,11 @@ class Stars(commands.Cog):
         try:
             channel = await ctx.guild.create_text_channel(name=name, overwrites=overwrites, reason=reason)
         except discord.Forbidden:
-            return await ctx.send("\N{NO ENTRY SIGN} I do not have permissions to create a channel.")
+            await ctx.send("\N{NO ENTRY SIGN} I do not have permissions to create a channel.")
+            return
         except discord.HTTPException:
-            return await ctx.send("\N{NO ENTRY SIGN} This channel name is bad or an unknown error happened.")
+            await ctx.send("\N{NO ENTRY SIGN} This channel name is bad or an unknown error happened.")
+            return
 
         query = "INSERT INTO starboard (id, channel_id) VALUES ($1, $2);"
         try:
@@ -711,7 +712,7 @@ class Stars(commands.Cog):
 
     @starboard.command(name="info")
     @requires_starboard()
-    async def starboard_info(self, ctx: StarboardContext):
+    async def starboard_info(self, ctx: StarboardContext) -> None:
         """Shows meta information about the starboard."""
         starboard = ctx.starboard
         channel = starboard.channel
@@ -731,7 +732,7 @@ class Stars(commands.Cog):
     @commands.hybrid_group(fallback="post", ignore_extra=False)
     @commands.guild_only()
     @app_commands.describe(message="The message ID to star")
-    async def star(self, ctx: GuildContext, message: Annotated[int, MessageID]):
+    async def star(self, ctx: GuildContext, message: Annotated[int, MessageID]) -> None:
         """Stars a message via message ID.
 
         To star a message you should right click on the on a message and then
@@ -756,7 +757,7 @@ class Stars(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @app_commands.describe(message="The message ID to remove a star from")
-    async def unstar(self, ctx: GuildContext, message: Annotated[int, MessageID]):
+    async def unstar(self, ctx: GuildContext, message: Annotated[int, MessageID]) -> None:
         """Unstars a message via message ID.
 
         To unstar a message you should right click on the on a message and then
@@ -767,7 +768,8 @@ class Stars(commands.Cog):
         try:
             await self.unstar_message(ctx.channel, message, ctx.author.id, verify=True)
         except StarError as e:
-            return await ctx.send(str(e), ephemeral=True)
+            await ctx.send(str(e), ephemeral=True)
+            return
         else:
             if ctx.interaction is None:
                 await ctx.message.delete()
@@ -778,7 +780,7 @@ class Stars(commands.Cog):
     @checks.is_manager()
     @requires_starboard()
     @app_commands.describe(stars="Remove messages that have less than or equal to this number")
-    async def star_clean(self, ctx: StarboardContext, stars: commands.Range[int, 1, None] = 1):
+    async def star_clean(self, ctx: StarboardContext, stars: commands.Range[int, 1, None] = 1) -> None:
         """Cleans the starboard
 
         This removes messages in the starboard that only have less
@@ -827,7 +829,7 @@ class Stars(commands.Cog):
     @star.command(name="show")
     @requires_starboard()
     @app_commands.describe(message="The message ID to show star information of")
-    async def star_show(self, ctx: StarboardContext, message: Annotated[int, MessageID]):
+    async def star_show(self, ctx: StarboardContext, message: Annotated[int, MessageID]) -> None:
         """Shows a starred message via its ID.
 
         To get the ID of a message you should right click on the
@@ -852,7 +854,8 @@ class Stars(commands.Cog):
 
         record = await ctx.db.fetchrow(query, ctx.guild.id, message)
         if record is None:
-            return await ctx.send("This message has not been starred.")
+            await ctx.send("This message has not been starred.")
+            return
 
         bot_message_id = record["bot_message_id"]
         if bot_message_id is not None:
@@ -860,7 +863,8 @@ class Stars(commands.Cog):
             msg = await self.get_message(ctx.starboard.channel, bot_message_id)
             if msg is not None:
                 embed = msg.embeds[0] if msg.embeds else None
-                return await ctx.send(msg.content, embed=embed)
+                await ctx.send(msg.content, embed=embed)
+                return
             else:
                 # somehow it got deleted, so just delete the entry
                 query = "DELETE FROM starboard_entries WHERE message_id=$1;"
@@ -868,13 +872,15 @@ class Stars(commands.Cog):
                 return
 
         # slow path, try to fetch the content
-        channel: Optional[discord.abc.Messageable] = ctx.guild.get_channel_or_thread(record["channel_id"])  # type: ignore
+        channel: discord.abc.Messageable | None = ctx.guild.get_channel_or_thread(record["channel_id"])  # type: ignore
         if channel is None:
-            return await ctx.send("The message's channel has been deleted.")
+            await ctx.send("The message's channel has been deleted.")
+            return
 
         msg = await self.get_message(channel, record["message_id"])
         if msg is None:
-            return await ctx.send("The message has been deleted.")
+            await ctx.send("The message has been deleted.")
+            return
 
         content, embed = self.get_emoji_message(msg, record["Stars"])
         await ctx.send(content, embed=embed)
@@ -882,7 +888,7 @@ class Stars(commands.Cog):
     @star.command(name="who")
     @requires_starboard()
     @app_commands.describe(message="The message ID to show starrer information of")
-    async def star_who(self, ctx: StarboardContext, message: Annotated[int, MessageID]):
+    async def star_who(self, ctx: StarboardContext, message: Annotated[int, MessageID]) -> None:
         """Show who starred a message.
 
         The ID can either be the starred message ID
@@ -899,7 +905,8 @@ class Stars(commands.Cog):
 
         records = await ctx.db.fetch(query, message)
         if records is None or len(records) == 0:
-            return await ctx.send("No one starred this message or this is an invalid message ID.")
+            await ctx.send("No one starred this message or this is an invalid message ID.")
+            return
 
         records = [r[0] for r in records]
         members = [str(member) async for member in self.bot.resolve_member_ids(ctx.guild, records)]
@@ -916,7 +923,7 @@ class Stars(commands.Cog):
     @star.command(name="migrate", with_app_command=False)
     @requires_starboard()
     @checks.is_manager()
-    async def star_migrate(self, ctx: StarboardContext):
+    async def star_migrate(self, ctx: StarboardContext) -> None:
         """Migrates the starboard to the newest version.
 
         While doing this, the starboard is locked.
@@ -930,10 +937,12 @@ class Stars(commands.Cog):
 
         perms = ctx.starboard.channel.permissions_for(ctx.me)
         if not perms.read_message_history:
-            return await ctx.send(f"Bot does not have Read Message History in {ctx.starboard.channel.mention}.")
+            await ctx.send(f"Bot does not have Read Message History in {ctx.starboard.channel.mention}.")
+            return
 
         if ctx.starboard.locked:
-            return await ctx.send("Starboard must be unlocked to migrate. It will be locked during the migration.")
+            await ctx.send("Starboard must be unlocked to migrate. It will be locked during the migration.")
+            return
 
         webhook = self.bot.logging_webhook
 
@@ -1004,13 +1013,13 @@ class Stars(commands.Cog):
         emoji_lookup = lambda i: "\N{SPORTS MEDAL}" if i >= 3 else chr(0x1F947 + i)  # :first_place:
         return "\n".join(f"{emoji_lookup(i)}: {fmt(r)}" for i, r in enumerate(records))
 
-    async def star_guild_stats(self, ctx: StarboardContext):
+    async def star_guild_stats(self, ctx: StarboardContext) -> None:
         e = discord.Embed()
         e.timestamp = ctx.starboard.channel.created_at
         e.set_footer(text="Adding stars since")
         e.set_author(name="Server Starboard Stats")
         query = "SELECT COUNT(*), SUM(total) FROM starboard_entries WHERE guild_id=$1;"
-        record: Optional[tuple[int, int]] = await ctx.db.fetchrow(query, ctx.guild.id)
+        record: tuple[int, int] | None = await ctx.db.fetchrow(query, ctx.guild.id)
         assert record is not None
         total_messages, total_stars = record
 
@@ -1065,7 +1074,7 @@ class Stars(commands.Cog):
 
         await ctx.send(embed=e)
 
-    async def star_member_stats(self, ctx: StarboardContext, member: discord.Member):
+    async def star_member_stats(self, ctx: StarboardContext, member: discord.Member) -> None:
         e = discord.Embed(colour=discord.Colour.gold())
         e.set_author(name=member.display_name, icon_url=member.display_avatar.url)
 
@@ -1076,13 +1085,13 @@ class Stars(commands.Cog):
 
         # Gets stars received
         query = "SELECT SUM(total) FROM starboard_entries WHERE guild_id=$1 AND author_id=$2;"
-        record: Optional[tuple[int]] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)
+        record: tuple[int] | None = await ctx.db.fetchrow(query, ctx.guild.id, member.id)
         assert record is not None
         received = record[0]
 
         # Gets stars given
         query = "SELECT total FROM star_givers WHERE guild_id=$1 AND author_id=$2;"
-        record: Optional[tuple[int]] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)
+        record: tuple[int] | None = await ctx.db.fetchrow(query, ctx.guild.id, member.id)
         given = record[0] if record is not None else 0
 
         # Gets the top 10 starred posts
@@ -1101,7 +1110,7 @@ class Stars(commands.Cog):
 
         # this query calculates how many of our messages were starred
         query = """SELECT COUNT(*) FROM starboard_entries WHERE guild_id=$1 AND author_id=$2;"""
-        record: Optional[tuple[int]] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)
+        record: tuple[int] | None = await ctx.db.fetchrow(query, ctx.guild.id, member.id)
         assert record is not None
         messages_starred = record[0]
 
@@ -1114,7 +1123,7 @@ class Stars(commands.Cog):
     @star.command(name="stats")
     @requires_starboard()
     @app_commands.describe(member="The member to show stats of, if not given then shows server stats")
-    async def star_stats(self, ctx: StarboardContext, *, member: discord.Member | None = None):
+    async def star_stats(self, ctx: StarboardContext, *, member: discord.Member | None = None) -> None:
         """Shows statistics on the starboard usage of the server or a member."""
 
         await ctx.defer()
@@ -1129,7 +1138,7 @@ class Stars(commands.Cog):
     @star.command(name="random")
     @requires_starboard()
     @app_commands.describe(member="The member to show random stars of, if not given then shows a random star in the server")
-    async def star_random(self, ctx: StarboardContext, member: discord.User | None = None):
+    async def star_random(self, ctx: StarboardContext, member: discord.User | None = None) -> None:
         """Shows a random starred message."""
 
         await ctx.defer()
@@ -1151,7 +1160,8 @@ class Stars(commands.Cog):
                 """
         record = await ctx.db.fetchrow(query, *args)
         if record is None:
-            return await ctx.send("Could not find anything.")
+            await ctx.send("Could not find anything.")
+            return
 
         message_id = record[0]
         message = await self.get_message(ctx.starboard.channel, message_id)
@@ -1164,14 +1174,14 @@ class Stars(commands.Cog):
             await ctx.send(message.content)
 
     @star_random.error
-    async def star_random_error(self, ctx: StarboardContext, error: commands.CommandError):
+    async def star_random_error(self, ctx: StarboardContext, error: commands.CommandError) -> None:
         if isinstance(error, commands.UserNotFound):
             return await ctx.send("Could not find that member.")
 
     @star.command(name="lock")
     @checks.is_manager()
     @requires_starboard()
-    async def star_lock(self, ctx: StarboardContext):
+    async def star_lock(self, ctx: StarboardContext) -> None:
         """Locks the starboard from being processed.
 
         This is a moderation tool that allows you to temporarily
@@ -1198,7 +1208,7 @@ class Stars(commands.Cog):
     @star.command(name="unlock")
     @checks.is_manager()
     @requires_starboard()
-    async def star_unlock(self, ctx: StarboardContext):
+    async def star_unlock(self, ctx: StarboardContext) -> None:
         """Unlocks the starboard for re-processing.
 
         To use this command you need Manage Server permission.
@@ -1217,7 +1227,7 @@ class Stars(commands.Cog):
     @checks.is_manager()
     @requires_starboard()
     @app_commands.describe(stars="The number of stars required before it shows up on the board")
-    async def star_limit(self, ctx: StarboardContext, stars: int):
+    async def star_limit(self, ctx: StarboardContext, stars: int) -> None:
         """Sets the minimum number of stars required to show up.
 
         When this limit is set, messages must have this number
@@ -1263,7 +1273,7 @@ class Stars(commands.Cog):
         ctx: StarboardContext,
         number: int,
         units: Literal["days", "weeks", "months", "years", "day", "week", "month", "year"] = "days",
-    ):
+    ) -> None:
         """Sets the maximum age of a message valid for starring.
 
         By default, the maximum age is 7 days. Any message older
@@ -1297,16 +1307,13 @@ class Stars(commands.Cog):
         await ctx.db.execute(query, ctx.guild.id)
         self.get_starboard.invalidate(self, ctx.guild.id)
 
-        if number == 1:
-            age = f"1 {units[:-1]}"
-        else:
-            age = f"{number} {units}"
+        age = f"1 {units[:-1]}" if number == 1 else f"{number} {units}"
 
         await ctx.send(f"Messages must now be less than {age} old to be starred.")
 
     @star.command(hidden=True, with_app_command=False)
     @commands.is_owner()
-    async def star_update_givers(self, ctx: GuildContext, guild_id: int | None = None):
+    async def star_update_givers(self, ctx: GuildContext, guild_id: int | None = None) -> None:
         """Updates the star givers for all guilds."""
 
         if guild_id is None:
@@ -1327,13 +1334,13 @@ class Stars(commands.Cog):
         """
 
         async with ctx.typing():
-            status = await ctx.db.execute(query, *args, timeout=asyncpg.protocol.NO_TIMEOUT)
+            status = await ctx.db.execute(query, *args, timeout=asyncpg.protocol.NO_TIMEOUT)  # type: ignore
 
         await ctx.send(f"Done updating, {status!r}")
 
     @commands.command(hidden=True, with_app_command=False)
     @commands.is_owner()
-    async def star_announce(self, ctx: GuildContext, *, message: str):
+    async def star_announce(self, ctx: GuildContext, *, message: str) -> None:
         """Announce stuff to every starboard."""
         query = "SELECT id, channel_id FROM starboard;"
         records = await ctx.db.fetch(query)
@@ -1365,5 +1372,5 @@ class Stars(commands.Cog):
         await ctx.send(f"Successfully sent to {success} channels (out of {len(to_send)}) in {delta:.2f}s.")
 
 
-async def setup(bot: Mipha):
-    await bot.add_cog(Stars(bot))
+async def setup(bot: Mipha) -> None:
+    await bot.add_cog(Stars(bot), guilds=[discord.Object(id=0)])

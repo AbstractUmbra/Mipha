@@ -20,14 +20,14 @@ import pkg_resources
 import psutil
 import pygit2
 from discord.ext import commands, menus, tasks
-from typing_extensions import Annotated
 
 from utilities import formats, time
 from utilities.context import Context, Interaction
 from utilities.paginator import FieldPageSource, RoboPages
 
-
 if TYPE_CHECKING:
+    from typing_extensions import Annotated
+
     from bot import Mipha
 
 log = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class LoggingHandler(logging.Handler):
 _INVITE_REGEX = re.compile(r"(?:https?:\/\/)?discord(?:\.gg|\.com|app\.com\/invite)?\/[A-Za-z0-9]+")
 
 
-def censor_invite(obj: Any, *, _regex=_INVITE_REGEX) -> str:
+def censor_invite(obj: Any, *, _regex: re.Pattern[str] = _INVITE_REGEX) -> str:
     return _regex.sub("[censored-invite]", str(obj))
 
 
@@ -152,7 +152,7 @@ class Stats(commands.Cog):
         else:
             content = message.content
 
-        log.info(f"{message.created_at}: {message.author} in {destination}: {content}")
+        log.info("%s: %s in %s: %s", message.created_at, message.author, destination, content)
         async with self._batch_lock:
             self._data_batch.append(
                 {
@@ -252,7 +252,7 @@ class Stats(commands.Cog):
         offset = time.format_relative(commit_time.astimezone(datetime.timezone.utc))
         return f"[`{short_sha2}`](https://github.com/AbstractUmbra/mipha/commit/{commit.hex}) {short} ({offset})"
 
-    def get_last_commits(self, count=3) -> str:
+    def get_last_commits(self, count: int = 3) -> str:
         repo = pygit2.Repository(".git")
         commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL), count))
         return "\n".join(self.format_commit(c) for c in commits)
@@ -326,10 +326,7 @@ class Stats(commands.Cog):
         count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id)  # type: ignore
 
         embed.description = f"{count[0]} commands used."
-        if count[1]:
-            timestamp = count[1].replace(tzinfo=datetime.timezone.utc)
-        else:
-            timestamp = discord.utils.utcnow()
+        timestamp = count[1].replace(tzinfo=datetime.timezone.utc) if count[1] else discord.utils.utcnow()
 
         embed.set_footer(text="Tracking command usage since").timestamp = timestamp
 
@@ -431,10 +428,7 @@ class Stats(commands.Cog):
         count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)  # type: ignore
 
         embed.description = f"{count[0]} commands used."
-        if count[1]:
-            timestamp = count[1].replace(tzinfo=datetime.timezone.utc)
-        else:
-            timestamp = discord.utils.utcnow()
+        timestamp = count[1].replace(tzinfo=datetime.timezone.utc) if count[1] else discord.utils.utcnow()
 
         embed.set_footer(text="First command used").timestamp = timestamp
 
@@ -740,13 +734,13 @@ class Stats(commands.Cog):
 
         # Check the connection pool health.
         pool = self.bot.pool
-        total_waiting = len(pool._queue._getters)  # type: ignore
+        total_waiting = len(pool._queue._getters)
         current_generation = pool._generation
 
         description = [
             f"Total `Pool.acquire` Waiters: {total_waiting}",
             f"Current Pool Generation: {current_generation}",
-            f"Connections In Use: {len(pool._holders) - pool._queue.qsize()}",  # type: ignore
+            f"Connections In Use: {len(pool._holders) - pool._queue.qsize()}",
         ]
 
         questionable_connections = 0
@@ -776,8 +770,8 @@ class Stats(commands.Cog):
         all_tasks = asyncio.all_tasks(loop=self.bot.loop)
         event_tasks = [t for t in all_tasks if "Client._run_event" in repr(t) and not t.done()]
 
-        cogs_directory = os.path.dirname(__file__)
-        tasks_directory = os.path.join("discord", "ext", "tasks", "__init__.py")
+        cogs_directory = os.path.dirname(__file__)  # noqa: PTH120
+        tasks_directory = os.path.join("discord", "ext", "tasks", "__init__.py")  # noqa: PTH118
         inner_tasks = [t for t in all_tasks if cogs_directory in repr(t) or tasks_directory in repr(t)]
 
         bad_inner_tasks = ", ".join(hex(id(t)) for t in inner_tasks if t.done() and t._exception is not None)
@@ -1019,7 +1013,7 @@ class Stats(commands.Cog):
                 self.failed = 0
                 self.total = 0
 
-            def add(self, record) -> None:
+            def add(self, record: asyncpg.Record) -> None:
                 self.success += record["success"]
                 self.failed += record["failed"]
                 self.total += record["total"]
@@ -1045,7 +1039,7 @@ class Stats(commands.Cog):
 old_on_error = commands.Bot.on_error
 
 
-async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
+async def on_error(self: commands.Bot, event: str, *args: Any, **kwargs: Any) -> None:
     (exc_type, exc, tb) = sys.exc_info()
     # Silence command errors that somehow get bubbled up far enough here
     if isinstance(exc, commands.CommandInvokeError):
@@ -1062,11 +1056,9 @@ async def on_error(self, event: str, *args: Any, **kwargs: Any) -> None:
         args_str.append(f"[{index}]: {arg!r}")
     args_str.append("```")
     e.add_field(name="Args", value="\n".join(args_str), inline=False)
-    hook = self.get_cog("Stats").webhook
-    try:
-        await hook.send(embed=e)
-    except:
-        pass
+    cog: Stats | None = self.get_cog("Stats")  # type: ignore # no upcasting
+    if cog:
+        await cog.webhook.send(embed=e)
 
 
 async def setup(bot: Mipha) -> None:

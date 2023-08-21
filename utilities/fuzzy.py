@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import heapq
 import re
-from collections.abc import Callable, Generator, Iterable, Sequence
 from difflib import SequenceMatcher
-from typing import Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Literal, TypeVar, overload
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator, Iterable, Sequence
 
 T = TypeVar("T")
 

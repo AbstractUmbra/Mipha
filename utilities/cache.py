@@ -8,7 +8,6 @@ from typing import Any, Callable, Coroutine, Generic, MutableMapping, Protocol, 
 
 from lru import LRU
 
-
 R = TypeVar("R")
 
 
@@ -81,7 +80,7 @@ def cache(
         def _make_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
             # this is a bit of a cluster fuck
             # we do care what 'self' parameter is when we __repr__ it
-            def _true_repr(o) -> str:
+            def _true_repr(o: object) -> str:
                 if o.__class__.__repr__ is object.__repr__:
                     return f"<{o.__class__.__module__}.{o.__class__.__name__}>"
                 return repr(o)
@@ -122,10 +121,7 @@ def cache(
                 return True
 
         def _invalidate_containing(key: str) -> None:
-            to_remove = []
-            for k in _internal_cache.keys():
-                if key in k:
-                    to_remove.append(k)
+            to_remove = [k for k in _internal_cache if key in k]
             for k in to_remove:
                 try:
                     del _internal_cache[k]

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import collections
 import datetime
-import zoneinfo
 from typing import TYPE_CHECKING, Literal, NamedTuple, TypedDict, overload
 
 import discord
+import zoneinfo
 from discord import app_commands
 from discord.ext import commands
 from lxml import etree
@@ -22,7 +22,6 @@ from utilities.context import Context, GuildContext, Interaction
 from utilities.formats import plural, random_pastel_colour
 from utilities.fuzzy import finder
 from utilities.paginator import RoboPages, SimpleListSource
-
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -376,10 +375,7 @@ class Time(commands.Cog):
         for record in records:
             user_id = record["user_id"]
             user_ = guild.get_member(user_id)
-            if user_:
-                user = f"{user_.name}"
-            else:
-                user = f"Member with the ID {user_id} cannot be found."
+            user = f"{user_.name}" if user_ else f"Member with the ID {user_id} cannot be found."
 
             tz = record["tz"]
             timezone = zoneinfo.ZoneInfo(tz)
