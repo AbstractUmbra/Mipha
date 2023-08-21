@@ -200,7 +200,7 @@ class Mipha(commands.Bot):
         self.config: RootConfig = config
 
         self._prefix_data: Config[list[str]] = Config(pathlib.Path("configs/prefixes.json"))
-        self._blacklist_data: Config[list[str]] = Config(pathlib.Path("configs/blacklist.json"))
+        self._blacklist_data: Config[bool] = Config(pathlib.Path("configs/blacklist.json"))
 
         # auto spam detection
         self._spam_cooldown_mapping: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(

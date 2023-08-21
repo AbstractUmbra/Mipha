@@ -9,13 +9,16 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, overload
+
+from typing_extensions import TypeVar
 
 if TYPE_CHECKING:
     import pathlib
 
+
 ObjectHook: TypeAlias = Callable[[dict[str, Any]], Any]
-_T = TypeVar("_T")
+_T = TypeVar("_T", default=Any)
 _defT = TypeVar("_defT")
 
 
@@ -84,7 +87,7 @@ class Config(Generic[_T]):
         """Retrieves a config entry."""
         return self._db.get(str(key), default)
 
-    async def put(self, key: Any, value: _T | Any) -> None:
+    async def put(self, key: Any, value: _T) -> None:
         """Edits a config entry."""
         self._db[str(key)] = value
         await self.save()
@@ -99,7 +102,7 @@ class Config(Generic[_T]):
     def __contains__(self, item: Any) -> bool:
         return str(item) in self._db
 
-    def __getitem__(self, item: Any) -> _T | Any:
+    def __getitem__(self, item: Any) -> _T:
         return self._db[str(item)]
 
     def __len__(self) -> int:
