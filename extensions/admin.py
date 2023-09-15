@@ -11,15 +11,16 @@ import time
 import traceback
 from typing import TYPE_CHECKING, Literal
 
+import aiohttp
 import discord
 from discord.ext import commands
+from discord.ext.commands import Greedy  # noqa: TCH002
 
 from utilities import formats
 from utilities.converters import MystbinPasteConverter
 
 if TYPE_CHECKING:
     from asyncpg import Record
-    from discord.ext.commands import Greedy
 
     from bot import Mipha
     from utilities.context import Context, GuildContext
@@ -204,6 +205,28 @@ class Admin(commands.Cog):
         paste: str = commands.param(converter=MystbinPasteConverter, description="Paste url or ID"),
     ) -> None:
         await ctx.bot.mb_client.delete_paste(paste)
+
+    @commands.command(name="delete_webhook", aliases=["dwh"])
+    async def delete_webhook(self, ctx: Context, *, webhook_url: str) -> None:
+        async with aiohttp.ClientSession() as session:
+            webhook = discord.Webhook.from_url(webhook_url, session=session)
+            try:
+                await webhook.fetch()
+            except discord.HTTPException:
+                return await ctx.send("Webhooks seems invalid or is gone.")
+            else:
+                await ctx.send(
+                    f"Webhook details are:-\n{webhook.name} ({webhook.user.name if webhook.user else 'No User'}) ::"
+                    f" {webhook.id}, bound to"
+                    f" {webhook.channel_id} ({webhook.channel.name if webhook.channel else 'Unknown'})"
+                )
+
+            try:
+                await webhook.delete()
+            except discord.HTTPException:
+                return await ctx.send("Couldn't delete the webhook")
+            else:
+                return await ctx.send("Webhook deleted.")
 
 
 async def setup(bot: Mipha) -> None:

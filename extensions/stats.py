@@ -12,7 +12,7 @@ import sys
 import textwrap
 import traceback
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 import asyncpg
 import discord
@@ -26,8 +26,6 @@ from utilities.context import Context, Interaction
 from utilities.paginator import FieldPageSource, RoboPages
 
 if TYPE_CHECKING:
-    from typing_extensions import Annotated
-
     from bot import Mipha
 
 log = logging.getLogger(__name__)

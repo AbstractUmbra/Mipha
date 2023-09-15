@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import random as rng
 from collections import Counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 from discord.ext import commands
 
 from utilities.formats import plural
 
 if TYPE_CHECKING:
-    from typing_extensions import Annotated
-
     from bot import Mipha
     from utilities.context import Context
 

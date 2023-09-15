@@ -7,7 +7,7 @@ import io
 import logging
 import re
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Literal, MutableMapping, NoReturn
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Literal, MutableMapping, NoReturn
 
 import asyncpg
 import discord
@@ -15,17 +15,17 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utilities import cache, checks, flags, time
+from utilities.converters import Snowflake  # noqa: TCH001
 from utilities.formats import human_join, plural
 from utilities.paginator import SimplePages
 from utilities.ui import MiphaBaseView
 
 if TYPE_CHECKING:
     from discord.ext.commands._types import Check
-    from typing_extensions import Annotated, Self
+    from typing_extensions import Self
 
     from bot import Mipha
     from utilities.context import GuildContext, Interaction
-    from utilities.converters import Snowflake
 
     from .reminders import Timer
 
