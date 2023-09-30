@@ -1,16 +1,9 @@
-networks:
-  main:
-    external: true
-    name: main
+version: "3"
 
 services:
   bot:
     container_name: mipha
-    extra_hosts:
-      - "database:host-gateway"
     image: ghcr.io/abstractumbra/mipha:latest
-    networks:
-      main:
     restart: unless-stopped
     volumes:
       - ./configs/:/app/configs/:rw
@@ -21,9 +14,6 @@ services:
   duckling:
     container_name: "duckling"
     image: ghcr.io/abstractumbra/duckling:latest
-    networks:
-      main:
-        ipv4_address: 172.19.0.20
     restart: unless-stopped
 
   synth:
@@ -31,4 +21,18 @@ services:
     image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
     restart: unless-stopped
 
-version: "3"
+  db:
+    image: postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=foofuck
+      - POSTGRES_USER=penumbra
+      - POSTGRES_DB=mipha
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # - ./schemas/:/docker-entrypoint-initdb.d/
+    profiles:
+      - db
+
+volumes:
+  pgdata:

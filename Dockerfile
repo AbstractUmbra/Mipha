@@ -35,18 +35,22 @@ RUN apt-get update \
     git \
     # deps for installing poetry
     curl \
+    ca-certificates \
     # deps for building python deps
     build-essential \
     libcurl4-gnutls-dev \
     gnutls-dev \
+    gnupg \
     libmagic-dev \
     ffmpeg
 
 RUN curl -sSL https://install.python-poetry.org | python -
 
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt install -y --no-install-recommends \
-    nodejs
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt update -y \
+    && apt install -y --no-install-recommends nodejs
 
 RUN npm install -g pyright@latest
 
