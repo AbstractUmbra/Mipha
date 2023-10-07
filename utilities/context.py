@@ -8,7 +8,17 @@ from __future__ import annotations
 
 import datetime
 import secrets
-from typing import TYPE_CHECKING, Any, Generic, Iterable, Literal, Protocol, Sequence, TypeAlias, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Iterable,
+    Literal,
+    Protocol,
+    Sequence,
+    TypeAlias,
+    overload,
+)
 
 import discord
 from discord.ext import commands
@@ -157,6 +167,13 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         ref = self.message.reference
         if ref and isinstance(ref.resolved, discord.Message):
             return ref.resolved.to_reference()
+
+    @discord.utils.cached_property
+    def replied_message(self) -> discord.Message:
+        ref = self.message.reference
+        if ref and isinstance(ref.resolved, discord.Message):
+            return ref.resolved
+        return self.message
 
     async def disambiguate(self, matches: list[T], entry: Callable[[T], Any], *, ephemeral: bool = False) -> T:
         if len(matches) == 0:

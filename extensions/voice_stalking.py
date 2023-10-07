@@ -155,12 +155,25 @@ class VoiceStalking(commands.Cog):
 
     @stalking.command()
     @commands.guild_only()
+    async def setup(self, ctx: GuildContext) -> None:
+        """Set up this guild for voice stalking."""
+        config = self._config.get(ctx.guild.id)
+        if config:
+            return await ctx.send("It seems it's already set up here?")
+
+        config = self._create_default_config()
+        await self._config.put(ctx.guild.id, config)
+
+        await ctx.message.add_reaction(ctx.tick(True))
+
+    @stalking.command()
+    @commands.guild_only()
     @has_guild_permissions(manage_channels=True)
     async def exclude(
         self, ctx: GuildContext, channel: discord.VoiceChannel | discord.StageChannel | discord.Object
     ) -> None:
         """Exclude a channel from the voice stalking."""
-        config = self._config.get(ctx.guild.id, {})
+        config = self._config.get(ctx.guild.id)
         if not config:
             return
 
@@ -171,7 +184,8 @@ class VoiceStalking(commands.Cog):
     @commands.guild_only()
     @has_guild_permissions(manage_channels=True)
     async def create(self, ctx: GuildContext, name: str, exclude: commands.Greedy[discord.Member | discord.Role]) -> None:
-        config = self._config.get(ctx.guild.id, {})
+        """Create an excluded text and voice channel combination."""
+        config: VoiceStalkingConfig | None = self._config.get(ctx.guild.id)
         if not config:
             return
 

@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import io
+import logging
 import time
 import traceback
 from typing import TYPE_CHECKING, Literal
@@ -24,6 +25,9 @@ if TYPE_CHECKING:
 
     from bot import Mipha
     from utilities.context import Context, GuildContext
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Admin(commands.Cog):
@@ -90,6 +94,7 @@ class Admin(commands.Cog):
         except commands.ExtensionNotLoaded:
             return await self.bot.load_extension(module)
         except commands.ExtensionError as err:
+            LOGGER.error("Extension is fucked", exc_info=err)
             await ctx.send(f"{err.__class__.__name__}: {err}")
             await ctx.message.add_reaction(ctx.tick(False))
             return

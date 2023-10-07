@@ -149,11 +149,11 @@ class MediaReposter(commands.Cog):
     async def media_context_menu_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(thinking=True)
 
-        if match := MOBILE_PATTERN.search(message.content):
-            url = match[1]
-        elif match := DESKTOP_PATTERN.search(message.content):
-            url = match[1]
-        elif match := TWITTER_PATTERN.search(message.content):
+        if (
+            match := MOBILE_PATTERN.search(message.content)
+            or DESKTOP_PATTERN.search(message.content)
+            or TWITTER_PATTERN.search(message.content)
+        ):
             url = match[1]
         elif match := REDDIT_PATTERN.search(message.content):
             url = match[0]
