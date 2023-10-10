@@ -7,3 +7,4 @@ _pyright/
 buffer/
 *.ipynb
 [!__]_*.py
+*.py[cod]

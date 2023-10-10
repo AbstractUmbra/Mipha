@@ -2,3 +2,6 @@
 [submodule "duckling"]
 	path = duckling
 	url = git@github.com:facebook/duckling.git
+[submodule "private-extensions"]
+	path = extensions/private
+	url = git@github.com:AbstractUmbra/mipha-private-extensions.git

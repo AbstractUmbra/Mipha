@@ -4,6 +4,8 @@ services:
   bot:
     container_name: mipha
     image: ghcr.io/abstractumbra/mipha:latest
+    extra_hosts:
+      - "database:host-gateway"
     restart: unless-stopped
     volumes:
       - ./configs/:/app/configs/:rw
