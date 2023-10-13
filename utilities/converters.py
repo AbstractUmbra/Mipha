@@ -238,6 +238,9 @@ class WhenAndWhatConverter(commands.Converter[tuple[datetime.datetime, str]]):
         if begin != 0 and end != len(argument):
             raise commands.BadArgument("Could not distinguish time from argument.")
 
+        if when < now:
+            raise commands.BadArgument("This time is in the past.")
+
         what = argument[end + 1 :].lstrip(" ,.!:;") if begin == 0 else argument[:begin].strip()
 
         for prefix in ("to ",):
@@ -426,6 +429,9 @@ class WhenAndWhatTransformer(app_commands.Transformer):
 
         if begin != 0 and end != len(value):
             raise BadDatetimeTransform("Could not distinguish time from argument.")
+
+        if when < now:
+            raise BadDatetimeTransform("This time is in the past.")
 
         what = value[end + 1 :].lstrip(" ,.!:;") if begin == 0 else value[:begin].strip()
 
