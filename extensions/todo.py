@@ -15,6 +15,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utilities.cache import cache
 from utilities.converters import DatetimeTransformer
 from utilities.formats import plural, random_pastel_colour
 from utilities.time import format_relative, human_timedelta
@@ -107,10 +108,14 @@ class Todo(commands.Cog):
         )
         self.bot.tree.add_command(self.create_todo_context_menu)
 
+    def __repr__(self) -> str:
+        return "<TodoCog>"
+
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.create_todo_context_menu.name, type=self.create_todo_context_menu.type)
 
-    async def get_todos(self, interaction: Interaction) -> list[TodoRecord]:
+    @cache()
+    async def get_todos(self, user_id: int) -> list[TodoRecord]:
         query = """
                 SELECT *
                 FROM todos
@@ -118,7 +123,7 @@ class Todo(commands.Cog):
                 ORDER BY todo_created_at ASC;
                 """
 
-        return await self.bot.pool.fetch(query, interaction.user.id)
+        return await self.bot.pool.fetch(query, user_id)
 
     async def create_todo(
         self,
@@ -142,17 +147,28 @@ class Todo(commands.Cog):
         if reminder is not None:
             reminder_cog: Reminder | None = self.bot.get_cog("Reminder")  # type: ignore # wtf dpy
             if reminder_cog is not None:
-                return await reminder_cog.create_timer(
-                    reminder, "todo_reminder", channel_id, created=now, todo_record=record[0]
-                )
+                await reminder_cog.create_timer(reminder, "todo_reminder", channel_id, created=now, todo_record=record[0])
+                self.get_todos.invalidate(self, author_id)
             else:
                 LOGGER.warning("Reminder cog is not loaded. Is this an issue?")
+                raise commands.CheckFailure("This functionality is currently unavailable.")
 
     async def fetch_todo(self, todo_id: int, /) -> TodoRecord | None:
         return await self.bot.pool.fetchrow("SELECT * FROM todos WHERE todo_id = $1;", todo_id)
 
     async def delete_todo(self, todo_id: int, /, *, author_id: int) -> bool:
-        ...
+        query = """
+                DELETE
+                FROM todos
+                WHERE todo_id = $1
+                AND author_id = $2;
+                """
+
+        execution = await self.bot.pool.execute(query, todo_id, author_id)
+
+        if execution == "":
+            return False
+        return True
 
     def generate_embed(self, record: TodoRecord, /) -> discord.Embed:
         ret = discord.Embed(title="To-do Reminder!", colour=random_pastel_colour())
@@ -236,11 +252,27 @@ class Todo(commands.Cog):
 
     @todo_group.command(name="delete", description="Delete one of your to-dos!")
     async def todo_delete(self, interaction: Interaction, todo: int) -> None:
-        ...
+        await interaction.response.defer(ephemeral=True)
+
+        success = await self.delete_todo(todo, author_id=interaction.user.id)
+
+        if success:
+            self.get_todos.invalidate(self, interaction.user.id)
+            await interaction.followup.send("Done!")
+        else:
+            await interaction.followup.send("Sorry, are you sure this is your todo?")
 
     @todo_delete.autocomplete(name="todo")
     async def todo_delete_autocomplete(self, interaction: Interaction, current: str) -> list[app_commands.Choice[int]]:
-        ...
+        todos = await self.get_todos(interaction.user.id)
+        choices = [
+            app_commands.Choice(
+                name=textwrap.shorten(todo["todo_content"], width=20, placeholder="..."), value=todo["todo_id"]
+            )
+            for todo in todos
+        ]
+
+        return choices[:25]
 
     @commands.Cog.listener()
     async def on_todo_reminder_timer_complete(self, timer: Timer, /) -> None:
