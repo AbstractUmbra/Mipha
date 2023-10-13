@@ -168,11 +168,12 @@ class URLChecker(commands.Cog):
                 fmt += "URL was found in the following ad or tracker lists:-\n\n"
                 fmt += "\n".join(url_found_in)
 
-            await ctx.send(f"URL Details follow:-{fmt}", view=view, ephemeral=True)
+            view.message = await ctx.send(f"URL Details follow:-{fmt}", view=view, ephemeral=True, wait=True)
 
     @tasks.loop(hours=24)
     async def update_adlist_master(self) -> None:
         for url, key in zip(AD_LISTS, self.ad_lists.keys()):
+            LOGGER.info("Updating adlist '%s' ('%s').", key, url)
             async with self.bot.session.get(url) as resp:
                 data = await resp.text()
                 clean_lines = data.splitlines()
