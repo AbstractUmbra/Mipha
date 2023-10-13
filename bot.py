@@ -237,6 +237,12 @@ class Mipha(commands.Bot):
     def logging_webhook(self) -> discord.Webhook:
         return discord.Webhook.from_url(self.config["webhooks"]["logging"], session=self.session)
 
+    def update_config(self) -> None:
+        config = CONFIG_PATH.read_text("utf-8")
+        raw_cfg: RootConfig = discord.utils._from_json(config)
+
+        self.config = raw_cfg
+
     async def on_socket_response(self, message: Any) -> None:
         """Quick override to log websocket events."""
         self._previous_websocket_events.append(message)
