@@ -84,4 +84,4 @@ class RootConfig(TypedDict, total=False):
     rcon: RCONConfig
     duckling: DucklingConfig
     lewd: LewdConfig
-    logging_webhooks: list[str]
+    logging_webhooks: dict[str, list[str]]  # guild_id: [channels]
