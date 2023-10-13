@@ -333,7 +333,7 @@ class Time(commands.Cog):
     async def _remove(self, ctx: Context) -> None:
         """Remove your timezone from the bot."""
         query = """
-            DELETE *
+            DELETE
             FROM tz_store
             WHERE user_id = $1;
             """
