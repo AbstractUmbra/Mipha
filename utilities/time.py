@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import datetime
+import enum
 import re
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,16 @@ units["minutes"].append("mins")
 units["seconds"].append("secs")
 units["hours"].append("hr")
 units["hours"].append("hrs")
+
+
+class Weekday(enum.Enum):
+    monday = 0
+    tuesday = 1
+    wednesday = 2
+    thursday = 3
+    friday = 4
+    saturday = 5
+    sunday = 6
 
 
 class ShortTime:
@@ -295,9 +306,12 @@ def human_timedelta(
             return " ".join(output) + str_suffix
 
 
-def hf_time(dt: datetime.datetime) -> str:
+def hf_time(dt: datetime.datetime, *, with_time: bool = True) -> str:
     date_modif = ordinal(dt.day)
-    return dt.strftime(f"%A {date_modif} of %B %Y @ %H:%M %Z (%z)")
+    if with_time:
+        return dt.strftime(f"%A {date_modif} of %B %Y @ %H:%M %Z (%z)")
+    else:
+        return dt.strftime(f"%A {date_modif} of %B %Y")
 
 
 def ordinal(number: int) -> str:
@@ -306,3 +320,20 @@ def ordinal(number: int) -> str:
 
 def format_relative(dt: datetime.datetime) -> str:
     return format_dt(dt, "R")
+
+
+def resolve_next_weekday(
+    *, source: datetime.datetime | None = None, target: Weekday, exit_soon: bool = False
+) -> datetime.datetime:
+    source = source or datetime.datetime.now(datetime.timezone.utc)
+    weekday = source.weekday()
+
+    if weekday == target.value:
+        if exit_soon:
+            return source
+        return source + datetime.timedelta(days=7)
+
+    while source.weekday() != target.value:
+        source += datetime.timedelta(days=1)
+
+    return source
