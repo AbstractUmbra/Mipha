@@ -175,7 +175,7 @@ class MangaCog(commands.Cog, name="Manga"):
             return
 
         view = MangaView(ctx.author, ctx.bot, manga)
-        await ctx.send(view=view)
+        view.message = await ctx.send(view=view, wait=True)
 
     @mangadex_group.command(name="search")
     @app_commands.describe(query="The manga name to search for")
@@ -189,6 +189,7 @@ class MangaCog(commands.Cog, name="Manga"):
 
         view = MangaView(interaction.user, self.bot, manga)
         await interaction.followup.send(view=view, ephemeral=True)
+        view.message = await interaction.original_response()
 
     @search_.error
     async def search_error(self, ctx: Context, error: commands.CommandError) -> None:
