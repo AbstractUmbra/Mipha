@@ -1,5 +1,5 @@
 {
-    "$schema": "https://static.abstractumbra.dev/schemas/mipha-schema.json",
+    "$schema": "https://static.abstractumbra.dev/schemas/mipha.json",
     "bot": {
         "token": ""
     },
