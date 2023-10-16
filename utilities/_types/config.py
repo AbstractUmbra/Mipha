@@ -9,14 +9,14 @@ class BotConfig(TypedDict):
     token: str
 
 
-class DatabaseConfig(TypedDict):
-    dsn: str
-    audio_dsn: NotRequired[str]
-    host: NotRequired[str]
-    user: NotRequired[str]
-    password: NotRequired[str]
-    database: NotRequired[str]
-    port: NotRequired[int]
+class DatabaseConfig(TypedDict, total=False):
+    dsn: Required[str]
+    audio_dsn: str
+    host: str
+    user: str
+    password: str
+    database: str
+    port: int
 
 
 class WebhookConfig(TypedDict):
@@ -24,7 +24,7 @@ class WebhookConfig(TypedDict):
     mangadex: NotRequired[str]
 
 
-class TokenConfig(TypedDict):
+class TokenConfig(TypedDict, total=False):
     mystbin: str
     github: str
     wanikani: str
@@ -70,6 +70,11 @@ class LewdConfig(TypedDict):
     danbooru: _BooruConfig
 
 
+class Logging(TypedDict):
+    dm: bool
+    webhooks: list[str]
+
+
 class RootConfig(TypedDict, total=False):
     bot: Required[BotConfig]
     owner_ids: Required[list[int]]
@@ -84,4 +89,4 @@ class RootConfig(TypedDict, total=False):
     rcon: RCONConfig
     duckling: DucklingConfig
     lewd: LewdConfig
-    logging_webhooks: dict[str, list[str]]  # guild_id: [channels]
+    logging_webhooks: dict[str, Logging]  # guild_id: [channels]
