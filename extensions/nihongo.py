@@ -402,7 +402,8 @@ class Nihongo(commands.Cog):
     async def romaji(self, ctx: Context, *, text: commands.clean_content) -> None:
         """Sends the Romaji version of passed Kana."""
         ret = await self.bot.loop.run_in_executor(None, self.kakasi.convert, text)
-        await ctx.send(ret)
+        conjoined = " ".join(piece["hepburn"] for piece in ret)
+        await ctx.send(conjoined)
 
     @commands.group(name="kanji", aliases=["かんじ", "漢字"], invoke_without_command=True)
     async def kanji(self, ctx: Context, character: str) -> None:
