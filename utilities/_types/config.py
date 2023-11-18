@@ -30,6 +30,7 @@ class TokenConfig(TypedDict, total=False):
     wanikani: str
     sonarr: str
     tiktok: str
+    pythonista_api: str
 
 
 class MangaDexConfig(TypedDict):
