@@ -6,16 +6,20 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
+import tarfile
 import time
 import traceback
+from io import BytesIO
 from typing import TYPE_CHECKING, Literal
 
 import aiohttp
 import discord
 from discord.ext import commands
 from discord.ext.commands import Greedy  # noqa: TCH002
+from jishaku.functools import executor_function
 
 from utilities import formats
 from utilities.converters import MystbinPasteConverter
@@ -232,6 +236,39 @@ class Admin(commands.Cog):
                 return await ctx.send("Couldn't delete the webhook")
             else:
                 return await ctx.send("Webhook deleted.")
+
+    async def url_to_bytes(self, data: tuple[str, str]) -> tuple[str, BytesIO]:
+        name, url = data
+        async with self.bot.session.get(url) as r:
+            return name, BytesIO(await r.read())
+
+    @executor_function
+    def dump_to_tar(self, user_avys: list[tuple[str, BytesIO]]) -> BytesIO:
+        buf = BytesIO()
+        tar = tarfile.open(fileobj=buf, mode="x:gz")
+        for name, avy in user_avys:
+            info = tarfile.TarInfo(f"{name}.png")
+            info.size = avy.getbuffer().nbytes
+            tar.addfile(tarinfo=info, fileobj=avy)
+        tar.close()
+        buf.seek(0)
+
+        return buf
+
+    @commands.guild_only()
+    @commands.command()
+    async def avys(self, ctx: GuildContext, *, role: discord.Role) -> None:
+        urls = [
+            (member.name + "#" + member.discriminator, str(member.display_avatar.replace(static_format="png", size=256)))
+            for member in ctx.guild.members
+            if role in member.roles
+        ]
+
+        avys = await asyncio.gather(*[self.url_to_bytes(data) for data in urls])
+
+        buf = await self.dump_to_tar(avys)
+
+        await ctx.send(file=discord.File(buf, "test.tar"))
 
 
 async def setup(bot: Mipha) -> None:
