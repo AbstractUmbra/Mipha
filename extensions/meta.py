@@ -141,10 +141,10 @@ class Meta(commands.Cog):
         def to_string(c: str) -> str:
             digit = f"{ord(c):x}"
             name = unicodedata.name(c, "Name not found.")
-            return f"`\\U{digit:>08}`: {name} - {c} \N{EM DASH} <http://www.fileformat.info/info/unicode/char/{digit}>"
+            return f"[`\\U{digit:>08}`](http://www.fileformat.info/info/unicode/char/{digit}): {name} **\N{EM DASH}** {c}"
 
         msg = "\n".join(map(to_string, characters))
-        await ctx.send(msg)
+        await ctx.send(msg, suppress_embeds=True)
 
     @commands.group(name="prefix", invoke_without_command=True)
     async def prefix(self, ctx: Context) -> None:
