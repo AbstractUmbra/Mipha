@@ -15,20 +15,15 @@ R = TypeVar("R")
 class CacheProtocol(Protocol[R]):
     cache: MutableMapping[str, asyncio.Task[R]]
 
-    def __call__(self, *args: Any, **kwds: Any) -> asyncio.Task[R]:
-        ...
+    def __call__(self, *args: Any, **kwds: Any) -> asyncio.Task[R]: ...
 
-    def get_key(self, *args: Any, **kwargs: Any) -> str:
-        ...
+    def get_key(self, *args: Any, **kwargs: Any) -> str: ...
 
-    def invalidate(self, *args: Any, **kwargs: Any) -> bool:
-        ...
+    def invalidate(self, *args: Any, **kwargs: Any) -> bool: ...
 
-    def invalidate_containing(self, key: str) -> None:
-        ...
+    def invalidate_containing(self, key: str) -> None: ...
 
-    def get_stats(self) -> tuple[int, int]:
-        ...
+    def get_stats(self) -> tuple[int, int]: ...
 
 
 class ExpiringCache(dict, Generic[R]):
@@ -47,9 +42,16 @@ class ExpiringCache(dict, Generic[R]):
         self.__verify_cache_integrity()
         return super().__contains__(key)
 
-    def __getitem__(self, key: str) -> tuple[R, float]:
+    def __getitem__(self, key: str) -> R:
         self.__verify_cache_integrity()
-        return super().__getitem__(key)
+        v, _ = super().__getitem__(key)
+        return v
+
+    def get(self, key: str, default: R | None = None) -> R | None:
+        v = super().get(key, default)
+        if v is default:
+            return default
+        return v[0]
 
     def __setitem__(self, key: str, value: R) -> None:
         super().__setitem__(key, (value, time.monotonic()))
