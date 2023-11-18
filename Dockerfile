@@ -31,19 +31,20 @@ ENV PYTHONUNBUFFERED=1 \
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
 RUN mkdir -p /etc/apt/keyrings \
+    && apt update -y \
+    && apt-get install --no-install-recommends -y \
+    curl \
+    ca-certificates \
+    gnupg \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
     && apt update -y \
     && apt-get install --no-install-recommends -y \
     git \
-    # deps for installing poetry
-    curl \
-    ca-certificates \
     # deps for building python deps
     build-essential \
     libcurl4-gnutls-dev \
     gnutls-dev \
-    gnupg \
     libmagic-dev \
     ffmpeg \
     nodejs
