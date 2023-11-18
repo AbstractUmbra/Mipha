@@ -16,6 +16,7 @@ from discord.ext import commands
 from typing_extensions import NotRequired, Self
 
 from utilities.context import Context, GuildContext, Interaction
+from utilities.time import hf_time
 
 MYSTBIN_REGEX = re.compile(r"(?:(?:https?://)?(?:beta\.)?(?:mystb\.in\/))?(?P<id>(?:[A-Z]{1}[a-z]+)*)(?P<ext>\.\w+)?")
 LOGGER = logging.getLogger(__name__)
@@ -294,7 +295,7 @@ class DatetimeTransformer(app_commands.Transformer):
                 if time["dim"] == "time" and "value" in time["value"]:
                     times.append(
                         (
-                            datetime.datetime.fromisoformat(time["value"]["value"]),
+                            datetime.datetime.fromisoformat(time["value"]["value"]).astimezone(timezone),
                             time["start"],
                             time["end"],
                         )
@@ -302,7 +303,7 @@ class DatetimeTransformer(app_commands.Transformer):
                 elif time["dim"] == "duration":
                     times.append(
                         (
-                            datetime.datetime.now(datetime.timezone.utc)
+                            datetime.datetime.now(timezone)
                             + datetime.timedelta(seconds=time["value"]["normalized"]["value"]),
                             time["start"],
                             time["end"],
@@ -333,68 +334,32 @@ class DatetimeTransformer(app_commands.Transformer):
 
         return parsed_times[0][0]
 
+    async def autocomplete(self, interaction: Interaction, value: str) -> list[app_commands.Choice[str]]:
+        if not value:
+            return []
 
-class WhenAndWhatTransformer(app_commands.Transformer):
-    @staticmethod
-    async def get_timezone(interaction: Interaction) -> zoneinfo.ZoneInfo | None:
-        if interaction.guild is None:
-            tz = zoneinfo.ZoneInfo("UTC")
-        else:
-            row: str | None = await interaction.client.pool.fetchval(
-                "SELECT tz FROM tz_store WHERE user_id = $1;",
-                interaction.user.id,
-            )
-            tz = zoneinfo.ZoneInfo(row) if row else zoneinfo.ZoneInfo("UTC")
+        duckling_key = interaction.client.config.get("duckling")
+        if not duckling_key:
+            raise RuntimeError("No Duckling instance available to perform this action.")
 
-        return tz
+        duckling_url = yarl.URL.build(scheme="http", host=duckling_key["host"], port=duckling_key["port"], path="/parse")
 
-    @classmethod
-    async def parse(
-        cls,
-        argument: str,
-        /,
-        *,
-        interaction: Interaction,
-        timezone: datetime.tzinfo | None = datetime.timezone.utc,
-        now: datetime.datetime | None = None,
-        duckling_url: yarl.URL,
-    ) -> list[tuple[datetime.datetime, int, int]]:
-        now = now or datetime.datetime.now(datetime.timezone.utc)
+        # implement caching
+        # if interaction.user.id in cache:
+        #   tz = cache[interaction.user.id]
+        # else:
+        tz = await self.get_timezone(interaction)
+        #   cache[interaction.user.id] = tz
 
-        times: list[tuple[datetime.datetime, int, int]] = []
+        now = interaction.created_at.astimezone(tz=tz)
+        parsed_times = await self.parse(value, timezone=tz, now=now, interaction=interaction, duckling_url=duckling_url)
 
-        async with interaction.client.session.post(
-            duckling_url,
-            data={
-                "locale": "en_US",
-                "text": argument,
-                "dims": '["time", "duration"]',
-                "tz": str(timezone),
-            },
-        ) as response:
-            data: list[DucklingResponse] = await response.json()
+        return [
+            app_commands.Choice(name=hf_time(when, with_time=True), value=when.isoformat()) for when, _, _ in parsed_times
+        ]
 
-            for time in data:
-                if time["dim"] == "time" and "value" in time["value"]:
-                    times.append(
-                        (
-                            datetime.datetime.fromisoformat(time["value"]["value"]),
-                            time["start"],
-                            time["end"],
-                        )
-                    )
-                elif time["dim"] == "duration":
-                    times.append(
-                        (
-                            datetime.datetime.now(datetime.timezone.utc)
-                            + datetime.timedelta(seconds=time["value"]["normalized"]["value"]),
-                            time["start"],
-                            time["end"],
-                        )
-                    )
 
-        return times
-
+class WhenAndWhatTransformer(DatetimeTransformer):
     @classmethod
     async def transform(cls, interaction: Interaction, value: str) -> datetime.datetime:
         timezone = await cls.get_timezone(interaction)
@@ -440,6 +405,9 @@ class WhenAndWhatTransformer(app_commands.Transformer):
                 what = what[len(prefix) :]
 
         return when
+
+    async def autocomplete(self, interaction: Interaction, value: str) -> list[app_commands.Choice[str]]:
+        raise NotImplementedError("Not meant for this subclass.")
 
 
 # This is because Discord is stupid with Slash Commands and doesn't actually have integer types.
