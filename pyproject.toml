@@ -85,7 +85,6 @@ allow-star-arg-any = true
 [tool.ruff.flake8-quotes]
 inline-quotes = "single"
 
-
 [tool.pyright]
 useLibraryCodeForTypes = true
 typeCheckingMode = "basic"

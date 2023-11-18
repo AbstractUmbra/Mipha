@@ -30,7 +30,10 @@ ENV PYTHONUNBUFFERED=1 \
 
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
-RUN apt-get update \
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt update -y \
     && apt-get install --no-install-recommends -y \
     git \
     # deps for installing poetry
@@ -42,16 +45,10 @@ RUN apt-get update \
     gnutls-dev \
     gnupg \
     libmagic-dev \
-    ffmpeg
+    ffmpeg \
+    nodejs
 
 RUN curl -sSL https://install.python-poetry.org | python -
-
-RUN mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
-    && apt update -y \
-    && apt install -y --no-install-recommends nodejs
-
 RUN npm install -g pyright@latest
 
 # copy project requirement files here to ensure they will be cached.
