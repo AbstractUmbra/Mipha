@@ -169,11 +169,10 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
             return ref.resolved.to_reference()
 
     @discord.utils.cached_property
-    def replied_message(self) -> discord.Message:
+    def replied_message(self) -> discord.Message | None:
         ref = self.message.reference
         if ref and isinstance(ref.resolved, discord.Message):
             return ref.resolved
-        return self.message
 
     async def disambiguate(self, matches: list[T], entry: Callable[[T], Any], *, ephemeral: bool = False) -> T:
         if len(matches) == 0:
