@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import copy
 from functools import wraps
 from typing import TYPE_CHECKING, Concatenate, ParamSpec, TypeVar
 
@@ -33,13 +33,16 @@ class MarkdownBuilder:
     def __init__(self) -> None:
         self._inner: str = ""
 
+    def __str__(self) -> str:
+        return self.text
+
     @property
     def text(self) -> str:
         return self._inner
 
     @text.getter
     def text(self) -> str:
-        c = deepcopy(self._inner)
+        c = copy(self._inner)
         self.clear()
         return c
 
