@@ -205,11 +205,13 @@ class Lewd(commands.Cog):
 
         await ctx.send(file=discord.File(fmt, filename="you_horny_fuck.m4a"))
 
-    async def _play_asmr(self, url: str, /, *, ctx: GuildContext, v_client: discord.VoiceClient | None) -> None:
+    async def _play_asmr(self, url: str, /, *, ctx: GuildContext, v_client: discord.VoiceProtocol | None) -> None:
         if not ctx.author.voice or not ctx.author.voice.channel:
             return
 
         v_client = v_client or await ctx.author.voice.channel.connect(cls=discord.VoiceClient)
+
+        assert isinstance(v_client, discord.VoiceClient)
 
         if v_client.is_playing():
             v_client.stop()
@@ -221,7 +223,7 @@ class Lewd(commands.Cog):
     @commands.command()
     @commands.is_owner()
     @require_secure_keys()
-    async def asmr(self, ctx: Context) -> None:
+    async def asmr(self, ctx: GuildContext) -> None:
         query = """
                 SELECT *
                 FROM audio
@@ -233,8 +235,8 @@ class Lewd(commands.Cog):
         rows = await conn.fetch(query)
         await conn.close()
         if not rows:
-            await ctx.send("No more asmr.")
-            return
+            return await ctx.send("No more asmr.")
+
         row = random.choice(rows)
 
         url = f"https://audio.saikoro.moe/{row['filename']}"
@@ -242,7 +244,7 @@ class Lewd(commands.Cog):
         await ctx.send(f"You're listening to: **{row['title']}**\nBy: **{row['soundgasm_author']}**\n{url}")
 
         if ctx.guild:
-            await self._play_asmr(url, ctx=ctx, v_client=ctx.guild.voice_client)  # type: ignore # did a dummy break voice
+            await self._play_asmr(url, ctx=ctx, v_client=ctx.guild.voice_client)
 
 
 async def setup(bot: Mipha) -> None:
