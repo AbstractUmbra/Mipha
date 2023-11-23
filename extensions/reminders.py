@@ -22,7 +22,12 @@ from lxml import etree
 
 from utilities import formats, fuzzy, time
 from utilities.cache import cache
-from utilities.converters import BadDatetimeTransform, DatetimeTransformer, WhenAndWhatConverter, WhenAndWhatTransformer
+from utilities.converters import (
+    BadDatetimeTransform,
+    DatetimeTransformer,
+    WhenAndWhatConverter,
+    WhenAndWhatTransformer,
+)
 from utilities.db import MaybeAcquire
 from utilities.ui import MiphaBaseView
 
@@ -439,7 +444,7 @@ class Reminder(commands.Cog):
                    RETURNING id;
                 """
 
-        row: asyncpg.Record = await pool.fetchrow(query, event, {"args": args, "kwargs": kwargs}, when, now)
+        row = await pool.fetchrow(query, event, {"args": args, "kwargs": kwargs}, when, now)
         timer.id = row[0]
 
         # only set the data check if it can be waited on
