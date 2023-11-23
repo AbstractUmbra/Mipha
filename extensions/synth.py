@@ -15,8 +15,8 @@ from discord.ext import commands
 from utilities.fuzzy import extract
 
 if TYPE_CHECKING:
+    from _types.synth import KanaResponse, SpeakersResponse, TikTokSynth
     from bot import Mipha
-    from utilities._types.synth import KanaResponse, SpeakersResponse, TikTokSynth
     from utilities.context import Interaction
 
 LOGGER: logging.Logger = logging.getLogger(__name__)

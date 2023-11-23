@@ -21,12 +21,12 @@ from discord import app_commands
 from discord.ext import commands
 
 from utilities import checks, formats, time
-from utilities._types.discord_ import MessageableGuildChannel
 from utilities.context import Context, GuildContext, Interaction
 
 if TYPE_CHECKING:
     import datetime
 
+    from _types.discord_ import MessageableGuildChannel
     from bot import Mipha
 
 GuildChannel = (
@@ -569,7 +569,6 @@ class Meta(commands.Cog):
                 return
 
         assert message.channel is not None
-        assert isinstance(message.channel, MessageableGuildChannel)
 
         try:
             msg = await ctx.bot.http.get_message(message.channel.id, message.id)

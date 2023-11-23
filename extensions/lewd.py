@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 
     from discord.ext.commands._types import Check
 
+    from _types.uploader import AudioPost
     from bot import Mipha
-    from utilities._types.uploader import AudioPost
     from utilities.context import Context, GuildContext
 
 MEDIA_PATTERN = re.compile(

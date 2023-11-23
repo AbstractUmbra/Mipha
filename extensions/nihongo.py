@@ -34,13 +34,13 @@ from utilities.paginator import RoboPages, SimpleListSource
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from bot import Mipha
-    from utilities._types.nihongo import (
+    from _types.nihongo import (
         JishoWordsResponse,
         KanjiDevKanjiPayload,
         KanjiDevWordsPayload,
         _JishoJapanesePayload,
     )
+    from bot import Mipha
     from utilities.context import Context
 
 BASE_URL = "https://kanjiapi.dev/v1"
