@@ -310,15 +310,16 @@ class Mipha(commands.Bot):
     @overload
     def _log_spammer(
         self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: Literal[True]
-    ) -> Coroutine[None, None, discord.WebhookMessage]: ...
+    ) -> Coroutine[None, None, discord.WebhookMessage]:
+        ...
 
     @overload
-    def _log_spammer(
-        self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: Literal[False]
-    ) -> None: ...
+    def _log_spammer(self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: Literal[False]) -> None:
+        ...
 
     @overload
-    def _log_spammer(self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: bool = ...) -> None: ...
+    def _log_spammer(self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: bool = ...) -> None:
+        ...
 
     def _log_spammer(
         self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: bool = False
@@ -395,10 +396,12 @@ class Mipha(commands.Bot):
                     yield member
 
     @overload
-    async def get_context(self, origin: Interaction | discord.Message, /) -> Context: ...
+    async def get_context(self, origin: Interaction | discord.Message, /) -> Context:
+        ...
 
     @overload
-    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT: ...
+    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT:
+        ...
 
     async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT] = MISSING) -> ContextT:
         if cls is MISSING:

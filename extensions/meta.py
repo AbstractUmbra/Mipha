@@ -20,13 +20,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from _types.discord_ import MessageableGuildChannel  # noqa: TCH001
 from utilities import checks, formats, time
 from utilities.context import Context, GuildContext, Interaction
 
 if TYPE_CHECKING:
     import datetime
 
-    from _types.discord_ import MessageableGuildChannel
     from bot import Mipha
 
 GuildChannel = (
