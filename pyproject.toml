@@ -38,6 +38,7 @@ tabulate = "*"
 black = "*"
 ruff = "*"
 asyncpg-stubs = "*"
+pre-commit = "*"
 
 [tool.black]
 line-length = 125
@@ -45,7 +46,6 @@ preview = true
 
 [tool.ruff]
 line-length = 125
-exclude = ["docs/extensions/*.py"]
 select = [
     "C4",
     "F",
