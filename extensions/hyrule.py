@@ -45,7 +45,11 @@ class HyruleRoleAssignmentView(MiphaBaseView):
         return True
 
     @discord.ui.button(
-        label="Hondana", custom_id="HyruleHondana__", style=discord.ButtonStyle.blurple, emoji="\U0001f4da", row=0
+        label="Hondana",
+        custom_id="HyruleHondana__",
+        style=discord.ButtonStyle.blurple,
+        emoji="\U0001f4da",
+        row=0,
     )
     async def add_hondana_role(self, interaction: Interaction, item: discord.ui.Button[Self]) -> None:
         assert isinstance(interaction.user, discord.Member)
@@ -57,7 +61,11 @@ class HyruleRoleAssignmentView(MiphaBaseView):
         await interaction.user.add_roles(discord.Object(id=HONDANA_ROLE_ID))
 
     @discord.ui.button(
-        label="Kotka", custom_id="HyruleKotka__", style=discord.ButtonStyle.blurple, emoji="\U00002694\U0000fe0f", row=0
+        label="Kotka",
+        custom_id="HyruleKotka__",
+        style=discord.ButtonStyle.blurple,
+        emoji="\U00002694\U0000fe0f",
+        row=0,
     )
     async def add_kotka_role(self, interaction: Interaction, item: discord.ui.Button[Self]) -> None:
         assert isinstance(interaction.user, discord.Member)

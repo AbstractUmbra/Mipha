@@ -78,7 +78,8 @@ class Meta(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.interpret_as_command_ctx_menu = app_commands.ContextMenu(
-            name="Interpret as Command", callback=self.interpret_as_command_callback
+            name="Interpret as Command",
+            callback=self.interpret_as_command_callback,
         )
         self.bot.tree.add_command(self.interpret_as_command_ctx_menu)
 
@@ -92,7 +93,8 @@ class Meta(commands.Cog):
     async def interpret_as_command_callback(self, interaction: Interaction, message: discord.Message, /) -> None:
         if message.author.bot:
             return await interaction.response.send_message(
-                "Sorry I won't invoke commands based on a bot's messages.", ephemeral=True
+                "Sorry I won't invoke commands based on a bot's messages.",
+                ephemeral=True,
             )
 
         if interaction.user.id != message.author.id:
@@ -102,7 +104,8 @@ class Meta(commands.Cog):
 
         if not context.valid:
             return await interaction.response.send_message(
-                content="Sorry this doesn't look like a command for me.", ephemeral=True
+                content="Sorry this doesn't look like a command for me.",
+                ephemeral=True,
             )
 
         _current.set(interaction)
@@ -574,13 +577,14 @@ class Meta(commands.Cog):
             msg = await ctx.bot.http.get_message(message.channel.id, message.id)
         except discord.NotFound as err:
             raise commands.BadArgument(
-                f"Message with the ID of {message.id} cannot be found in {message.channel.mention}."
+                f"Message with the ID of {message.id} cannot be found in {message.channel.mention}.",
             ) from err
 
-        msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")
+        # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")
+        # thanks daggy
 
         await ctx.send(
-            f"```json\n{formats.clean_triple_backtick(formats.escape_invis_chars(json.dumps(msg, indent=2, ensure_ascii=False, sort_keys=True)))}\n```"
+            f"```json\n{formats.clean_triple_backtick(formats.escape_invis_chars(json.dumps(msg, indent=2, ensure_ascii=False, sort_keys=True)))}\n```",
         )
 
     @commands.check(lambda ctx: bool(ctx.guild and ctx.guild.voice_client))

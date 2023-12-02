@@ -110,7 +110,10 @@ class VoiceStalking(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(
-        self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
     ) -> None:
         config: VoiceStalkingConfig = self._config.get(member.guild.id, {})  # type: ignore # dumb
         if not config:
@@ -170,7 +173,9 @@ class VoiceStalking(commands.Cog):
     @commands.guild_only()
     @has_guild_permissions(manage_channels=True)
     async def exclude(
-        self, ctx: GuildContext, channel: discord.VoiceChannel | discord.StageChannel | discord.Object
+        self,
+        ctx: GuildContext,
+        channel: discord.VoiceChannel | discord.StageChannel | discord.Object,
     ) -> None:
         """Exclude a channel from the voice stalking."""
         config = self._config.get(ctx.guild.id)
@@ -201,7 +206,7 @@ class VoiceStalking(commands.Cog):
         try:
             await ctx.author.send(
                 f"Okay, I have created {tc.mention} and {vc.mention} for you, and excluded the following:-\n\n"
-                + "\n".join([i.mention for i in exclude])
+                + "\n".join([i.mention for i in exclude]),
             )
         except discord.HTTPException:
             pass

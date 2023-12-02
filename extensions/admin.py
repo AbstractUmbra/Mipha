@@ -101,7 +101,7 @@ class Admin(commands.Cog):
             LOGGER.error("Extension is fucked", exc_info=err)
             await ctx.send(f"{err.__class__.__name__}: {err}")
             await ctx.message.add_reaction(ctx.tick(False))
-            return
+            return None
 
         await ctx.message.add_reaction(ctx.tick(True))
 
@@ -167,7 +167,10 @@ class Admin(commands.Cog):
     @commands.command()
     @commands.guild_only()
     async def sync(
-        self, ctx: GuildContext, guilds: Greedy[discord.Object], spec: Literal["~", "*", "^"] | None = None
+        self,
+        ctx: GuildContext,
+        guilds: Greedy[discord.Object],
+        spec: Literal["~", "*", "^"] | None = None,
     ) -> None:
         """
         Pass guild ids or pass a sync specification:-
@@ -190,7 +193,7 @@ class Admin(commands.Cog):
                 fmt = await ctx.bot.tree.sync()
 
             await ctx.send(
-                f"Synced {formats.plural(len(fmt)):command} {'globally' if spec is None else 'to the current guild.'}"
+                f"Synced {formats.plural(len(fmt)):command} {'globally' if spec is None else 'to the current guild.'}",
             )
             return
 
@@ -227,7 +230,7 @@ class Admin(commands.Cog):
                 await ctx.send(
                     f"Webhook details are:-\n{webhook.name} ({webhook.user.name if webhook.user else 'No User'}) ::"
                     f" {webhook.id}, bound to"
-                    f" {webhook.channel_id} ({webhook.channel.name if webhook.channel else 'Unknown'})"
+                    f" {webhook.channel_id} ({webhook.channel.name if webhook.channel else 'Unknown'})",
                 )
 
             try:

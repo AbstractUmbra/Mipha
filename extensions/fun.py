@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 ABT_REG = re.compile(r"~([a-zA-Z]+)~")
 MESSAGE_LINK_RE = re.compile(
-    r"^(?:https?://)(?:(?:canary|ptb)\.)?discord(?:app)?\.com/channels/(?P<guild>\d{16,20})/(?P<channel>\d{16,20})/(?P<message>\d{16,20})/?$"
+    r"^(?:https?://)(?:(?:canary|ptb)\.)?discord(?:app)?\.com/channels/(?P<guild>\d{16,20})/(?P<channel>\d{16,20})/(?P<message>\d{16,20})/?$",
 )
 
 MENTION_CHANNEL_ID = 722930330897743894
@@ -375,7 +375,10 @@ class Fun(commands.Cog):
 
     @commands.command(name="lego")
     async def lego_command(
-        self, ctx: Context, *, target: discord.User | discord.Emoji | discord.PartialEmoji | str | None
+        self,
+        ctx: Context,
+        *,
+        target: discord.User | discord.Emoji | discord.PartialEmoji | str | None,
     ) -> None:
         if target is None:
             if attachments := (

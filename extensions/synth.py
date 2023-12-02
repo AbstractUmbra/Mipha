@@ -114,7 +114,9 @@ class SynthCog(commands.Cog, name="Synth"):
 
         for url in self._tiktok_urls:
             async with self.bot.session.post(
-                f"https://{url}/media/api/text/speech/invoke/", params=parameters, headers=headers
+                f"https://{url}/media/api/text/speech/invoke/",
+                params=parameters,
+                headers=headers,
             ) as response:
                 data: TikTokSynth = await response.json()
 
@@ -141,7 +143,9 @@ class SynthCog(commands.Cog, name="Synth"):
             return data
 
     @app_commands.command(
-        name="tiktok-voice", description="Generate an audio file with a given TikTok voice engine and text.", nsfw=False
+        name="tiktok-voice",
+        description="Generate an audio file with a given TikTok voice engine and text.",
+        nsfw=False,
     )
     @app_commands.describe(engine="Which voice engine to use", text="What do you want the voice engine to say?")
     async def tiktok_callback(self, itx: Interaction, engine: str, text: str) -> None:
@@ -154,12 +158,13 @@ class SynthCog(commands.Cog, name="Synth"):
 
         if not data:
             return await itx.followup.send(
-                "Tiktok broke, sorry. Your input might be too long or it might just be fucked.", ephemeral=True
+                "Tiktok broke, sorry. Your input might be too long or it might just be fucked.",
+                ephemeral=True,
             )
 
         if data["status_code"] != 0:
             return await itx.followup.send(
-                f"Sorry, your synthetic audio cannot be created due to the following reason: {data['status_msg']!r}."
+                f"Sorry, your synthetic audio cannot be created due to the following reason: {data['status_msg']!r}.",
             )
 
         vstr: str = data["data"]["v_str"]

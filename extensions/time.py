@@ -173,7 +173,7 @@ class Time(commands.Cog):
 
     async def parse_bcp47_timezones(self) -> None:
         async with self.bot.session.get(
-            "https://raw.githubusercontent.com/unicode-org/cldr/main/common/bcp47/timezone.xml"
+            "https://raw.githubusercontent.com/unicode-org/cldr/main/common/bcp47/timezone.xml",
         ) as resp:
             if resp.status != 200:
                 return
@@ -316,7 +316,8 @@ class Time(commands.Cog):
                 """
         async with ctx.typing(ephemeral=True):
             confirm = await ctx.prompt(
-                f"This will make {timezone.label!r} your public timezone public, confirm?", delete_after=False
+                f"This will make {timezone.label!r} your public timezone public, confirm?",
+                delete_after=False,
             )
 
             if not confirm:
@@ -369,7 +370,10 @@ class Time(commands.Cog):
             await ctx.send("How am I supposed to do this if you don't supply the timezone?")
 
     def _transform_records(
-        self, records: list[TimezoneRecord], *, guild: discord.Guild
+        self,
+        records: list[TimezoneRecord],
+        *,
+        guild: discord.Guild,
     ) -> list[tuple[str, datetime.timedelta]]:
         ret: list[tuple[str, datetime.timedelta]] = []
         for record in records:
@@ -392,7 +396,8 @@ class Time(commands.Cog):
         """This command will show a board of all public timezones in Dannyware."""
         if not interaction.guild:
             return await interaction.response.send_message(
-                "Sorry, this command can only be used in a guild!", ephemeral=True
+                "Sorry, this command can only be used in a guild!",
+                ephemeral=True,
             )
 
         await interaction.response.defer(ephemeral=True)

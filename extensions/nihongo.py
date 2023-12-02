@@ -66,7 +66,7 @@ JLPT_LOOKUP = MemeDict(
         ("n3", "ｎ３", "3", "３"): JLPT_N3,
         ("n4", "ｎ４", "4", "４"): JLPT_N4,
         ("n5", "ｎ５", "5", "５"): JLPT_N5,
-    }
+    },
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -76,8 +76,8 @@ class JLPTConverter(commands.Converter[list[str]]):
     async def convert(self, _: Context, argument: str) -> list[str]:
         try:
             return JLPT_LOOKUP[argument.lower().strip()]
-        except KeyError:
-            raise commands.BadArgument("Invalid key for JLPT level.")
+        except KeyError as err:
+            raise commands.BadArgument("Invalid key for JLPT level.") from err
 
 
 def word_to_reading(stuff: list[_JishoJapanesePayload]) -> list[str]:
@@ -184,7 +184,7 @@ class JishoKanji:
 
         raw = raw.find("dl", class_=f"dictionary_entry {key}_yomi")  # type: ignore # bs4 types are bad
         if not raw:
-            return
+            return None
 
         raw = raw.select("dd", class_="kanji-details__main-readings")[0]  # type: ignore # bs4 types are bad
 
@@ -442,7 +442,7 @@ class Nihongo(commands.Cog):
                     f"{embed.footer.text} :: {real_embeds.index(embed) + 1}/{len(real_embeds)}"
                     if embed.footer.text
                     else f"{real_embeds.index(embed) + 1}/{len(real_embeds)}"
-                )
+                ),
             )
             for embed in real_embeds
         ]
@@ -480,7 +480,7 @@ class Nihongo(commands.Cog):
                     f"{embed.footer.text} :: {embeds.index(embed) + 1}/{len(embeds)}"
                     if embed.footer.text
                     else f"{embeds.index(embed) + 1}/{len(embeds)}"
-                )
+                ),
             )
             for embed in embeds
         ]

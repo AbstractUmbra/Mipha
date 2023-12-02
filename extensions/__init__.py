@@ -13,7 +13,7 @@ if private_path.exists():
             module
             for module in iter_modules([str(private_path.absolute())], prefix=__package__ + ".private.")
             if not module.name.rsplit(".")[-1].startswith("_")
-        ]
+        ],
     )
 
 

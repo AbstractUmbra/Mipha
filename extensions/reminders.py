@@ -75,7 +75,10 @@ class TimeZone(NamedTuple):
 
 class SnoozeModal(discord.ui.Modal, title="Snooze"):
     duration: discord.ui.TextInput[ReminderView] = discord.ui.TextInput["ReminderView"](
-        label="Duration", placeholder="10 minutes", default="10 minutes", min_length=2
+        label="Duration",
+        placeholder="10 minutes",
+        default="10 minutes",
+        min_length=2,
     )
 
     def __init__(self, parent: ReminderView, cog: Reminder, timer: Timer) -> None:
@@ -89,7 +92,8 @@ class SnoozeModal(discord.ui.Modal, title="Snooze"):
             when = await WhenAndWhatTransformer.transform(interaction, self.duration.value)
         except Exception:
             await interaction.response.send_message(
-                'Duration could not be parsed, sorry. Try something like "5 minutes" or "1 hour"', ephemeral=True
+                'Duration could not be parsed, sorry. Try something like "5 minutes" or "1 hour"',
+                ephemeral=True,
             )
             return
 
@@ -97,12 +101,17 @@ class SnoozeModal(discord.ui.Modal, title="Snooze"):
         await interaction.response.edit_message(view=self.parent)
 
         refreshed = await self.cog.create_timer(
-            when, self.timer.event, *self.timer.args, **self.timer.kwargs, created=interaction.created_at
+            when,
+            self.timer.event,
+            *self.timer.args,
+            **self.timer.kwargs,
+            created=interaction.created_at,
         )
         author_id, _, message = self.timer.args
         delta = time.human_timedelta(when, source=refreshed.created_at)
         await interaction.followup.send(
-            f"Alright <@{author_id}>, I've snoozed your reminder for {delta}: {message}", ephemeral=True
+            f"Alright <@{author_id}>, I've snoozed your reminder for {delta}: {message}",
+            ephemeral=True,
         )
 
 
@@ -194,7 +203,7 @@ class Timer:
     def author_id(self) -> int | None:
         if self.args:
             return int(self.args[0])
-        return
+        return None
 
     def __repr__(self) -> str:
         return f"<Timer created={self.created_at} expires={self.expires} event={self.event}>"
@@ -274,7 +283,7 @@ class Reminder(commands.Cog):
 
     async def parse_bcp47_timezones(self) -> None:
         async with self.bot.session.get(
-            "https://raw.githubusercontent.com/unicode-org/cldr/main/common/bcp47/timezone.xml"
+            "https://raw.githubusercontent.com/unicode-org/cldr/main/common/bcp47/timezone.xml",
         ) as resp:
             if resp.status != 200:
                 return

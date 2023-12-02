@@ -162,7 +162,7 @@ class Stats(commands.Cog):
                     "command": command,
                     "failed": ctx.command_failed,
                     "app_command": is_app_command,
-                }
+                },
             )
 
     @commands.Cog.listener()
@@ -974,7 +974,7 @@ class Stats(commands.Cog):
             cog = self.bot.get_cog(cog_name)
             if cog is None:
                 await ctx.send(f"Unknown cog: {cog_name}")
-                return
+                return None
 
             query = """SELECT *, t.success + t.failed AS "total"
                        FROM (

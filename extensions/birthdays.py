@@ -31,7 +31,7 @@ class Birthdays(commands.Cog):
     birthday_group = app_commands.Group(
         name="birthday",
         description="A set of commands to assist you in remembering birthdays!",
-        guild_ids=[1045411522421198939, 705500489248145459],
+        guild_ids=[1045411522421198939, 705500489248145459, 174702278673039360],
     )
 
     @birthday_group.command(name="set")
@@ -42,7 +42,7 @@ class Birthdays(commands.Cog):
         date: Annotated[datetime.datetime, DatetimeTransformer],
         timezone: str | None = None,
     ) -> None:
-        reminder: Reminder = self.bot.get_cog("Reminder")  # type: ignore # downstream narrowing
+        reminder: Reminder | None = self.bot.get_cog("Reminder")  # type: ignore # downstream narrowing
         if not reminder:
             return await interaction.response.send_message("Sorry this functionality is currently unavailable.")
 

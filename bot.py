@@ -46,7 +46,6 @@ jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
 jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.NO_DM_TRACEBACK = True
-# INTENTS = discord.Intents(_bot_config.INTENTS)
 INTENTS = discord.Intents.all()
 
 CONFIG_PATH = pathlib.Path("configs/bot.json")
@@ -128,7 +127,11 @@ class LogHandler:
 
         self.log.setLevel(logging.INFO)
         handler = RotatingFileHandler(
-            filename=self.logging_path / "Mipha.log", encoding="utf-8", mode="w", maxBytes=self.max_bytes, backupCount=5
+            filename=self.logging_path / "Mipha.log",
+            encoding="utf-8",
+            mode="w",
+            maxBytes=self.max_bytes,
+            backupCount=5,
         )
         dt_fmt = "%Y-%m-%d %H:%M:%S"
         fmt = logging.Formatter("[{asctime}] [{levelname:<7}] {name}: {message}", dt_fmt, style="{")
@@ -205,14 +208,18 @@ class Mipha(commands.Bot):
 
         # auto spam detection
         self._spam_cooldown_mapping: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(
-            10, 12.0, commands.BucketType.user
+            10,
+            12.0,
+            commands.BucketType.user,
         )
         self._spammer_count: Counter = Counter()
 
         # misc logging
         self._previous_websocket_events: deque = deque(maxlen=10)
         self._error_handling_cooldown: commands.CooldownMapping = commands.CooldownMapping.from_cooldown(
-            1, 5, commands.BucketType.user
+            1,
+            5,
+            commands.BucketType.user,
         )
         self.command_stats = Counter()
         self.socket_stats = Counter()
@@ -309,12 +316,24 @@ class Mipha(commands.Bot):
 
     @overload
     def _log_spammer(
-        self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: Literal[True]
+        self,
+        ctx: Context,
+        message: discord.Message,
+        retry_after: float,
+        *,
+        autoblock: Literal[True],
     ) -> Coroutine[None, None, discord.WebhookMessage]:
         ...
 
     @overload
-    def _log_spammer(self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: Literal[False]) -> None:
+    def _log_spammer(
+        self,
+        ctx: Context,
+        message: discord.Message,
+        retry_after: float,
+        *,
+        autoblock: Literal[False],
+    ) -> None:
         ...
 
     @overload
@@ -322,14 +341,19 @@ class Mipha(commands.Bot):
         ...
 
     def _log_spammer(
-        self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: bool = False
+        self,
+        ctx: Context,
+        message: discord.Message,
+        retry_after: float,
+        *,
+        autoblock: bool = False,
     ) -> Coroutine[None, None, discord.WebhookMessage] | None:
         guild_name = getattr(ctx.guild, "name", "No Guild (DMs)")
         guild_id = getattr(ctx.guild, "id", None)
         fmt = "User %s (ID %s) in guild %r (ID %s) is spamming. retry_after: %.2fs"
         self.log_handler.log.warning(fmt, message.author, message.author.id, guild_name, guild_id, retry_after)
         if not autoblock:
-            return
+            return None
 
         embed = discord.Embed(title="Autoblocked Member", colour=0xDDA453)
         embed.add_field(name="User", value=f"{message.author} (ID {message.author.id})", inline=False)
@@ -494,7 +518,10 @@ async def main() -> None:
     raw_cfg: RootConfig = discord.utils._from_json(config)
 
     async with Mipha(raw_cfg) as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
-        dsn=bot.config["postgresql"]["dsn"], command_timeout=60, max_inactive_connection_lifetime=0, init=db_init
+        dsn=bot.config["postgresql"]["dsn"],
+        command_timeout=60,
+        max_inactive_connection_lifetime=0,
+        init=db_init,
     ) as pool, LogHandler() as log_handler:
         bot.log_handler = log_handler
         bot.pool = pool
@@ -503,7 +530,9 @@ async def main() -> None:
 
         bot.mb_client = mystbin.Client(session=session, token=bot.config["tokens"]["mystbin"])
         bot.md_client = hondana.Client(
-            username=bot.config["mangadex"]["username"], password=bot.config["mangadex"]["password"], session=session
+            username=bot.config["mangadex"]["username"],
+            password=bot.config["mangadex"]["password"],
+            session=session,
         )
 
         await bot.load_extension("jishaku")

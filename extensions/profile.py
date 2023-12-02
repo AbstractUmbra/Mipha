@@ -251,7 +251,7 @@ class Profile(commands.Cog):
             app_commands.Choice(value="nnid", name="NNID"),
             app_commands.Choice(value="switch", name="Switch Friend Code"),
             app_commands.Choice(value="3ds", name="3DS Friend Code"),
-        ]
+        ],
     )
     @app_commands.describe(field="The field to delete from your profile. If not given then your entire profile is deleted.")
     async def delete(

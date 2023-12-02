@@ -54,7 +54,7 @@ class RNG(commands.Cog):
                 "( ͡͡ ° ͜ ʖ ͡ °)﻿",
                 "(ง ͠° ͟ل͜ ͡°)ง",
                 "ヽ༼ຈل͜ຈ༽ﾉ",
-            ]
+            ],
         )
         await ctx.send(lenny)
 
@@ -119,7 +119,7 @@ class RNG(commands.Cog):
         formatted_results = ", ".join("Win" if r == fourth_winner else "Loss" for r in results)
         if fourth_winner == second_winner:
             to_send.append(
-                f"4. {second_winner} vs {third_winner}: **{fourth_winner} won the championship ({formatted_results})!**"
+                f"4. {second_winner} vs {third_winner}: **{fourth_winner} won the championship ({formatted_results})!**",
             )
             return to_send
         else:
@@ -176,7 +176,9 @@ class RNG(commands.Cog):
 
     @commands.command()
     async def choosebestof(
-        self, ctx: Context, *choices: Annotated[str, commands.clean_content(escape_markdown=True)]
+        self,
+        ctx: Context,
+        *choices: Annotated[str, commands.clean_content(escape_markdown=True)],
     ) -> None:
         """Chooses between multiple choices in a tournament style."""
         if len(choices) < 2:

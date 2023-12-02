@@ -42,7 +42,9 @@ class TodoRecord(TypedDict):
 
 class TodoRescheduleModal(MiphaBaseModal, title="To-do rescheduling!"):
     when = discord.ui.TextInput(
-        label="When to reschedule for?", style=discord.TextStyle.short, placeholder="Tomorrow at 3pm!"
+        label="When to reschedule for?",
+        style=discord.TextStyle.short,
+        placeholder="Tomorrow at 3pm!",
     )
 
     async def on_submit(self, interaction: Interaction) -> None:
@@ -52,7 +54,9 @@ class TodoRescheduleModal(MiphaBaseModal, title="To-do rescheduling!"):
 
 class TodoCreateModal(MiphaBaseModal, title="To-do!"):
     what = discord.ui.TextInput(
-        label="What have you got To-do?", style=discord.TextStyle.paragraph, placeholder="Buy some milk!"
+        label="What have you got To-do?",
+        style=discord.TextStyle.paragraph,
+        placeholder="Buy some milk!",
     )
     when = discord.ui.TextInput(
         label="When do you wish to be reminded of this?",
@@ -104,7 +108,9 @@ class Todo(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot: Mipha = bot
         self.create_todo_context_menu = app_commands.ContextMenu(
-            name="Create To-do!", callback=self.create_todo_context_menu_callback, type=discord.AppCommandType.message
+            name="Create To-do!",
+            callback=self.create_todo_context_menu_callback,
+            type=discord.AppCommandType.message,
         )
         self.bot.tree.add_command(self.create_todo_context_menu)
 
@@ -267,7 +273,8 @@ class Todo(commands.Cog):
         todos = await self.get_todos(interaction.user.id)
         choices = [
             app_commands.Choice(
-                name=textwrap.shorten(todo["todo_content"], width=20, placeholder="..."), value=todo["todo_id"]
+                name=textwrap.shorten(todo["todo_content"], width=20, placeholder="..."),
+                value=todo["todo_id"],
             )
             for todo in todos
         ]

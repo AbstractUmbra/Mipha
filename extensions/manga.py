@@ -35,7 +35,9 @@ LOGGER = logging.getLogger(__name__)
 
 class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hondana.Author]):
     def lookup(
-        self, bot: Mipha, item: str
+        self,
+        bot: Mipha,
+        item: str,
     ) -> Callable[[str], Coroutine[None, None, hondana.Manga | hondana.Chapter | hondana.Author]] | None:
         table = {
             "title": bot.md_client.get_manga,
@@ -66,7 +68,9 @@ class MangaView(MiphaBaseView):
         options: list[discord.SelectOption] = []
         for idx, mango in enumerate(manga, start=1):
             options.append(
-                discord.SelectOption(label=f"[{idx}] {shorten(mango.title, width=95)}", description=mango.id, value=mango.id)
+                discord.SelectOption(
+                    label=f"[{idx}] {shorten(mango.title, width=95)}", description=mango.id, value=mango.id
+                ),
             )
         self._lookup = {m.id: m for m in manga}
         super().__init__()
@@ -103,7 +107,10 @@ class MangaView(MiphaBaseView):
         return True
 
     async def on_error(
-        self, interaction: Interaction, error: discord.app_commands.AppCommandError, item: discord.ui.Item[Self]
+        self,
+        interaction: Interaction,
+        error: discord.app_commands.AppCommandError,
+        item: discord.ui.Item[Self],
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
             return await interaction.response.send_message("You can't choose someone else's Manga!", ephemeral=True)
@@ -162,7 +169,7 @@ class MangaCog(commands.Cog, name="Manga"):
         collection = await self.bot.md_client.manga_list(limit=5, title=search_query, order=order)
 
         if not collection.manga:
-            return
+            return None
 
         return collection.manga
 
@@ -308,7 +315,10 @@ class MangaCog(commands.Cog, name="Manga"):
             password = secrets.token_urlsafe(16)
             expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
             paste = await self.bot.mb_client.create_paste(
-                filename="error.py", content=clean, password=password, expires=expires
+                filename="error.py",
+                content=clean,
+                password=password,
+                expires=expires,
             )
             clean = (
                 f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from utilities.context import Context, GuildContext
 
 MEDIA_PATTERN = re.compile(
-    r"(https?://(?P<host_url>media\.soundgasm\.net|media\d\.vocaroo\.com)(?:\/sounds|\/mp3)\/(?P<media>[a-zA-Z0-9]+)?\.?(?P<ext>m4a|mp3)?)"
+    r"(https?://(?P<host_url>media\.soundgasm\.net|media\d\.vocaroo\.com)(?:\/sounds|\/mp3)\/(?P<media>[a-zA-Z0-9]+)?\.?(?P<ext>m4a|mp3)?)",
 )
 SOUNDGASM_TITLE_PATTERN = re.compile(r"\=\"title\"\>(.*?)\<\/div\>")  # https://regex101.com/r/BJyiGM/1
 SOUNDGASM_AUTHOR_PATTERN = re.compile(r"\<a href\=\"(?:(?:https?://)?soundgasm\.net\/u\/(?:.*)\")\>(.*)\<\/a>")
@@ -69,18 +69,23 @@ class Lewd(commands.Cog):
 
         if isinstance(error, commands.BadArgument):
             await ctx.send(str(error))
-            return
+            return None
         elif isinstance(error, commands.NSFWChannelRequired):
             await ctx.send(f"{error.channel} is not a horny channel. No lewdie outside lewdie channels!")
-            return
+            return None
         elif isinstance(error, commands.CommandOnCooldown):
             if ctx.author.id == self.bot.owner_id:
                 return await ctx.reinvoke()
             await ctx.send(f"Stop being horny. You're on cooldown for {error.retry_after:.02f}s.")
-            return
+            return None
 
     async def _cache_soundgasm(
-        self, url: re.Match[str], /, *, title: str | None, author: str | None
+        self,
+        url: re.Match[str],
+        /,
+        *,
+        title: str | None,
+        author: str | None,
     ) -> tuple[bytes, str, int]:
         actual_url = url[0]
         ext = url["ext"]
@@ -147,14 +152,18 @@ class Lewd(commands.Cog):
         return audio, data["url"], data["size"]
 
     def _audio_factory(
-        self, match: re.Match[str]
+        self,
+        match: re.Match[str],
     ) -> Callable[[re.Match[str], str, str | None], Coroutine[Any, Any, tuple[bytes, str, int]]]:
         if match.group("host_url") == "media.soundgasm.net":
             return self._get_soundgasm_data
         return self._get_vocaroo_data
 
     def _get_soundgasm_data(
-        self, match: re.Match[str], data: str, _: str | None
+        self,
+        match: re.Match[str],
+        data: str,
+        _: str | None,
     ) -> Coroutine[Any, Any, tuple[bytes, str, int]]:
         title_match = SOUNDGASM_TITLE_PATTERN.search(data)
         title: str | None = None
@@ -168,7 +177,10 @@ class Lewd(commands.Cog):
         return self._cache_soundgasm(match, title=title, author=author)
 
     def _get_vocaroo_data(
-        self, match: re.Match[str], data: str, media_id: str | None
+        self,
+        match: re.Match[str],
+        data: str,
+        media_id: str | None,
     ) -> Coroutine[Any, Any, tuple[bytes, str, int]]:
         if not media_id:
             raise ValueError("Cannot parse Vocaroo media ID from the url.")

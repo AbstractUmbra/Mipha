@@ -29,10 +29,10 @@ BUFFER_PATH.mkdir(exist_ok=True, mode=770)
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
 
 MOBILE_PATTERN: re.Pattern[str] = re.compile(
-    r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+\/?)(?:\/\?.*\>?)?\>?"
+    r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+\/?)(?:\/\?.*\>?)?\>?",
 )
 DESKTOP_PATTERN: re.Pattern[str] = re.compile(
-    r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?"
+    r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?",
 )
 TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+))\>?")
 REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\w+))\>?")
@@ -94,7 +94,8 @@ class RepostView(MiphaBaseView):
             _info = await self.tiktok._extract_video_info(url)
         except yt_dlp.utils.DownloadError as error:
             await interaction.followup.send(
-                "Sorry downloading this video broke somehow. Umbra knows don't worry.", ephemeral=True
+                "Sorry downloading this video broke somehow. Umbra knows don't worry.",
+                ephemeral=True,
             )
             await interaction.client.tree.on_error(interaction, error)  # type: ignore
             return
@@ -112,7 +113,8 @@ class RepostView(MiphaBaseView):
     async def close_button(self, interaction: Interaction, button: discord.ui.Button[RepostView]) -> None:
         if interaction.user.id != self.owner_id:
             return await interaction.response.send_message(
-                "You're not allowed to close this, only the message author can!", ephemeral=True
+                "You're not allowed to close this, only the message author can!",
+                ephemeral=True,
             )
         await self.message.delete()
         self.stop()
@@ -169,7 +171,8 @@ class MediaReposter(commands.Cog):
         info = await self._extract_video_info(url, loop=loop)
         if not info:
             await interaction.followup.send(
-                "This message could not be parsed. Are you sure it's a valid link?", ephemeral=True
+                "This message could not be parsed. Are you sure it's a valid link?",
+                ephemeral=True,
             )
             return
 
@@ -189,7 +192,10 @@ class MediaReposter(commands.Cog):
             path.unlink(missing_ok=True)
 
     async def _extract_video_info(
-        self, url: yarl.URL, *, loop: asyncio.AbstractEventLoop | None = None
+        self,
+        url: yarl.URL,
+        *,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> dict[str, Any] | None:
         LOGGER.info("Extracting URL: %r", url)
         loop = loop or asyncio.get_running_loop()
@@ -197,12 +203,16 @@ class MediaReposter(commands.Cog):
         info = await loop.run_in_executor(None, ydl.extract_info, str(url))
 
         if not info:
-            return
+            return None
 
         return info
 
     async def _manipulate_video(
-        self, info: dict[str, Any], *, filesize_limit: int, loop: asyncio.AbstractEventLoop | None = None
+        self,
+        info: dict[str, Any],
+        *,
+        filesize_limit: int,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> tuple[discord.File, str]:
         loop = loop or asyncio.get_running_loop()
         file_loc = pathlib.Path(f"buffer/{info['id']}.{info['ext']}")
@@ -230,7 +240,7 @@ class MediaReposter(commands.Cog):
         content += f"**Description**: {info.get('description', '')}" * (bool(info["uploader"]))
 
         if file_loc.name in self.task_mapping:
-            self.task_mapping[file_loc.name][0].cancel()
+            self.task_mapping[file_loc.name].cancel()
 
         task = loop.create_task(self._cleanup_paths(file_loc, fixed_file_loc))
         self.task_mapping[file_loc.name] = task
@@ -306,7 +316,7 @@ class MediaReposter(commands.Cog):
                         DESKTOP_PATTERN.fullmatch(message.content),
                         MOBILE_PATTERN.fullmatch(message.content),
                         REDDIT_PATTERN.fullmatch(message.content),
-                    ]
+                    ],
                 ):
                     await message.delete()
 

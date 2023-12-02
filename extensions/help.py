@@ -25,7 +25,11 @@ class PaginatedHelpCommand(commands.HelpCommand):
         super().__init__(verify_checks=verify_checks, show_hidden=show_hidden)
 
     async def recursive_command_format(
-        self, command: commands.Command, *, indent: int = 1, subc: int = 0
+        self,
+        command: commands.Command,
+        *,
+        indent: int = 1,
+        subc: int = 0,
     ) -> AsyncGenerator[str, None]:
         yield ("" if indent == 1 else "├" if subc != 0 else "└") + f"`{command.qualified_name}`: {command.short_doc}"
         if isinstance(command, commands.Group):
@@ -103,7 +107,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
             await group.can_run(self.context)
         except (commands.CommandError, commands.CheckFailure):
             await self.context.send(f'No command called "{group.name}" found.')
-            return
+            return None
         if not group.commands:
             return await self.send_command_help(group)
         subs = "\n".join(f"`{c.qualified_name}`: {c.short_doc}" for c in group.commands)

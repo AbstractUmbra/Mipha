@@ -90,7 +90,7 @@ class URLUnfurlView(MiphaBaseView):
             self.markdown_handler.add_header(text="Redirect URL Query Parameters")
             # self.markdown_handler.add_text(text=f"`{self._redirect_url.query_string}`")
             self.markdown_handler.add_bulletpoints(
-                texts=[f"{key} -> `{value}`" for key, value in self._redirect_url.query.items()]
+                texts=[f"{key} -> `{value}`" for key, value in self._redirect_url.query.items()],
             )
 
         await interaction.followup.send(self.markdown_handler.text, ephemeral=True)
@@ -139,7 +139,10 @@ class URLChecker(commands.Cog):
     @commands.hybrid_command(name="check-url", aliases=["url"])
     @app_commands.describe(url="The URL to check against.")
     async def url_checker(
-        self, ctx: Context, *, url: URL = commands.param(converter=URLConverter, description="The URL to check against.")
+        self,
+        ctx: Context,
+        *,
+        url: URL = commands.param(converter=URLConverter, description="The URL to check against."),
     ) -> None:
         """Checks a URL against known adlists and for redirects, query parameters and fragments."""
         if ctx.guild and ctx.channel.permissions_for(ctx.me).manage_messages:  # type: ignore # guarded

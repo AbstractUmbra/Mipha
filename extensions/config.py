@@ -236,7 +236,10 @@ class Config(commands.Cog):
 
     @cache.cache()
     async def get_command_permissions(
-        self, guild_id: int, *, connection: Connection | Pool | None = None
+        self,
+        guild_id: int,
+        *,
+        connection: Connection | Pool | None = None,
     ) -> ResolvedCommandPermissions:
         connection = connection or self.bot.pool
         query = "SELECT name, channel_id, whitelist FROM command_config WHERE guild_id=$1;"
@@ -284,7 +287,9 @@ class Config(commands.Cog):
     @config.group(invoke_without_command=True, aliases=["plonk"])
     @checks.is_mod()
     async def ignore(
-        self, ctx: GuildContext, *entities: discord.TextChannel | discord.Member | discord.VoiceChannel
+        self,
+        ctx: GuildContext,
+        *entities: discord.TextChannel | discord.Member | discord.VoiceChannel,
     ) -> None:
         """Ignores text channels or members from using the bot.
 
@@ -360,7 +365,9 @@ class Config(commands.Cog):
     @config.group(pass_context=True, invoke_without_command=True, aliases=["unplonk"])
     @checks.is_mod()
     async def unignore(
-        self, ctx: GuildContext, *entities: discord.TextChannel | discord.Member | discord.VoiceChannel
+        self,
+        ctx: GuildContext,
+        *entities: discord.TextChannel | discord.Member | discord.VoiceChannel,
     ) -> None:
         """Allows channels or members to use the bot again.
 
@@ -390,13 +397,11 @@ class Config(commands.Cog):
     @checks.is_mod()
     async def server(self, ctx: GuildContext) -> None:
         """Handles the server-specific permissions."""
-        pass
 
     @config.group()
     @checks.is_mod()
     async def channel(self, ctx: GuildContext) -> None:
         """Handles the channel-specific permissions."""
-        pass
 
     async def command_toggle(
         self,
@@ -507,7 +512,10 @@ class Config(commands.Cog):
     @config.command(name="disabled")
     @checks.is_mod()
     async def config_disabled(
-        self, ctx: GuildContext, *, channel: discord.TextChannel | discord.VoiceChannel | None = None
+        self,
+        ctx: GuildContext,
+        *,
+        channel: discord.TextChannel | discord.VoiceChannel | None = None,
     ) -> None:
         """Shows the disabled commands for the channel given."""
 
@@ -526,7 +534,6 @@ class Config(commands.Cog):
     @commands.is_owner()
     async def _global(self, ctx: GuildContext) -> None:
         """Handles global bot configuration."""
-        pass
 
     @_global.command(name="block")
     async def global_block(self, ctx: GuildContext, object_id: int) -> None:

@@ -320,7 +320,10 @@ class RTFX(commands.Cog):
 
     @commands.command(name="rtfs")
     async def rtfs(
-        self, ctx: Context, *, target: str | None = commands.param(converter=SourceConverter, default=None)
+        self,
+        ctx: Context,
+        *,
+        target: str | None = commands.param(converter=SourceConverter, default=None),
     ) -> None:
         """
         This command will provide the source code of a given entity.
@@ -371,8 +374,8 @@ class RTFX(commands.Cog):
                             "typeCheckingMode": "basic",
                             "useLibraryCodeForTypes": False,
                             "reportMissingImports": True,
-                        }
-                    )
+                        },
+                    ),
                 )
 
         await ctx.typing()
