@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from discord.ext import commands
 
-from utilities.formats import plural
+from utilities.shared.formats import plural
 
 if TYPE_CHECKING:
     from bot import Mipha

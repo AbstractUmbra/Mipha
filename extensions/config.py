@@ -7,8 +7,8 @@ import asyncpg
 import discord
 from discord.ext import commands, menus
 
-from utilities import cache, checks
-from utilities.paginator import RoboPages, SimplePages
+from utilities.shared import cache, checks
+from utilities.shared.paginator import RoboPages, SimplePages
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable

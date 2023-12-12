@@ -12,12 +12,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities.fuzzy import extract
+from utilities.shared.fuzzy import extract
 
 if TYPE_CHECKING:
-    from _types.synth import KanaResponse, SpeakersResponse, TikTokSynth
     from bot import Mipha
     from utilities.context import Interaction
+    from utilities.shared._types.synth import KanaResponse, SpeakersResponse, TikTokSynth
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 

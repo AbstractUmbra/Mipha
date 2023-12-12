@@ -26,22 +26,22 @@ import pykakasi
 from discord.ext import commands, tasks
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from utilities.converters import MemeDict
-from utilities.formats import plural, to_codeblock
-from utilities.nihongo import JishoWord, KanjiDevKanji, KanjiDevWords
-from utilities.paginator import RoboPages, SimpleListSource
+from utilities.shared.converters import MemeDict
+from utilities.shared.formats import plural, to_codeblock
+from utilities.shared.nihongo import JishoWord, KanjiDevKanji, KanjiDevWords
+from utilities.shared.paginator import RoboPages, SimpleListSource
 
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from _types.nihongo import (
+    from bot import Mipha
+    from utilities.context import Context
+    from utilities.shared._types.nihongo import (
         JishoWordsResponse,
         KanjiDevKanjiPayload,
         KanjiDevWordsPayload,
         _JishoJapanesePayload,
     )
-    from bot import Mipha
-    from utilities.context import Context
 
 BASE_URL = "https://kanjiapi.dev/v1"
 HIRAGANA = "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよらりるれろわを"

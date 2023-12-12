@@ -14,11 +14,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utilities import cache, checks, flags, time
-from utilities.converters import Snowflake  # noqa: TCH001
-from utilities.formats import human_join, plural
-from utilities.paginator import SimplePages
-from utilities.ui import MiphaBaseView
+from utilities.shared import cache, checks, flags, time
+from utilities.shared.converters import Snowflake  # noqa: TCH001
+from utilities.shared.formats import human_join, plural
+from utilities.shared.paginator import SimplePages
+from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
     from discord.ext.commands._types import Check
@@ -42,7 +42,7 @@ class Arguments(argparse.ArgumentParser):
         raise RuntimeError(message)
 
 
-class AutoModFlags(flags.BaseFlags):
+class AutoModFlags(discord.flags.BaseFlags):
     @flags.flag_value
     def joins(self) -> int:
         """Whether the server is broadcasting joins"""
@@ -84,7 +84,7 @@ class ModConfig:
 
         # the basic configuration
         self.bot = bot
-        self.automod_flags = AutoModFlags(record["automod_flags"] or 0)
+        self.automod_flags = AutoModFlags._from_value(record["automod_flags"] or 0)
         self.id = record["id"]
         self.broadcast_channel_id = record["broadcast_channel"]
         self.broadcast_webhook_url = record["broadcast_webhook_url"]
@@ -122,7 +122,7 @@ class ModConfig:
             await member.add_roles(discord.Object(id=self.mute_role_id), reason=reason)
 
 
-class MigrateJoinLogView(MiphaBaseView):
+class MigrateJoinLogView(BaseView):
     def __init__(self, cog: Mod) -> None:
         super().__init__(timeout=None)
         self.cog: Mod = cog
@@ -143,7 +143,7 @@ class MigrateJoinLogView(MiphaBaseView):
             await interaction.followup.send("Successfully migrated to new join logs!", ephemeral=True)
 
 
-class PreExistingMuteRoleView(MiphaBaseView):
+class PreExistingMuteRoleView(BaseView):
     message: discord.Message
 
     def __init__(self, user: discord.abc.User) -> None:
@@ -183,7 +183,7 @@ class PreExistingMuteRoleView(MiphaBaseView):
         await self.message.delete()
 
 
-class LockdownPermissionIssueView(MiphaBaseView):
+class LockdownPermissionIssueView(BaseView):
     message: discord.Message
 
     def __init__(self, me: discord.Member, channel: discord.abc.GuildChannel) -> None:

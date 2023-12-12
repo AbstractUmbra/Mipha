@@ -9,7 +9,7 @@ import zoneinfo
 from discord import app_commands
 from discord.ext import commands
 
-from utilities.converters import DatetimeTransformer  # noqa: TCH001
+from utilities.shared.converters import DatetimeTransformer  # noqa: TCH001
 
 if TYPE_CHECKING:
     from bot import Mipha

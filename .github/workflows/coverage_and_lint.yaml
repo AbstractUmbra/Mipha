@@ -20,9 +20,10 @@ jobs:
     name: "Type Coverage and Linting @ ${{ matrix.python-version }}"
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: "true"
 
       - name: "Load cached poetry installation @ ${{ matrix.python-version }}"
         id: cached-poetry

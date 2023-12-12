@@ -21,9 +21,9 @@ import psutil
 import pygit2
 from discord.ext import commands, menus, tasks
 
-from utilities import formats, time
 from utilities.context import Context, Interaction
-from utilities.paginator import FieldPageSource, RoboPages
+from utilities.shared import formats, time
+from utilities.shared.paginator import FieldPageSource, RoboPages
 
 if TYPE_CHECKING:
     from bot import Mipha

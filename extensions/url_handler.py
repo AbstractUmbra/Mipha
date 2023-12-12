@@ -7,8 +7,8 @@ from discord import app_commands, ui
 from discord.ext import commands, tasks
 from yarl import URL
 
-from utilities.markdown import MarkdownBuilder
-from utilities.ui import MiphaBaseView
+from utilities.shared.markdown import MarkdownBuilder
+from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -38,7 +38,7 @@ class URLConverter(commands.Converter[URL]):
         return url
 
 
-class URLUnfurlView(MiphaBaseView):
+class URLUnfurlView(BaseView):
     __slots__ = (
         "url",
         "bot",

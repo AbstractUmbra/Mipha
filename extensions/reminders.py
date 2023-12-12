@@ -20,16 +20,16 @@ from discord import app_commands
 from discord.ext import commands
 from lxml import etree
 
-from utilities import formats, fuzzy, time
-from utilities.cache import cache
-from utilities.converters import (
+from utilities.shared import formats, fuzzy, time
+from utilities.shared.cache import cache
+from utilities.shared.converters import (
     BadDatetimeTransform,
     DatetimeTransformer,
     WhenAndWhatConverter,
     WhenAndWhatTransformer,
 )
-from utilities.db import MaybeAcquire
-from utilities.ui import MiphaBaseView
+from utilities.shared.db import MaybeAcquire
+from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -126,7 +126,7 @@ class SnoozeButton(discord.ui.Button["ReminderView"]):
         await interaction.response.send_modal(SnoozeModal(self.view, self.cog, self.timer))
 
 
-class ReminderView(MiphaBaseView):
+class ReminderView(BaseView):
     message: discord.Message
 
     def __init__(self, *, url: str, timer: Timer, cog: Reminder, author_id: int) -> None:

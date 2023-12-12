@@ -19,9 +19,9 @@ from discord.ext import commands, tasks
 from discord.utils import as_chunks
 from hondana.query import FeedOrderQuery, MangaListOrderQuery, Order
 
-from utilities import formats
-from utilities.paginator import MangaDexEmbed
-from utilities.ui import MiphaBaseView
+from utilities.shared import formats
+from utilities.shared.paginator import MangaDexEmbed
+from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -60,7 +60,7 @@ class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hon
         return true_item
 
 
-class MangaView(MiphaBaseView):
+class MangaView(BaseView):
     def __init__(self, user: discord.abc.Snowflake, bot: Mipha, manga: list[hondana.Manga], /) -> None:
         self.user: discord.abc.Snowflake = user
         self.bot: Mipha = bot

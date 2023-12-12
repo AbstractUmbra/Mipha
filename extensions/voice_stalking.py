@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, TypedDict
 import discord
 from discord.ext import commands
 
-from utilities.async_config import Config
-from utilities.checks import has_guild_permissions
+from utilities.shared.async_config import Config
+from utilities.shared.checks import has_guild_permissions
 
 if TYPE_CHECKING:
     from bot import Mipha

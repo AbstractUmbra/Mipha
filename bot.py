@@ -29,18 +29,18 @@ from discord.ext import commands
 from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
 
 from extensions import EXTENSIONS
-from utilities.async_config import Config
 from utilities.context import Context, Interaction
-from utilities.db import db_init
 from utilities.prefix import callable_prefix as _callable_prefix
+from utilities.shared.async_config import Config
+from utilities.shared.db import db_init
 
 if TYPE_CHECKING:
     from discord.ext.commands._types import ContextT
     from typing_extensions import Self
 
-    from _types.config import RootConfig
     from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
+    from utilities.shared._types.config import RootConfig
 
 jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True

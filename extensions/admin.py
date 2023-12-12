@@ -21,8 +21,8 @@ from discord.ext import commands
 from discord.ext.commands import Greedy  # noqa: TCH002
 from jishaku.functools import executor_function
 
-from utilities import formats
-from utilities.converters import MystbinPasteConverter
+from utilities.shared import formats
+from utilities.shared.converters import MystbinPasteConverter
 
 if TYPE_CHECKING:
     from asyncpg import Record

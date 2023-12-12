@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 
     from discord.ext.commands._types import Check
 
-    from _types.uploader import AudioPost
     from bot import Mipha
     from utilities.context import Context, GuildContext
+    from utilities.shared._types.uploader import AudioPost
 
 MEDIA_PATTERN = re.compile(
     r"(https?://(?P<host_url>media\.soundgasm\.net|media\d\.vocaroo\.com)(?:\/sounds|\/mp3)\/(?P<media>[a-zA-Z0-9]+)?\.?(?P<ext>m4a|mp3)?)",

@@ -15,11 +15,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities.cache import cache
-from utilities.converters import DatetimeTransformer
-from utilities.formats import plural, random_pastel_colour
-from utilities.time import format_relative, human_timedelta
-from utilities.ui import MiphaBaseModal, MiphaBaseView
+from utilities.shared.cache import cache
+from utilities.shared.converters import DatetimeTransformer
+from utilities.shared.formats import plural, random_pastel_colour
+from utilities.shared.time import format_relative, human_timedelta
+from utilities.shared.ui import BaseModal, BaseView
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -40,7 +40,7 @@ class TodoRecord(TypedDict):
     todo_created_at: datetime.datetime
 
 
-class TodoRescheduleModal(MiphaBaseModal, title="To-do rescheduling!"):
+class TodoRescheduleModal(BaseModal, title="To-do rescheduling!"):
     when = discord.ui.TextInput(
         label="When to reschedule for?",
         style=discord.TextStyle.short,
@@ -52,7 +52,7 @@ class TodoRescheduleModal(MiphaBaseModal, title="To-do rescheduling!"):
         self.stop()
 
 
-class TodoCreateModal(MiphaBaseModal, title="To-do!"):
+class TodoCreateModal(BaseModal, title="To-do!"):
     what = discord.ui.TextInput(
         label="What have you got To-do?",
         style=discord.TextStyle.paragraph,
@@ -74,7 +74,7 @@ class TodoCreateModal(MiphaBaseModal, title="To-do!"):
         self.stop()
 
 
-class TodoView(MiphaBaseView):
+class TodoView(BaseView):
     message: discord.Message
 
     def __init__(self, *, bot: Mipha, record: TodoRecord, cog: Todo, timeout: float | None = 180) -> None:

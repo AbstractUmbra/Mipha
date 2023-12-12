@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, AsyncGenerator, Mapping
 import discord
 from discord.ext import commands
 
-from utilities.paginator import RoboPages, SimpleListSource
+from utilities.shared.paginator import RoboPages, SimpleListSource
 
 if TYPE_CHECKING:
     from bot import Mipha

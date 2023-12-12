@@ -25,8 +25,8 @@ import legofy
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from utilities import checks
-from utilities.formats import plural
+from utilities.shared import checks
+from utilities.shared.formats import plural
 
 if TYPE_CHECKING:
     from discord.ext.commands._types import Check
@@ -47,7 +47,6 @@ MESSAGE_LINK_RE = re.compile(
 
 MENTION_CHANNEL_ID = 722930330897743894
 DM_CHANNEL_ID = 722930296756109322
-SPOILER_EMOJI_ID = 738038828928860269
 
 AL_BHED_CHARACTER_MAP = {
     "a": "y",

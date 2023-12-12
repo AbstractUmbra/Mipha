@@ -12,9 +12,9 @@ import yt_dlp
 from discord import app_commands, ui
 from discord.ext import commands
 
-from utilities.cache import ExpiringCache
-from utilities.time import ordinal
-from utilities.ui import MiphaBaseView
+from utilities.shared.cache import ExpiringCache
+from utilities.shared.time import ordinal
+from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -45,7 +45,7 @@ GUILDS: list[discord.Object] = [
 GUILD_IDS: set[int] = {guild.id for guild in GUILDS}
 
 
-class RepostView(MiphaBaseView):
+class RepostView(BaseView):
     message: discord.InteractionMessage
 
     def __init__(

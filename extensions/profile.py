@@ -8,8 +8,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utilities.formats import plural
-from utilities.ui import MiphaBaseView
+from utilities.shared.formats import plural
+from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
     from bot import Mipha
@@ -138,7 +138,7 @@ class ProfileCreateModal(discord.ui.Modal, title="Create Profile"):
             await interaction.followup.send("Successfully created your profile", ephemeral=True)
 
 
-class PromptProfileCreationView(MiphaBaseView):
+class PromptProfileCreationView(BaseView):
     def __init__(self, cog: Profile, ctx: Context) -> None:
         super().__init__()
         self.cog: Profile = cog

@@ -6,5 +6,5 @@
 	path = extensions/private
 	url = git@github.com:AbstractUmbra/mipha-private-extensions.git
 [submodule "utilities"]
-	path = utilities
+	path = utilities/shared
 	url = git@github.com:AbstractUmbra/_utilities.git

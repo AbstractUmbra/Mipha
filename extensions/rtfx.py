@@ -28,8 +28,8 @@ from discord.ext import commands, menus, tasks  # type: ignore # rtfs
 from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
 
-from utilities import fuzzy
-from utilities.formats import to_codeblock
+from utilities.shared import fuzzy
+from utilities.shared.formats import to_codeblock
 
 if TYPE_CHECKING:
     from types import ModuleType

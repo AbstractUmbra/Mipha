@@ -16,12 +16,12 @@ from discord import app_commands
 from discord.ext import commands
 from lxml import etree
 
-from utilities import time
-from utilities.cache import cache
 from utilities.context import Context, GuildContext, Interaction
-from utilities.formats import plural, random_pastel_colour
-from utilities.fuzzy import finder
-from utilities.paginator import RoboPages, SimpleListSource
+from utilities.shared import time
+from utilities.shared.cache import cache
+from utilities.shared.formats import plural, random_pastel_colour
+from utilities.shared.fuzzy import finder
+from utilities.shared.paginator import RoboPages, SimpleListSource
 
 if TYPE_CHECKING:
     from typing_extensions import Self

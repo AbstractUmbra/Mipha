@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
-from utilities.ui import MiphaBaseView
+from utilities.shared.ui import BaseView
 
 HYRULE_GUILD_ID = 705500489248145459
 _IRL_FRIEND_SERVER = 174702278673039360
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from utilities.context import GuildContext, Interaction
 
 
-class HyruleRoleAssignmentView(MiphaBaseView):
+class HyruleRoleAssignmentView(BaseView):
     def __init__(self, bot: Mipha, /) -> None:
         super().__init__(timeout=None)
         self.bot: Mipha = bot
