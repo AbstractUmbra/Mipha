@@ -24,8 +24,6 @@ from utilities.shared.fuzzy import finder
 from utilities.shared.paginator import RoboPages, SimpleListSource
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
-
     from bot import Mipha
 
 
@@ -39,7 +37,7 @@ class TimeZone(NamedTuple):
     key: str
 
     @classmethod
-    async def convert(cls, ctx: Context, argument: str) -> Self:
+    async def convert(cls, ctx: Context, argument: str) -> TimeZone:
         assert isinstance(ctx.cog, Time)
 
         # Prioritise aliases because they handle short codes slightly better
