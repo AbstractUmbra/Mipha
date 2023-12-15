@@ -33,6 +33,7 @@ mcrcon = "*"
 numpy = "*"
 tabulate = "*"
 "imagetext-py" = "*"
+orjson = "*"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"
