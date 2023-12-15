@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import inspect
 import io
-import json
 import operator
 import os
 import pathlib
@@ -29,7 +28,7 @@ from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
 
 from utilities.shared import fuzzy
-from utilities.shared.formats import to_codeblock
+from utilities.shared.formats import from_json, to_codeblock, to_json
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -368,7 +367,7 @@ class RTFX(commands.Cog):
             conf.touch()
             with conf.open("w") as f:
                 f.write(
-                    json.dumps(
+                    to_json(
                         {
                             "pythonVersion": "3.10",
                             "typeCheckingMode": "basic",
@@ -396,7 +395,7 @@ class RTFX(commands.Cog):
 
         counts = {"error": 0, "warn": 0, "info": 0}
 
-        data = json.loads(output)
+        data = from_json(output)
 
         diagnostics = []
         for diagnostic in data["generalDiagnostics"]:

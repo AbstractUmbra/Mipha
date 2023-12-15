@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import io
-import json
 import logging
 import pathlib
 from io import BytesIO
@@ -12,6 +11,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utilities.shared.formats import from_json
 from utilities.shared.fuzzy import extract
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _VOICE_PATH = pathlib.Path("configs/tiktok_voices.json")
 with _VOICE_PATH.open("r") as fp:
-    _VOICE_DATA: list[dict[str, str]] = json.load(fp)
+    _VOICE_DATA: list[dict[str, str]] = from_json(fp.read())
 
 
 class BadTikTokData(Exception):

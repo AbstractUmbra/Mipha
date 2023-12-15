@@ -9,12 +9,11 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import inspect
-import json
 import os
 import traceback
 import unicodedata
 from collections import Counter
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator, TypeAlias
 
 import discord
 from discord import app_commands
@@ -27,7 +26,6 @@ if TYPE_CHECKING:
     import datetime
 
     from bot import Mipha
-    from utilities.shared._types.discord_ import MessageableGuildChannel
 
 GuildChannel = (
     discord.TextChannel
@@ -37,6 +35,7 @@ GuildChannel = (
     | discord.Thread
     | discord.ForumChannel
 )
+MessageableGuildChannel: TypeAlias = discord.TextChannel | discord.Thread | discord.VoiceChannel
 
 
 class Prefix(commands.Converter):
@@ -584,7 +583,7 @@ class Meta(commands.Cog):
         # thanks daggy
 
         await ctx.send(
-            f"```json\n{formats.clean_triple_backtick(formats.escape_invis_chars(json.dumps(msg, indent=2, ensure_ascii=False, sort_keys=True)))}\n```",
+            f"```json\n{formats.clean_triple_backtick(formats.escape_invis_chars(formats.to_json(msg)))}\n```",
         )
 
     @commands.check(lambda ctx: bool(ctx.guild and ctx.guild.voice_client))

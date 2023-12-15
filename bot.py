@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import json
 import logging
 import pathlib
 import secrets
@@ -33,6 +32,7 @@ from utilities.context import Context, Interaction
 from utilities.prefix import callable_prefix as _callable_prefix
 from utilities.shared.async_config import Config
 from utilities.shared.db import db_init
+from utilities.shared.formats import to_json
 
 if TYPE_CHECKING:
     from discord.ext.commands._types import ContextT
@@ -500,7 +500,7 @@ class Mipha(commands.Bot):
             with path.open("w+", encoding="utf-8") as f:
                 for event in self._previous_websocket_events:
                     try:
-                        last_log = json.dumps(event, ensure_ascii=True, indent=2)
+                        last_log = to_json(event)
                     except Exception:
                         f.write(f"{event}\n")
                     else:
