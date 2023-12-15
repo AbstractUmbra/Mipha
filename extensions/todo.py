@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime
 import logging
 import textwrap
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Annotated, TypedDict
 
 import discord
 from discord import app_commands
@@ -196,7 +196,12 @@ class Todo(commands.Cog):
         await interaction.response.send_modal(create_modal)
 
     @todo_group.command(name="create", description="Create a To-do for later.")
-    async def todo_create(self, interaction: Interaction, what: str | None = None, when: str | None = None) -> None:
+    async def todo_create(
+        self,
+        interaction: Interaction,
+        what: str | None = None,
+        when: Annotated[datetime.datetime, DatetimeTransformer] | None = None,
+    ) -> None:
         assert interaction.channel
 
         content = what
@@ -216,10 +221,7 @@ class Todo(commands.Cog):
         else:
             content = what
 
-            if when:
-                parsed = await DatetimeTransformer.transform(interaction, when)
-            else:
-                parsed = None
+            parsed = when
 
         await self.create_todo(
             author_id=interaction.user.id,
