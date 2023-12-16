@@ -33,7 +33,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: "true"
+          token: ${{ secrets.BUILD_GH_TOKEN }}
 
       - name: Log in to the Container registry
         uses: docker/login-action@master
