@@ -18,7 +18,7 @@ import zoneinfo
 from dateutil.zoneinfo import get_zonefile_instance
 from discord import app_commands
 from discord.ext import commands
-from lxml import etree
+from lxml import etree  # type: ignore[reportGeneralTypeIssues] # etree causes typing issues...?
 
 from utilities.shared import formats, fuzzy, time
 from utilities.shared.cache import cache
