@@ -562,13 +562,10 @@ class Meta(commands.Cog):
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def raw_message(self, ctx: Context, message: discord.Message | None = None) -> None:
         """Quickly return the raw content of the specific message."""
-        if message is None:
-            ref = ctx.message.reference
-            if ref and isinstance(ref.resolved, discord.Message):
-                message = ref.resolved
-            else:
-                await ctx.send("Missing a message to fetch information from.")
-                return
+        message = message or ctx.replied_message
+        if not message:
+            await ctx.send("Missing a message to fetch information from.")
+            return
 
         assert message.channel is not None
 
@@ -576,7 +573,7 @@ class Meta(commands.Cog):
             msg = await ctx.bot.http.get_message(message.channel.id, message.id)
         except discord.NotFound as err:
             raise commands.BadArgument(
-                f"Message with the ID of {message.id} cannot be found in {message.channel.mention}.",
+                f"Message with the ID of {message.id} cannot be found in <#{message.channel.id}>.",
             ) from err
 
         # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")
