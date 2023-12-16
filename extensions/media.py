@@ -81,7 +81,7 @@ class RepostView(BaseView):
                 await interaction.channel.send(str(url))  # type: ignore # it's definitely not a stagechannel thanks
 
     @ui.button(label="Upload video?", emoji="\U0001f4fa")
-    async def download_video(self, interaction: Interaction, button: discord.ui.Button) -> None:
+    async def download_video(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
         assert self.tiktok
         assert interaction.guild  # covered in the guard in message
 
@@ -110,7 +110,7 @@ class RepostView(BaseView):
         await self.target_message.reply(content="I downloaded the video for you:-", file=file)
 
     @ui.button(label="No thanks", style=discord.ButtonStyle.danger, row=2, emoji="\U0001f5d1\U0000fe0f")
-    async def close_button(self, interaction: Interaction, button: discord.ui.Button[RepostView]) -> None:
+    async def close_button(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
         if interaction.user.id != self.owner_id:
             return await interaction.response.send_message(
                 "You're not allowed to close this, only the message author can!",

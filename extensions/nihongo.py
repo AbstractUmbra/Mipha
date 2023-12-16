@@ -16,7 +16,7 @@ from collections import defaultdict
 from functools import partial
 from io import BytesIO
 from textwrap import dedent, fill
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 from urllib.parse import quote
 
 import aiohttp
@@ -295,7 +295,7 @@ class KanjiEmbed(discord.Embed):
         return embed
 
     @classmethod
-    def from_words(cls: type[Self], character: str, payload: KanjiDevWords) -> list[Self]:
+    def from_words(cls: type[Self], character: str, payload: KanjiDevWords) -> list[KanjiEmbed]:
         embeds: list[KanjiEmbed] = []
         variants = payload.variants
         meanings = payload.meanings()
@@ -399,7 +399,7 @@ class Nihongo(commands.Cog):
         pass
 
     @commands.command()
-    async def romaji(self, ctx: Context, *, text: commands.clean_content) -> None:
+    async def romaji(self, ctx: Context, *, text: Annotated[str, commands.clean_content]) -> None:
         """Sends the Romaji version of passed Kana."""
         ret = await self.bot.loop.run_in_executor(None, self.kakasi.convert, text)
         conjoined = " ".join(piece["hepburn"] for piece in ret)

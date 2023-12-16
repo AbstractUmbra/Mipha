@@ -184,7 +184,7 @@ class Timer:
             "created": created,
             "expires": expires,
         }
-        return cls(record=pseudo)
+        return cls(record=pseudo)  # type: ignore # this gets complicated due to Record type
 
     def __eq__(self, other: object) -> bool:
         try:
@@ -454,6 +454,7 @@ class Reminder(commands.Cog):
                 """
 
         row = await pool.fetchrow(query, event, {"args": args, "kwargs": kwargs}, when, now)
+        assert row  # covered by it being an insert
         timer.id = row[0]
 
         # only set the data check if it can be waited on
