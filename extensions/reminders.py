@@ -52,7 +52,7 @@ class TimeZone(NamedTuple):
     key: str
 
     @classmethod
-    async def convert(cls, ctx: Context, argument: str) -> Self:
+    async def convert(cls, ctx: Context, argument: str) -> TimeZone:
         assert isinstance(ctx.cog, Reminder)
 
         # Prioritise aliases because they handle short codes slightly better
