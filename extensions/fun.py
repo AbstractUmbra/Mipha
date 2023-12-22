@@ -219,7 +219,6 @@ class Fun(commands.Cog):
         await ctx.send(embed=embed)
 
     def _draw_words(self, text: str) -> io.BytesIO:
-        """."""
         text = fill(text, 25)
         font = ImageFont.truetype("static/fonts/W6.ttc", 60)
         padding = 50
@@ -379,6 +378,10 @@ class Fun(commands.Cog):
         *,
         target: discord.User | discord.Emoji | discord.PartialEmoji | str | None,
     ) -> None:
+        """
+        Turns a Member's avatar into a lego-fied version.
+        Defaults to the executing user.
+        """
         if target is None:
             if attachments := (
                 ctx.message.attachments

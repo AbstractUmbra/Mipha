@@ -30,7 +30,9 @@ def hex_to_rgb(hex_: str | int) -> tuple[int, int, int]:
     return (hex_ >> 16, (hex_ >> 0) & 0xFF, hex_ & 0xFF)
 
 
-class ColourShitCog(commands.Cog):
+class Colour(commands.Cog):
+    """An extension to do things with colours!"""
+
     def __init__(self, bot: Mipha, /) -> None:
         self.bot: Mipha = bot
 

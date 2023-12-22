@@ -136,6 +136,7 @@ class MangaCog(commands.Cog, name="Manga"):
 
     @commands.group(aliases=["dex"])
     async def mangadex(self, ctx: Context) -> None:
+        """Top level group command for `mangadex`."""
         if not ctx.invoked_subcommand:
             return await ctx.send_help(self)
 
