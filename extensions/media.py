@@ -4,7 +4,7 @@ import logging
 import pathlib
 import random
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import discord
 import yarl
@@ -29,11 +29,11 @@ DESKTOP_PATTERN: re.Pattern[str] = re.compile(
 TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+))\>?")
 REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\w+))\>?")
 
-SUBSTITUTIONS: dict[str, list[str]] = {
-    "twitter.com": ["vxtwitter", "fxtwitter"],
-    "x.com": ["vxtwitter", "fxtwitter"],
-    "tiktok.com": ["vxtiktok"],
-    "vm.tiktok.com": ["vxtiktok"],
+SUBSTITUTIONS: dict[str, SubstitutionData] = {
+    "twitter.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
+    "x.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
+    "tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
+    "vm.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
 }
 
 GUILDS: list[discord.Object] = [
@@ -42,6 +42,11 @@ GUILDS: list[discord.Object] = [
 ]
 
 GUILD_IDS: set[int] = {guild.id for guild in GUILDS}
+
+
+class SubstitutionData(TypedDict):
+    repost_urls: list[str]
+    remove_query: bool
 
 
 class MediaReposter(commands.Cog):
@@ -71,7 +76,11 @@ class MediaReposter(commands.Cog):
             if not _url.host or not (_sub := SUBSTITUTIONS.get(_url.host, None)):
                 return
 
-            new_urls.append(_url.with_host(random.choice(_sub)))
+            new_url = _url.with_host(random.choice(_sub["repost_urls"]))
+            if _sub["remove_query"] is True:
+                new_url = new_url.with_query(None)
+
+            new_urls.append(new_url)
 
         content = "\n".join([str(url) for url in new_urls])
 
