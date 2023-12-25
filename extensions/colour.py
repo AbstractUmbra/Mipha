@@ -86,4 +86,4 @@ class Colour(commands.Cog):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(ColourShitCog(bot))
+    await bot.add_cog(Colour(bot))
