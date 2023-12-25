@@ -247,7 +247,7 @@ class Stats(commands.Cog):
         commit_time = datetime.datetime.fromtimestamp(commit.commit_time).astimezone(commit_tz)
 
         # [`hash`](url) message (offset)
-        offset = time.format_relative(commit_time.astimezone(datetime.timezone.utc))
+        offset = discord.utils.format_dt(commit_time.astimezone(datetime.timezone.utc), "R")
         return f"[`{short_sha2}`](https://github.com/AbstractUmbra/mipha/commit/{commit.hex}) {short} ({offset})"
 
     def get_last_commits(self, count: int = 3) -> str:
@@ -705,7 +705,7 @@ class Stats(commands.Cog):
         else:
             message = record.message
 
-        msg = textwrap.shorten(f"{emoji} {time.format_dt(dt)}\n{message}", width=1990)
+        msg = textwrap.shorten(f"{emoji} {discord.utils.format_dt(dt)}\n{message}", width=1990)
         if record.name == "discord.gateway":
             username = "Gateway"
             avatar_url = "https://i.imgur.com/4PnCKB3.png"

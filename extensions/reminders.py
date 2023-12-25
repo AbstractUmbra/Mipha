@@ -197,7 +197,7 @@ class Timer:
 
     @property
     def human_delta(self) -> str:
-        return time.format_relative(self.created_at)
+        return discord.utils.format_dt(self.created_at, "R")
 
     @property
     def author_id(self) -> int | None:
@@ -559,7 +559,7 @@ class Reminder(commands.Cog):
         for id_, expires, message in records:
             shorten = textwrap.shorten(message, width=512)
             e.add_field(
-                name=f"{id_}: {time.format_relative(expires)}",
+                name=f"{id_}: {discord.utils.format_dt(expires, 'R')}",
                 value=shorten,
                 inline=False,
             )
@@ -651,4 +651,4 @@ class Reminder(commands.Cog):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(Reminder(bot))
+    await bot.add_cog(Reminder(bot), guild=discord.Object(id=0))

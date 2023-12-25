@@ -772,8 +772,8 @@ class Mod(commands.Cog):
         e.set_author(name=str(member), icon_url=member.display_avatar.url)
         e.add_field(name="ID", value=member.id)
         assert member.joined_at is not None
-        e.add_field(name="Joined", value=time.format_dt(member.joined_at, "F"))
-        e.add_field(name="Created", value=time.format_relative(member.created_at), inline=False)
+        e.add_field(name="Joined", value=discord.utils.format_dt(member.joined_at, "F"))
+        e.add_field(name="Created", value=discord.utils.format_dt(member.created_at, "R"), inline=False)
 
         if config.requires_migration:
             await self.suggest_automod_migration(config, e, guild_id)
@@ -846,7 +846,9 @@ class Mod(commands.Cog):
 
         for member in members:
             joined = member.joined_at or datetime.datetime(1970, 1, 1)
-            body = f"Joined {time.format_relative(joined)}\nCreated {time.format_relative(member.created_at)}"
+            body = (
+                f"Joined {discord.utils.format_dt(joined, 'R')}\nCreated {discord.utils.format_dt(member.created_at, 'R')}"
+            )
             e.add_field(name=f"{member} (ID: {member.id})", value=body, inline=False)
 
         await ctx.send(embed=e)
@@ -1626,7 +1628,7 @@ class Mod(commands.Cog):
             await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
             return
 
-        until = f'until {time.format_dt(duration.dt, "F")}'
+        until = f'until {discord.utils.format_dt(duration.dt, "F")}'
         heads_up_message = f"You have been banned from {ctx.guild.name} {until}. Reason: {reason}"
 
         try:
@@ -1645,7 +1647,7 @@ class Mod(commands.Cog):
             member.id,
             created=ctx.message.created_at,
         )
-        await ctx.send(f"Banned {member} for {time.format_relative(duration.dt)}.")
+        await ctx.send(f"Banned {member} for {discord.utils.format_dt(duration.dt, 'R')}.")
 
     @commands.Cog.listener()
     async def on_tempban_timer_complete(self, timer: Timer) -> None:
@@ -2006,7 +2008,9 @@ class Mod(commands.Cog):
             role_id,
             created=ctx.message.created_at,
         )
-        await ctx.send(f"Muted {discord.utils.escape_mentions(str(member))} for {time.format_relative(duration.dt)}.")
+        await ctx.send(
+            f"Muted {discord.utils.escape_mentions(str(member))} for {discord.utils.format_dt(duration.dt, 'R')}."
+        )
 
     @commands.Cog.listener()
     async def on_tempmute_timer_complete(self, timer: Timer) -> None:

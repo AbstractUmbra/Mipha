@@ -20,7 +20,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utilities.context import Context, GuildContext, Interaction
-from utilities.shared import checks, formats, time
+from utilities.shared import checks, formats
 
 if TYPE_CHECKING:
     import datetime
@@ -448,7 +448,7 @@ class Meta(commands.Cog):
             boosts = f"Level {guild.premium_tier}\n{guild.premium_subscription_count} boosts"
             last_boost = max(guild.members, key=lambda m: m.premium_since or guild.created_at)  # type: ignore # pyright bug
             if last_boost.premium_since is not None:
-                boosts = f"{boosts}\nLast Boost: {last_boost} ({time.format_relative(last_boost.premium_since)})"
+                boosts = f"{boosts}\nLast Boost: {last_boost} ({discord.utils.format_dt(last_boost.premium_since, 'R')})"
             e.add_field(name="Boosts", value=boosts, inline=False)
 
         bots = sum(m.bot for m in guild.members)

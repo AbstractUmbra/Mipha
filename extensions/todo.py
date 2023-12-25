@@ -18,7 +18,7 @@ from discord.ext import commands
 from utilities.shared.cache import cache
 from utilities.shared.converters import DatetimeTransformer
 from utilities.shared.formats import plural, random_pastel_colour
-from utilities.shared.time import format_relative, human_timedelta
+from utilities.shared.time import human_timedelta
 from utilities.shared.ui import BaseModal, BaseView
 
 if TYPE_CHECKING:
@@ -253,7 +253,7 @@ class Todo(commands.Cog):
         for record in records:
             shorten = textwrap.shorten(record["todo_content"], width=512)
             if record["todo_reminder"]:
-                shorten += f": {format_relative(record['todo_reminder'])}"
+                shorten += f": {discord.utils.format_dt(record['todo_reminder'], 'R')}"
             embed.add_field(name=str(record["todo_id"]) + ".", value=shorten, inline=False)
 
         await interaction.followup.send(embed=embed)
