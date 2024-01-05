@@ -10,7 +10,7 @@ services:
     volumes:
       - ./configs/:/app/configs/:rw
       - ./logs/:/app/logs/:rw
-      - ./static/:/app/static/:ro
+      - ./static/:/app/static/:rw
       - ./extensions/:/app/extensions/:ro
 
   duckling:

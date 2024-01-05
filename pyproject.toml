@@ -12,6 +12,7 @@ python = "^3.11"
     "speedup",
 ], rev = "master" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
+great-asset = { git = "https://github.com/AbstractUmbra/GreatAsset.git", rev = "main" }
 jishaku = "*"
 hondana = "*"
 "mystbin.py" = "*"
