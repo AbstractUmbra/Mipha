@@ -11,6 +11,7 @@ HYRULE_GUILD_ID = 705500489248145459
 _IRL_FRIEND_SERVER = 174702278673039360
 HONDANA_ROLE_ID = 1086537644093231144
 KOTKA_ROLE_ID = 1086537709285285901
+GREAT_ASSET_ROLE_ID = 1189005762790441010
 ROLE_ASSIGNMENT_CHANNEL_ID = 1086540538112647229
 ROLE_ASSIGNMENT_MESSAGE_ID = 1086545767356977173
 
@@ -75,6 +76,22 @@ class HyruleRoleAssignmentView(BaseView):
             return
 
         await interaction.user.add_roles(discord.Object(id=KOTKA_ROLE_ID))
+
+    @discord.ui.button(
+        label="Great Asset",
+        custom_id="HyruleGreatAsset__",
+        style=discord.ButtonStyle.blurple,
+        emoji="\U0001f480",
+        row=0,
+    )
+    async def add_great_asset_role(self, interaction: Interaction, item: discord.ui.Button[Self]) -> None:
+        assert isinstance(interaction.user, discord.Member)
+
+        if interaction.user.get_role(GREAT_ASSET_ROLE_ID):
+            await interaction.response.send_message("You already have the Kotka role!")
+            return
+
+        await interaction.user.add_roles(discord.Object(id=GREAT_ASSET_ROLE_ID))
 
 
 class Hyrule(commands.Cog):
