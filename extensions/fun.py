@@ -339,8 +339,7 @@ class Fun(commands.Cog):
         upper = len(members) // 2
         choices = random.choices(members, k=upper)
 
-        for m in choices:
-            await m.move_to(None)
+        await asyncio.gather(*[m.move_to(None) for m in choices])
 
     @commands.command()
     @commands.guild_only()
