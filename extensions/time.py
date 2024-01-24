@@ -14,7 +14,7 @@ import discord
 import zoneinfo
 from discord import app_commands
 from discord.ext import commands
-from lxml import etree  # type: ignore[reportGeneralTypeIssues] # etree causes typing issues...?
+from lxml import etree
 
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import time
