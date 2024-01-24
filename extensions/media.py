@@ -11,6 +11,8 @@ import yarl
 import yt_dlp
 from discord.ext import commands
 
+from utilities.shared.async_config import Config
+
 if TYPE_CHECKING:
     from bot import Mipha
 
@@ -26,14 +28,17 @@ MOBILE_PATTERN: re.Pattern[str] = re.compile(
 DESKTOP_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(https?://(?:www\.)?tiktok\.com/@(?P<user>.*)/video/(?P<video_id>\d+))(\?(?:.*))?\>?",
 )
-TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://twitter\.com/(?P<user>\w+)/status/(?P<id>\d+))\>?")
+TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(twitter|x)\.com/(?P<user>\w+)/status/(?P<id>\d+))\>?")
 REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\w+))\>?")
+INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(?:www\.)instagram\.com/reel/(?P<id>[a-zA-Z0-9]+)\/?)\>?")
 
 SUBSTITUTIONS: dict[str, SubstitutionData] = {
-    "twitter.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
-    "x.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
-    "tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
-    "vm.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
+    # "twitter.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
+    # "x.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
+    "tiktok.com": {"repost_urls": ["vm.tiktxk.com"], "remove_query": False},
+    "vm.tiktok.com": {"repost_urls": ["vm.tiktxk.com"], "remove_query": False},
+    "instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
+    "www.instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
 }
 
 GUILDS: list[discord.Object] = [
@@ -49,9 +54,22 @@ class SubstitutionData(TypedDict):
     remove_query: bool
 
 
+class MediaConfig(TypedDict):
+    allowed_roles: list[int]
+    allowed_members: list[int]
+
+
 class MediaReposter(commands.Cog):
-    def __init__(self, bot: Mipha) -> None:
+    def __init__(self, bot: Mipha, config: Config[MediaConfig]) -> None:
         self.bot: Mipha = bot
+        self.config: Config[MediaConfig] = config
+
+    def _check_author(self, author: discord.Member) -> bool:
+        config_entry = self.config.get(author.guild.id)
+        if not config_entry:
+            return True
+
+        return any(author.get_role(r) for r in config_entry["allowed_roles"]) or author.id in config_entry["allowed_members"]
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -60,11 +78,16 @@ class MediaReposter(commands.Cog):
         if message.guild.id not in GUILD_IDS:
             return
 
+        assert isinstance(message.author, discord.Member)  # guarded in previous if
+        if not self._check_author(message.author):
+            return
+
         matches: list[re.Match[str]] = (
             list(DESKTOP_PATTERN.finditer(message.content))
             + list(MOBILE_PATTERN.finditer(message.content))
             + list(REDDIT_PATTERN.finditer(message.content))
             + list(TWITTER_PATTERN.finditer(message.content))
+            + list(INSTAGRAM_PATTERN.finditer(message.content))
         )
 
         if not matches:
@@ -96,10 +119,13 @@ class MediaReposter(commands.Cog):
                 MOBILE_PATTERN.fullmatch(message.content),
                 REDDIT_PATTERN.fullmatch(message.content),
                 TWITTER_PATTERN.fullmatch(message.content),
+                INSTAGRAM_PATTERN.fullmatch(message.content),
             ],
         ):
             await message.delete()
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(MediaReposter(bot))
+    config_path = pathlib.Path("configs/media.json")
+    config = Config(config_path)
+    await bot.add_cog(MediaReposter(bot, config))
