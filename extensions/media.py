@@ -77,9 +77,7 @@ class MediaReposter(commands.Cog):
             return
         if message.guild.id not in GUILD_IDS:
             return
-
-        assert isinstance(message.author, discord.Member)  # guarded in previous if
-        if not self._check_author(message.author):
+        if message.webhook_id:
             return
 
         matches: list[re.Match[str]] = (
@@ -91,6 +89,10 @@ class MediaReposter(commands.Cog):
         )
 
         if not matches:
+            return
+
+        assert isinstance(message.author, discord.Member)  # guarded in previous if
+        if not self._check_author(message.author):
             return
 
         new_urls = []
