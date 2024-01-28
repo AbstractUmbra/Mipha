@@ -10,7 +10,7 @@ import datetime
 import logging
 import secrets
 from textwrap import shorten
-from typing import TYPE_CHECKING, Callable, Coroutine
+from typing import TYPE_CHECKING
 
 import discord
 import hondana
@@ -24,7 +24,8 @@ from utilities.shared.paginator import MangaDexEmbed
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from collections.abc import Callable, Coroutine
+    from typing import Self
 
     from bot import Mipha
     from utilities.context import Context, Interaction
@@ -268,7 +269,7 @@ class MangaCog(commands.Cog, name="Manga"):
         This is all the latest released chapters in order.
         """
         order = FeedOrderQuery(created_at=Order.ascending)
-        one_h_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
+        one_h_ago = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=1)
         feed = await self.bot.md_client.get_my_feed(
             limit=32,
             translated_language=["en", "ja"],
@@ -314,7 +315,7 @@ class MangaCog(commands.Cog, name="Manga"):
         clean = fmt + to_send
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
-            expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+            expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
             paste = await self.bot.mb_client.create_paste(
                 filename="error.py",
                 content=clean,

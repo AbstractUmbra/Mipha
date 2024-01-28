@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import collections
 import datetime
+import zoneinfo
 from typing import TYPE_CHECKING, Literal, NamedTuple, TypedDict, overload
 
 import discord
-import zoneinfo
 from discord import app_commands
 from discord.ext import commands
 from lxml import etree
@@ -220,12 +220,12 @@ class Time(commands.Cog):
     async def get_tzinfo(self, user_id: int, /) -> datetime.tzinfo:
         tz = await self.get_timezone(user_id)
         if tz is None:
-            return datetime.timezone.utc
+            return datetime.UTC
 
         try:
             tz = zoneinfo.ZoneInfo(tz)
         except zoneinfo.ZoneInfoNotFoundError:
-            tz = datetime.timezone.utc
+            tz = datetime.UTC
 
         return tz
 
@@ -289,7 +289,7 @@ class Time(commands.Cog):
             current_time = self._curr_tz_time(zoneinfo.ZoneInfo(tz.key), ret_datetime=False)
             embed = discord.Embed(title=f"Time for {full_member}", description=f"```\n{current_time}\n```")
             embed.set_footer(text=member_timezone)
-            embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+            embed.timestamp = datetime.datetime.now(datetime.UTC)
 
         await ctx.send(embed=embed)
 
@@ -349,7 +349,7 @@ class Time(commands.Cog):
             description=f"```\n{self._curr_tz_time(timezone.to_zone(), ret_datetime=False)}\n```",
         )
         embed.set_footer(text=f"Requested by: {ctx.author}")
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        embed.timestamp = datetime.datetime.now(datetime.UTC)
         await ctx.send(embed=embed)
 
     @_info.autocomplete("timezone")
@@ -381,7 +381,7 @@ class Time(commands.Cog):
 
             tz = record["tz"]
             timezone = zoneinfo.ZoneInfo(tz)
-            offset = timezone.utcoffset(datetime.datetime.now(datetime.timezone.utc)) or datetime.timedelta(0)
+            offset = timezone.utcoffset(datetime.datetime.now(datetime.UTC)) or datetime.timedelta(0)
 
             ret.append((user, offset))
 

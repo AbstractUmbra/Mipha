@@ -10,11 +10,11 @@ import asyncio
 import datetime
 import logging
 import textwrap
-from typing import TYPE_CHECKING, Any, Mapping, NamedTuple, Sequence
+import zoneinfo
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import asyncpg
 import discord
-import zoneinfo
 from dateutil.zoneinfo import get_zonefile_instance
 from discord import app_commands
 from discord.ext import commands
@@ -32,7 +32,8 @@ from utilities.shared.db import MaybeAcquire
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from collections.abc import Mapping, Sequence
+    from typing import Self
 
     from bot import Mipha
     from utilities.context import Context, Interaction
@@ -330,11 +331,11 @@ class Reminder(commands.Cog):
     async def get_tzinfo(self, user_id: int, /) -> datetime.tzinfo:
         tz = await self.get_timezone(user_id)
         if tz is None:
-            return datetime.timezone.utc
+            return datetime.UTC
         try:
             timezone = zoneinfo.ZoneInfo(tz)
         except zoneinfo.ZoneInfoNotFoundError:
-            timezone = datetime.timezone.utc
+            timezone = datetime.UTC
 
         return timezone
 
@@ -390,7 +391,7 @@ class Reminder(commands.Cog):
                 # so we're gonna cap it off at 40 days
                 # see: http://bugs.python.org/issue20493
                 timer = self._current_timer = await self.wait_for_active_timers(days=40)
-                now = datetime.datetime.now(datetime.timezone.utc)
+                now = datetime.datetime.now(datetime.UTC)
 
                 if timer.expires >= now:
                     to_sleep = (timer.expires - now).total_seconds()
@@ -439,7 +440,7 @@ class Reminder(commands.Cog):
         try:
             now: datetime.datetime = kwargs.pop("created")
         except KeyError:
-            now = datetime.datetime.now(datetime.timezone.utc)
+            now = datetime.datetime.now(datetime.UTC)
 
         timer = Timer.temporary(event=event, args=args, kwargs=kwargs, expires=when, created=now)
         delta = (when - now).total_seconds()

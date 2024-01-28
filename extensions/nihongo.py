@@ -32,7 +32,7 @@ from utilities.shared.nihongo import JishoWord, KanjiDevKanji, KanjiDevWords
 from utilities.shared.paginator import RoboPages, SimpleListSource
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from bot import Mipha
     from utilities.context import Context
@@ -676,7 +676,7 @@ class Nihongo(commands.Cog):
     async def before_nihongo_reminder(self) -> None:
         await self.bot.wait_until_ready()
 
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         time = datetime.time(hour=18, minute=0, second=0, microsecond=0)
         if now.time() > time:
             LOGGER.info("After 6pm, sleeping until tomorrow.")

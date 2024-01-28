@@ -6,7 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncGenerator, Mapping
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -14,6 +14,8 @@ from discord.ext import commands
 from utilities.shared.paginator import RoboPages, SimpleListSource
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Mapping
+
     from bot import Mipha
     from utilities.context import Context
 

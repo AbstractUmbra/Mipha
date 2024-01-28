@@ -11,7 +11,7 @@ from utilities.shared.markdown import MarkdownBuilder
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from bot import Mipha
     from utilities.context import Context, Interaction

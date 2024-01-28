@@ -247,7 +247,7 @@ class Stats(commands.Cog):
         commit_time = datetime.datetime.fromtimestamp(commit.commit_time).astimezone(commit_tz)
 
         # [`hash`](url) message (offset)
-        offset = discord.utils.format_dt(commit_time.astimezone(datetime.timezone.utc), "R")
+        offset = discord.utils.format_dt(commit_time.astimezone(datetime.UTC), "R")
         return f"[`{short_sha2}`](https://github.com/AbstractUmbra/mipha/commit/{commit.hex}) {short} ({offset})"
 
     def get_last_commits(self, count: int = 3) -> str:
@@ -324,7 +324,7 @@ class Stats(commands.Cog):
         count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id)  # type: ignore
 
         embed.description = f"{count[0]} commands used."
-        timestamp = count[1].replace(tzinfo=datetime.timezone.utc) if count[1] else discord.utils.utcnow()
+        timestamp = count[1].replace(tzinfo=datetime.UTC) if count[1] else discord.utils.utcnow()
 
         embed.set_footer(text="Tracking command usage since").timestamp = timestamp
 
@@ -426,7 +426,7 @@ class Stats(commands.Cog):
         count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)  # type: ignore
 
         embed.description = f"{count[0]} commands used."
-        timestamp = count[1].replace(tzinfo=datetime.timezone.utc) if count[1] else discord.utils.utcnow()
+        timestamp = count[1].replace(tzinfo=datetime.UTC) if count[1] else discord.utils.utcnow()
 
         embed.set_footer(text="First command used").timestamp = timestamp
 

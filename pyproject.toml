@@ -37,16 +37,12 @@ tabulate = "*"
 orjson = "*"
 
 [tool.poetry.group.dev.dependencies]
-black = "*"
 ruff = "*"
 asyncpg-stubs = "*"
 pre-commit = "*"
 
-[tool.black]
-line-length = 125
-preview = true
-
 [tool.ruff]
+target-version = "py311"
 line-length = 125
 select = [
     "C4",

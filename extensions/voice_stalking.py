@@ -104,7 +104,7 @@ class VoiceStalking(commands.Cog):
             fmt = f"{member.mention} has {normalised} from {before.mention} to {after.mention}."
 
         embed.description = fmt
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        embed.timestamp = datetime.datetime.now(datetime.UTC)
 
         return embed
 

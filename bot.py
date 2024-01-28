@@ -15,7 +15,7 @@ import sys
 import traceback
 from collections import Counter, deque
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Coroutine, Iterable, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import aiohttp
 import asyncpg
@@ -35,8 +35,10 @@ from utilities.shared.db import db_init
 from utilities.shared.formats import to_json
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable, Coroutine, Iterable
+    from typing import Self
+
     from discord.ext.commands._types import ContextT
-    from typing_extensions import Self
 
     from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
@@ -84,7 +86,7 @@ class MiphaCommandTree(app_commands.CommandTree):
             )
         else:
             e.description = f"```py\n{clean}\n```"
-        e.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        e.timestamp = datetime.datetime.now(datetime.UTC)
         await self.client.logging_webhook.send(embed=e)
         await self.client.owner.send(embed=e)
 
@@ -360,7 +362,7 @@ class Mipha(commands.Bot):
         if guild_id is not None:
             embed.add_field(name="Guild Info", value=f"{guild_name} (ID {guild_id})", inline=False)
         embed.add_field(name="Channel Info", value=f"{message.channel} (ID: {message.channel.id}", inline=False)
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        embed.timestamp = datetime.datetime.now(datetime.UTC)
 
         return self.logging_webhook.send(embed=embed, wait=True)
 
@@ -507,7 +509,7 @@ class Mipha(commands.Bot):
                         f.write(f"{last_log}\n")
 
     async def setup_hook(self) -> None:
-        self.start_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
+        self.start_time: datetime.datetime = datetime.datetime.now(datetime.UTC)
 
         self.bot_app_info = await self.application_info()
         self.owner_ids = self.config["owner_ids"]

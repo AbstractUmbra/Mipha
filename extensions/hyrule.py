@@ -17,7 +17,7 @@ ROLE_ASSIGNMENT_MESSAGE_ID = 1086545767356977173
 
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from bot import Mipha
     from utilities.context import GuildContext, Interaction

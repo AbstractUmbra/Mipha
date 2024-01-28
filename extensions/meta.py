@@ -13,7 +13,7 @@ import os
 import traceback
 import unicodedata
 from collections import Counter
-from typing import TYPE_CHECKING, AsyncGenerator, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 import discord
 from discord import app_commands
@@ -24,6 +24,7 @@ from utilities.shared import checks, formats
 
 if TYPE_CHECKING:
     import datetime
+    from collections.abc import AsyncGenerator
 
     from bot import Mipha
 

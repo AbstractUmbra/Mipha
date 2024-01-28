@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import datetime
 import logging
+import zoneinfo
 from typing import TYPE_CHECKING, Annotated
 
 import discord
-import zoneinfo
 from discord import app_commands
 from discord.ext import commands
 
@@ -52,9 +52,9 @@ class Birthdays(commands.Cog):
             try:
                 resolved_timezone = zoneinfo.ZoneInfo(timezone)
             except zoneinfo.ZoneInfoNotFoundError:
-                resolved_timezone = datetime.timezone.utc
+                resolved_timezone = datetime.UTC
         else:
-            resolved_timezone = datetime.timezone.utc
+            resolved_timezone = datetime.UTC
 
         parsed_when = date.astimezone(resolved_timezone)
 

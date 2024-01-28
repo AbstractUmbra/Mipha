@@ -22,7 +22,7 @@ from utilities.shared.time import human_timedelta
 from utilities.shared.ui import BaseModal, BaseView
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from bot import Mipha
     from extensions.reminders import Reminder, Timer
@@ -139,7 +139,7 @@ class Todo(commands.Cog):
         content: str,
         reminder: datetime.datetime | None,
     ) -> Timer | None:
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         query: str = """
                      INSERT INTO todos (user_id, channel_id, todo_content, todo_reminder, todo_created_at)
                      VALUES ($1, $2, $3, $4, $5)

@@ -7,7 +7,7 @@ import io
 import logging
 import re
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Literal, MutableMapping, NoReturn
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NoReturn
 
 import asyncpg
 import discord
@@ -21,8 +21,10 @@ from utilities.shared.paginator import SimplePages
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, MutableMapping
+    from typing import Self
+
     from discord.ext.commands._types import Check
-    from typing_extensions import Self
 
     from bot import Mipha
     from utilities.context import GuildContext, Interaction

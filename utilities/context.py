@@ -14,10 +14,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
-    Iterable,
     Literal,
     Protocol,
-    Sequence,
     TypeAlias,
     overload,
 )
@@ -29,7 +27,7 @@ from typing_extensions import TypeVar
 from .shared.ui import BaseView, ConfirmationView
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable, Sequence
     from types import TracebackType
 
     from aiohttp import ClientSession
@@ -353,7 +351,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
                 filename=f"output.{mystbin_syntax}",
                 content=content,
                 password=password,
-                expires=(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=2)),
+                expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
             )
             assert paste.expires
             content = (

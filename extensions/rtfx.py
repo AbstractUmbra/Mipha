@@ -15,7 +15,7 @@ import re
 import sys
 import zlib
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Callable, Generator
+from typing import TYPE_CHECKING, Any
 
 import asyncpg  # type: ignore # rtfs
 import discord
@@ -31,6 +31,7 @@ from utilities.shared import fuzzy
 from utilities.shared.formats import from_json, to_codeblock, to_json
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
     from types import ModuleType
 
     from bot import Mipha

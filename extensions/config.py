@@ -12,9 +12,9 @@ from utilities.shared.paginator import RoboPages, SimplePages
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
+    from typing import TypeAlias
 
     from asyncpg import Connection, Pool, Record
-    from typing_extensions import TypeAlias
 
     from bot import Mipha
     from utilities.context import Context, GuildContext
