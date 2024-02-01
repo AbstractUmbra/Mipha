@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Literal, NamedTuple, TypedDict, overload
 import discord
 from discord import app_commands
 from discord.ext import commands
-from lxml import etree
+from lxml import etree  # type: ignore # this is broke in CI
 
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import time

@@ -340,7 +340,7 @@ class RTFX(commands.Cog):
         if len(new_target) < 2000:
             new_target = to_codeblock(new_target, language="py", escape_md=False)
 
-        await ctx.send(new_target, mystbin_syntax="py")
+        await ctx.send(new_target, paste_language="py")
 
     @rtfs.error
     async def rtfs_error(self, ctx: Context, error: commands.CommandError) -> None:
