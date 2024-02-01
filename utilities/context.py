@@ -24,6 +24,7 @@ import discord
 from discord.ext import commands
 from typing_extensions import TypeVar
 
+from .shared.paste import create_paste
 from .shared.ui import BaseView, ConfirmationView
 
 if TYPE_CHECKING:
@@ -263,8 +264,8 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = ...,
         ephemeral: bool = ...,
         silent: bool = ...,
-        mystbin: bool = ...,
-        mystbin_syntax: str = "txt",
+        paste: bool = ...,
+        paste_language: str = "txt",
         wait: Literal[True],
     ) -> discord.Message:
         ...
@@ -289,8 +290,8 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = ...,
         ephemeral: bool = ...,
         silent: bool = ...,
-        mystbin: bool = ...,
-        mystbin_syntax: str = "txt",
+        paste: bool = ...,
+        paste_language: str = "txt",
         wait: Literal[False],
     ) -> None:
         ...
@@ -315,8 +316,8 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = ...,
         ephemeral: bool = ...,
         silent: bool = ...,
-        mystbin: bool = ...,
-        mystbin_syntax: str = "txt",
+        paste: bool = ...,
+        paste_language: str = "txt",
         wait: bool = ...,
     ) -> None:
         ...
@@ -340,24 +341,24 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = False,
         ephemeral: bool = False,
         silent: bool = False,
-        mystbin: bool = False,
-        mystbin_syntax: str = "txt",
+        paste: bool = False,
+        paste_language: str = "txt",
         wait: bool = False,
     ) -> discord.Message | None:
         content = str(content) if content is not None else None
-        if (mystbin and content) or (content and len(content) >= 2000):
+        if (paste and content) or (content and len(content) >= 2000):
             password = secrets.token_urlsafe(10)
-            paste = await self.bot.mb_client.create_paste(
-                filename=f"output.{mystbin_syntax}",
+            paste_url = await create_paste(
                 content=content,
                 password=password,
-                expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
+                expiry=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
+                language=paste_language,
+                session=self.session,
             )
-            assert paste.expires
+
             content = (
-                "Sorry, the output was too large but I posted it to mystb.in for you here:"
-                f" https://mystb.in/{paste.id}\n\nThe password is `{password}` and it expires at"
-                f" {discord.utils.format_dt(paste.expires)}"
+                "Sorry, the output was too large but I posted it to a paste for you here:"
+                f" https://paste.abstractumbra.dev/{paste_url}"
             )
 
         sent = await super().send(  # type: ignore
