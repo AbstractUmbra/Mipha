@@ -28,7 +28,7 @@ jobs:
 
       - name: "Load cached poetry installation @ ${{ matrix.python-version }}"
         id: cached-poetry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local
           key: poetry-0
@@ -44,14 +44,14 @@ jobs:
 
       - name: "Setup Python @ ${{ matrix.python-version }}"
         id: setup-python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
           cache: "poetry"
 
       - name: "Load cached venv @ ${{ matrix.python-version }}"
         id: cached-pip-wheels
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .venv/
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
@@ -67,7 +67,7 @@ jobs:
           echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
 
       - name: "Run Pyright @ ${{ matrix.python-version }}"
-        uses: jakebailey/pyright-action@v1
+        uses: jakebailey/pyright-action@v2
         with:
           warnings: false
           no-comments: ${{ matrix.python-version != '3.x' }}
