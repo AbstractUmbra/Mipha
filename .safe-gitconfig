@@ -1,0 +1,5 @@
+[user]
+    name = Mipha
+    email = mipha@tloz.com
+[safe]
+    directory = /app

@@ -12,6 +12,8 @@ services:
       - ./logs/:/app/logs/:rw
       - ./static/:/app/static/:rw
       - ./extensions/:/app/extensions/:ro
+      - ./.git/:/app/.git/:ro
+      - ./.safe-gitconfig:/root/.gitconfig:ro
 
   duckling:
     container_name: "duckling"

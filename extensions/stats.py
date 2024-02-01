@@ -252,10 +252,10 @@ class Stats(commands.Cog):
 
     def get_last_commits(self, count: int = 3) -> str:
         repo = pygit2.Repository(".git")
-        commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL), count))
+        commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.enums.SortMode.TOPOLOGICAL), count))  # type: ignore # not exported
         return "\n".join(self.format_commit(c) for c in commits)
 
-    @commands.command(enabled=False)
+    @commands.command()
     async def about(self, ctx: Context) -> None:
         """Tells you information about the bot itself."""
 
