@@ -21,7 +21,6 @@ import asyncpg  # type: ignore # rtfs
 import discord
 import hondana  # type: ignore # rtfs
 import jishaku  # type: ignore # rtfs
-import mystbin  # type: ignore # rtfs
 from discord import app_commands, ui  # type: ignore # rtfs
 from discord.ext import commands, menus, tasks  # type: ignore # rtfs
 from jishaku.codeblocks import Codeblock, codeblock_converter
@@ -51,7 +50,6 @@ RTFS = (
     "ui",
     "asyncpg",
     "hondana",
-    "mystbin",
 )
 
 RTFM_PAGE_TYPES = {

@@ -13,9 +13,9 @@ python = "^3.11"
 ], rev = "master" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
 great-asset = { git = "https://github.com/AbstractUmbra/GreatAsset.git", rev = "main" }
+rcon = { git = "https://github.com/conqp/rcon.git", rev = "master" }
 jishaku = "*"
 hondana = "*"
-"mystbin.py" = "*"
 asyncpg = "*"
 psutil = "*"
 lru_dict = "*"

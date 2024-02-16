@@ -22,7 +22,6 @@ import asyncpg
 import discord
 import hondana
 import jishaku
-import mystbin
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
@@ -165,7 +164,6 @@ class Mipha(commands.Bot):
     pool: asyncpg.Pool
     user: discord.ClientUser
     session: aiohttp.ClientSession
-    mb_client: mystbin.Client
     md_client: hondana.Client
     start_time: datetime.datetime
     command_stats: Counter[str]
@@ -530,7 +528,6 @@ async def main() -> None:
 
         bot.session = session
 
-        bot.mb_client = mystbin.Client(session=session, token=bot.config["tokens"]["mystbin"])
         bot.md_client = hondana.Client(
             username=bot.config["mangadex"]["username"],
             password=bot.config["mangadex"]["password"],
