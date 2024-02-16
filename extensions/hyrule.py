@@ -10,7 +10,6 @@ from utilities.shared.ui import BaseView
 HYRULE_GUILD_ID = 705500489248145459
 _IRL_FRIEND_SERVER = 174702278673039360
 HONDANA_ROLE_ID = 1086537644093231144
-KOTKA_ROLE_ID = 1086537709285285901
 GREAT_ASSET_ROLE_ID = 1189005762790441010
 ROLE_ASSIGNMENT_CHANNEL_ID = 1086540538112647229
 ROLE_ASSIGNMENT_MESSAGE_ID = 1086545767356977173
@@ -60,22 +59,6 @@ class HyruleRoleAssignmentView(BaseView):
             return
 
         await interaction.user.add_roles(discord.Object(id=HONDANA_ROLE_ID))
-
-    @discord.ui.button(
-        label="Kotka",
-        custom_id="HyruleKotka__",
-        style=discord.ButtonStyle.blurple,
-        emoji="\U00002694\U0000fe0f",
-        row=0,
-    )
-    async def add_kotka_role(self, interaction: Interaction, item: discord.ui.Button[Self]) -> None:
-        assert isinstance(interaction.user, discord.Member)
-
-        if interaction.user.get_role(KOTKA_ROLE_ID):
-            await interaction.response.send_message("You already have the Kotka role!")
-            return
-
-        await interaction.user.add_roles(discord.Object(id=KOTKA_ROLE_ID))
 
     @discord.ui.button(
         label="Great Asset",
