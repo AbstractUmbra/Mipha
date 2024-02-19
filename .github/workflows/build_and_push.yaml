@@ -59,10 +59,23 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
+      - name: Generate short SHA
+        run: |
+          echo "IMAGE_NAME_LC=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+        env:
+          IMAGE_NAME: '${{ env.IMAGE_NAME }}'
+
+      - name: Get short SHA
+        id: slug
+        run: echo "GIT_SHORT_SHA7=$(echo ${GITHUB_SHA} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: "${{ env.REGISTRY }}/abstractumbra/${{ env.IMAGE_NAME }}:latest"
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ghcr.io/${{ env.IMAGE_NAME_LC }}:${{ steps.slug.outputs.GIT_SHORT_SHA7 }}
+            ghcr.io/${{ env.IMAGE_NAME_LC }}:latest
           labels: ${{ steps.meta.outputs.labels }}
