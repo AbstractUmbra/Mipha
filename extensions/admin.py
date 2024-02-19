@@ -22,7 +22,6 @@ from discord.ext.commands import Greedy  # noqa: TCH002
 from jishaku.functools import executor_function
 
 from utilities.shared import formats
-from utilities.shared.converters import MystbinPasteConverter
 
 if TYPE_CHECKING:
     from asyncpg import Record
@@ -207,16 +206,6 @@ class Admin(commands.Cog):
                 ret += 1
 
         await ctx.send(f"Synced the tree to {formats.plural(ret):guild}.")
-
-    @commands.command(name="delete_paste", aliases=["dp"])
-    @commands.guild_only()
-    async def delete_paste(
-        self,
-        ctx: GuildContext,
-        *,
-        paste: str = commands.param(converter=MystbinPasteConverter, description="Paste url or ID"),
-    ) -> None:
-        await ctx.bot.mb_client.delete_paste(paste)
 
     @commands.command(name="delete_webhook", aliases=["dwh"])
     async def delete_webhook(self, ctx: Context, *, webhook_url: str) -> None:

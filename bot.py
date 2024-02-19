@@ -32,6 +32,7 @@ from utilities.prefix import callable_prefix as _callable_prefix
 from utilities.shared.async_config import Config
 from utilities.shared.db import db_init
 from utilities.shared.formats import to_json
+from utilities.shared.paste import create_paste
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Coroutine, Iterable
@@ -78,9 +79,9 @@ class MiphaCommandTree(app_commands.CommandTree):
         clean = "".join(trace)
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
-            paste = await self.client.mb_client.create_paste(filename="error.py", content=clean, password=password)
+            paste = await create_paste(content=clean, password=password, session=interaction.client.session)
             e.description = (
-                f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."
+                f"Error was too long to send in a codeblock, so I have pasted it [here]({paste})."
                 f"\nThe password is `{password}`."
             )
         else:
@@ -175,7 +176,6 @@ class Mipha(commands.Bot):
 
     __slots__ = (
         "session",
-        "mb_client",
         "md_client",
         "start_time",
         "pool",
