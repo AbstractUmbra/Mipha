@@ -291,7 +291,7 @@ class Fun(commands.Cog):
 
         try:
             await asyncio.wait_for(is_ended.wait(), timeout=60)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await ctx.send("No participants matched the output.")
         else:
             await ctx.send("Input accepted... Other players have 10 seconds left.")

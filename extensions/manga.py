@@ -21,6 +21,7 @@ from hondana.query import FeedOrderQuery, MangaListOrderQuery, Order
 
 from utilities.shared import formats
 from utilities.shared.paginator import MangaDexEmbed
+from utilities.shared.paste import create_paste
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
@@ -46,7 +47,7 @@ class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hon
             "author": bot.md_client.get_author,
         }
 
-        return table.get(item, None)
+        return table.get(item)
 
     async def convert(self, ctx: Context, argument: str) -> hondana.Manga | hondana.Chapter | hondana.Author | None:
         search = hondana.MANGADEX_URL_REGEX.search(argument)
@@ -316,14 +317,9 @@ class MangaCog(commands.Cog, name="Manga"):
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
             expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
-            paste = await self.bot.mb_client.create_paste(
-                filename="error.py",
-                content=clean,
-                password=password,
-                expires=expires,
-            )
+            paste = await create_paste(content=clean, password=password, expiry=expires, session=self.bot.session)
             clean = (
-                f"Error was too long to send in a codeblock, so I have pasted it [here]({paste.url})."
+                f"Error was too long to send in a codeblock, so I have pasted it [here]({paste})."
                 f"\nThe password is {password} and it expires at {discord.utils.format_dt(expires, 'F')}."
             )
 
