@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local
-          key: poetry-0
+          key: "poetry-0-${{ matrix.python-version }}"
 
       - name: "Setup Poetry @ ${{ matrix.python-version }}"
         if: steps.cached-poetry.outputs.cache-hit != 'true'
@@ -72,6 +72,12 @@ jobs:
           warnings: false
           no-comments: ${{ matrix.python-version != '3.x' }}
 
-      - name: Lint
+      - name: Lint check
         if: ${{ always() && steps.install-deps.outcome == 'success' }}
         uses: chartboost/ruff-action@v1
+
+      - name: Formatting check
+        if: ${{ always() && steps.install-deps.outcome == 'success' }}
+        uses: chartboost/ruff-action@v1
+        with:
+          args: format --check
