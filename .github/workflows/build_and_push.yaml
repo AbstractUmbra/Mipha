@@ -59,9 +59,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Generate short SHA
+      - name: Generate lowername image
+        id: image-name
         run: |
-          echo "IMAGE_NAME_LC=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+          echo "IMAGE_NAME_LC=${IMAGE_NAME,,}" >> "${GITHUB_OUTPUT}"
         env:
           IMAGE_NAME: '${{ env.IMAGE_NAME }}'
 
@@ -76,6 +77,6 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.tags }}
-            ghcr.io/${{ env.IMAGE_NAME_LC }}:${{ steps.slug.outputs.GIT_SHORT_SHA7 }}
-            ghcr.io/${{ env.IMAGE_NAME_LC }}:latest
+            ghcr.io/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:${{ steps.slug.outputs.GIT_SHORT_SHA7 }}
+            ghcr.io/${{ steps.image-name.outputs.IMAGE_NAME_LC }}:latest
           labels: ${{ steps.meta.outputs.labels }}
