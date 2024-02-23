@@ -345,7 +345,7 @@ class Time(commands.Cog):
     async def _info(self, ctx: Context, *, timezone: TimeZone) -> None:
         """This will return the time in a specified timezone."""
         embed = discord.Embed(
-            title=f"Current time in {timezone}",
+            title=f"Current time in {timezone.label}",
             description=f"```\n{self._curr_tz_time(timezone.to_zone(), ret_datetime=False)}\n```",
         )
         embed.set_footer(text=f"Requested by: {ctx.author}")
