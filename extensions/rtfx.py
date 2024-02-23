@@ -368,8 +368,8 @@ class RTFX(commands.Cog):
                 f.write(
                     to_json(
                         {
-                            "pythonVersion": "3.10",
-                            "typeCheckingMode": "basic",
+                            "pythonVersion": "3.12",
+                            "typeCheckingMode": "strict",
                             "useLibraryCodeForTypes": False,
                             "reportMissingImports": True,
                         },
