@@ -15,7 +15,7 @@ import sys
 import traceback
 from collections import Counter, deque
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, overload
 
 import aiohttp
 import asyncpg
@@ -160,6 +160,10 @@ class LogHandler:
 
 class Mipha(commands.Bot):
     """Mipha's bot class."""
+
+    DEV_GUILDS: ClassVar[list[discord.Object]] = [
+        discord.Object(id=705500489248145459, type=discord.Guild),
+    ]
 
     log_handler: LogHandler
     pool: asyncpg.Pool
@@ -517,7 +521,9 @@ async def main() -> None:
     config = CONFIG_PATH.read_text("utf-8")
     raw_cfg: RootConfig = discord.utils._from_json(config)
 
-    async with Mipha(raw_cfg) as bot, aiohttp.ClientSession() as session, asyncpg.create_pool(
+    async with Mipha(raw_cfg) as bot, aiohttp.ClientSession(
+        json_serialize=discord.utils._to_json
+    ) as session, asyncpg.create_pool(
         dsn=bot.config["postgresql"]["dsn"],
         command_timeout=60,
         max_inactive_connection_lifetime=0,
