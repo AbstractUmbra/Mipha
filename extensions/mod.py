@@ -3,31 +3,33 @@ from __future__ import annotations
 import argparse
 import asyncio
 import datetime
+import enum
 import io
 import logging
 import re
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NoReturn
+from collections.abc import Callable, Hashable, MutableMapping, Sequence
+from typing import TYPE_CHECKING, Annotated, Any, Generic, Literal, NoReturn, Self, TypeVar
 
 import asyncpg
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+from discord.utils import MISSING
+from lru import LRU
 
+from utilities.context import ConfirmationView
 from utilities.shared import cache, checks, flags, time
-from utilities.shared.converters import Snowflake  # noqa: TCH001
 from utilities.shared.formats import human_join, plural
 from utilities.shared.paginator import SimplePages
-from utilities.shared.ui import BaseView
+from utilities.shared.queue import CancellableQueue
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, MutableMapping
-    from typing import Self
-
     from discord.ext.commands._types import Check
 
     from bot import Mipha
     from utilities.context import GuildContext, Interaction
+    from utilities.shared.converters import Snowflake
 
     from .reminders import Timer
 
@@ -36,7 +38,13 @@ if TYPE_CHECKING:
         guild_config: ModConfig
 
 
-LOGGER = logging.getLogger(__name__)
+HashableT = TypeVar("HashableT", bound=Hashable)
+K = TypeVar("K")
+V = TypeVar("V")
+
+log = logging.getLogger(__name__)
+
+## Misc utilities
 
 
 class Arguments(argparse.ArgumentParser):
@@ -44,7 +52,7 @@ class Arguments(argparse.ArgumentParser):
         raise RuntimeError(message)
 
 
-class AutoModFlags(discord.flags.BaseFlags):
+class AutoModFlags(flags.BaseFlags):
     @flags.flag_value
     def joins(self) -> int:
         """Whether the server is broadcasting joins"""
@@ -54,6 +62,38 @@ class AutoModFlags(discord.flags.BaseFlags):
     def raid(self) -> int:
         """Whether the server is autobanning spammers"""
         return 2
+
+    @flags.flag_value
+    def alerts(self) -> int:
+        """Whether the server has alerts enabled."""
+        return 4
+
+    @flags.flag_value
+    def gatekeeper(self) -> int:
+        """Whether the server has gatekeeper enabled."""
+        return 8
+
+
+class CannotEnableGatekeeper(Exception):
+    pass
+
+
+def merge_permissions(overwrite: discord.PermissionOverwrite, permissions: discord.Permissions, **perms: bool) -> None:
+    for perm, value in perms.items():
+        if getattr(permissions, perm):
+            setattr(overwrite, perm, value)
+
+
+def has_manage_roles_overwrite(member: discord.Member, channel: discord.abc.GuildChannel) -> bool:
+    ow = channel.overwrites
+    default = discord.PermissionOverwrite()
+    if ow.get(member, default).manage_roles:
+        return True
+
+    return any(ow.get(role, default).manage_roles for role in member.roles)
+
+
+## Configuration
 
 
 class ModConfig:
@@ -67,7 +107,10 @@ class ModConfig:
         "safe_automod_entity_ids",
         "mute_role_id",
         "muted_members",
+        "alert_webhook_url",
+        "alert_channel_id",
         "_cs_broadcast_webhook",
+        "_cs_alert_webhook",
     )
 
     bot: Mipha
@@ -79,6 +122,8 @@ class ModConfig:
     safe_automod_entity_ids: set[int]
     muted_members: set[int]
     mute_role_id: int | None
+    alert_webhook_url: str | None
+    alert_channel_id: int | None
 
     @classmethod
     def from_record(cls, record: Any, bot: Mipha) -> Self:
@@ -86,7 +131,7 @@ class ModConfig:
 
         # the basic configuration
         self.bot = bot
-        self.automod_flags = AutoModFlags._from_value(record["automod_flags"] or 0)
+        self.automod_flags = AutoModFlags(record["automod_flags"] or 0)
         self.id = record["id"]
         self.broadcast_channel_id = record["broadcast_channel"]
         self.broadcast_webhook_url = record["broadcast_webhook_url"]
@@ -94,6 +139,8 @@ class ModConfig:
         self.safe_automod_entity_ids = set(record["safe_automod_entity_ids"] or [])
         self.muted_members = set(record["muted_members"] or [])
         self.mute_role_id = record["mute_role_id"]
+        self.alert_webhook_url = record["alert_webhook_url"]
+        self.alert_channel_id = record["alert_channel_id"]
         return self
 
     @property
@@ -109,7 +156,7 @@ class ModConfig:
     def broadcast_webhook(self) -> discord.Webhook | None:
         if self.broadcast_webhook_url is None:
             return None
-        return discord.Webhook.from_url(self.broadcast_webhook_url, session=self.bot.session)
+        return discord.Webhook.from_url(self.broadcast_webhook_url, session=self.bot.session, client=self.bot)
 
     @property
     def mute_role(self) -> discord.Role | None:
@@ -123,21 +170,362 @@ class ModConfig:
         if self.mute_role_id:
             await member.add_roles(discord.Object(id=self.mute_role_id), reason=reason)
 
+    @discord.utils.cached_slot_property("_cs_alert_webhook")
+    def alert_webhook(self) -> discord.Webhook | None:
+        if self.alert_webhook_url is None:
+            return None
+        return discord.Webhook.from_url(self.alert_webhook_url, session=self.bot.session, client=self.bot)
 
-class MigrateJoinLogView(BaseView):
+    if TYPE_CHECKING:
+        send_alert = discord.Webhook.send
+    else:
+
+        async def send_alert(self, **kwargs: Any) -> None:
+            if not self.automod_flags.alerts or not self.alert_webhook:
+                return
+
+            try:
+                return await self.alert_webhook.send(**kwargs)
+            except discord.HTTPException:
+                return None
+
+
+class GatekeeperRoleState(enum.Enum):
+    added = "added"
+    pending_add = "pending_add"
+    pending_remove = "pending_remove"
+
+
+class Gatekeeper:
+    """A gatekeeper that prevents users from participating in the server until certain conditions are met.
+
+    Currently this is implemented as a random captcha in a channel where a bot must solve a random question
+    through a modal.
+
+    This class maintains a lot of the states and invariants but it can be easy to lose track of it all so
+    I'm listing it here for my future purposes:
+
+    - ModConfig.automod_flags.gatekeeper
+        This is used to signal whether the feature is enabled at all.
+        This is different from whether the gatekeeper is *actually* enabled.
+        If this flag is *disabled* then **started_at** should be set to None.
+        The remaining data *should be kept*, in case it is re-enabled in the
+        future.
+    - members
+        This is a set of members that have the role and are pending to
+        receive the role. Anyone in this set is technically being gatekept.
+        If they talk in any channel while technically gatekept then they
+        should get autobanned (or kicked, might be a setting).
+
+        If the gatekeeper is disabled then this list should be cleared,
+        probably one by one during clean up.
+    - started_at is None
+        This signals that the gatekeeper is fully disabled.
+        If this is true, then all members should lose their role
+        and the table **should not** be cleared.
+
+        There is a special case where this is true, but there
+        are still members. In this case, clean up should resume.
+    - started_at is not None
+        This one's simple, the gatekeeper is fully operational
+        and serving captchas and adding roles.
+
+        There's a bit of a weird case when the queue is still full
+        from e.g. a previous raid. For simplicity I'll just leave it
+        alone.
+
+        It should be impossible for this case to be true and role_id
+        is None and channel_id is None and message_id is None.
+    - Changing the role
+        Changing the role should remove the member list being gatekept.
+
+        This is merely as a convenience for my sake, since implementing
+        it any other way would be annoying. Ideally role changes should
+        be pretty rare.
+
+    Basically, all this to say that `members` is just tracking the role
+    updates on our side and mirroring the same information.
+    """
+
+    __slots__ = (
+        "bot",
+        "cog",
+        "id",
+        "members",
+        "queue",
+        "task",
+        "started_at",
+        "role_id",
+        "channel_id",
+        "message_id",
+        "bypass_action",
+        "rate",
+    )
+
+    def __init__(self, record: Any, members: list[Any], cog: Mod) -> None:
+        self.bot: Mipha = cog.bot
+        self.id: int = record["id"]
+        self.cog: Mod = cog
+        self.members: set[int] = {r["user_id"] for r in members if r["state"] == "added"}
+        self.started_at: datetime.datetime | None = record["started_at"]
+        self.role_id: int | None = record["role_id"]
+        self.channel_id: int | None = record["channel_id"]
+        self.message_id: int | None = record["message_id"]
+        self.bypass_action: Literal["ban", "kick"] = record["bypass_action"]
+        rate: str | None = record["rate"]
+        self.rate: tuple[int, int] | None = None
+        if rate is not None:
+            rate, per = rate.split("/")
+            self.rate = (int(rate), int(per))
+
+        self.task = asyncio.create_task(self.role_loop())
+        if self.started_at is not None:
+            self.started_at = self.started_at.replace(tzinfo=datetime.UTC)
+
+        self.queue: CancellableQueue[int, tuple[int, GatekeeperRoleState]] = CancellableQueue()
+        for member in members:
+            state = GatekeeperRoleState(member["state"])
+            member_id = member["user_id"]
+            if state is not GatekeeperRoleState.added:
+                self.queue.put(member_id, (member_id, state))
+
+    def __repr__(self) -> str:
+        attrs = [
+            ("id", self.id),
+            ("members", len(self.members)),
+            ("started_at", self.started_at),
+            ("role_id", self.role_id),
+            ("channel_id", self.channel_id),
+            ("message_id", self.message_id),
+            ("bypass_action", self.bypass_action),
+            ("rate", self.rate),
+        ]
+        joined = " ".join("{}={!r}".format(*t) for t in attrs)
+        return f"<{self.__class__.__name__} {joined}>"
+
+    @property
+    def status(self) -> str:
+        headers = [
+            ("Blocked Members", len(self.members)),
+            ("Enabled", self.started_at is not None),
+            ("Role", self.role.mention if self.role is not None else "Not set up"),
+            ("Channel", self.channel.mention if self.channel is not None else "Not set up"),
+            ("Message", self.message.jump_url if self.message is not None else "Not set up"),
+            ("Bypass Action", self.bypass_action.title()),
+            ("Auto Trigger", f"{self.rate[0]}/{self.rate[1]}s" if self.rate is not None else "Not set up"),
+        ]
+        return "\n".join(f"{header}: {value}" for header, value in headers)
+
+    async def edit(
+        self,
+        *,
+        started_at: datetime.datetime | None = MISSING,
+        role_id: int | None = MISSING,
+        channel_id: int | None = MISSING,
+        message_id: int | None = MISSING,
+        bypass_action: str = MISSING,
+        rate: tuple[int, int] | None = MISSING,
+    ) -> None:
+        form: dict[str, Any] = {}
+
+        if role_id is None or channel_id is None or message_id is None:
+            started_at = None
+        if started_at is not MISSING:
+            form["started_at"] = started_at
+        if role_id is not MISSING:
+            form["role_id"] = role_id
+        if channel_id is not MISSING:
+            form["channel_id"] = channel_id
+        if message_id is not MISSING:
+            form["message_id"] = message_id
+        if bypass_action is not MISSING:
+            form["bypass_action"] = bypass_action
+        if rate is not MISSING:
+            form["rate"] = "/".join(map(str, rate)) if rate is not None else None
+
+        async with self.bot.pool.acquire(timeout=300.0) as conn, conn.transaction():
+            table_columns = ", ".join(form)
+            set_values = ", ".join(f"{key} = ${index}" for index, key in enumerate(form, start=2))
+            values = [self.id, *form.values()]
+            values_as_str = ", ".join(f"${i}" for i in range(1, len(values) + 1))
+            query = f"INSERT INTO guild_gatekeeper(id, {table_columns}) VALUES ({values_as_str}) ON CONFLICT(id) DO UPDATE SET {set_values};"
+            await conn.execute(query, *values)
+            if role_id is not MISSING:
+                await conn.execute("DELETE FROM guild_gatekeeper_members WHERE guild_id = $1", self.id)
+
+        if role_id is not MISSING:
+            self.members.clear()
+            self.queue.cancel_all()
+            self.task.cancel()
+            self.role_id = role_id
+            self.task = asyncio.create_task(self.role_loop())
+
+        if started_at is not MISSING:
+            self.started_at = started_at
+        if role_id is not MISSING:
+            self.role_id = role_id
+        if channel_id is not MISSING:
+            self.channel_id = channel_id
+        if message_id is not MISSING:
+            self.message_id = message_id
+        if bypass_action is not MISSING:
+            self.bypass_action = bypass_action  # type: ignore
+        if rate is not MISSING:
+            self.rate = rate
+
+    async def role_loop(self) -> None:
+        # Use low level methods (unfortunately)
+        remove_role = self.bot.http.remove_role
+        add_role = self.bot.http.add_role
+
+        while self.role_id is not None:
+            member_id, action = await self.queue.get()
+
+            try:
+                if action is GatekeeperRoleState.pending_add:
+                    await add_role(
+                        self.id, member_id, self.role_id, reason=f"RoboMod Gatekeeper is active since {self.started_at}"
+                    )
+                    query = "UPDATE guild_gatekeeper_members SET state = 'added' WHERE guild_id = $1 AND user_id = $2"
+                    await self.bot.pool.execute(query, self.id, member_id)
+                elif action is GatekeeperRoleState.pending_remove:
+                    await remove_role(self.id, member_id, self.role_id, reason="Completed RoboMod Gatekeeper verification")
+                    query = "DELETE FROM guild_gatekeeper_members WHERE guild_id = $1 AND user_id = $2"
+                    await self.bot.pool.execute(query, self.id, member_id)
+            except discord.DiscordServerError:
+                self.queue.put(member_id, (member_id, action))
+            except discord.NotFound as e:
+                # Unknown role/user
+                if e.code not in (10011, 10013):
+                    break
+            except Exception:
+                log.exception("[Gatekeeper] An exception happened in the role loop of guild ID %d", self.id)
+                continue
+
+    async def cleanup_loop(self, members: set[int]) -> None:
+        # This can be potentially expensive if there's hundreds of members
+        # so the background cleaning would be pretty expensive.
+        # Not much I can do about this other than handle the case where
+        # people delete the role in frustration instead.
+        if self.role_id is None:
+            return
+
+        for member_id in members:
+            try:
+                await self.bot.http.remove_role(self.id, member_id, self.role_id)
+            except discord.HTTPException as e:
+                # Unknown role
+                if e.code == 10011:
+                    await self.edit(role_id=None)
+                    break
+                elif e.code == 10013:
+                    continue
+                else:
+                    break  # Can't handle this exception so just break for now
+            except Exception:
+                log.exception("[Gatekeeper] An exception happened in the role cleanup loop of guild ID %d", self.id)
+
+    @property
+    def pending_members(self) -> int:
+        return len(self.members)
+
+    async def enable(self) -> None:
+        now = datetime.datetime.utcnow()
+        query = "UPDATE guild_gatekeeper SET started_at = $2 WHERE id = $1"
+        # Ensure constraints are run before saving state
+        await self.bot.pool.execute(query, self.id, now)
+        self.started_at = now
+
+    async def disable(self) -> None:
+        self.started_at = None
+        async with self.bot.pool.acquire(timeout=300.0) as conn, conn.transaction():
+            query = "UPDATE guild_gatekeeper SET started_at = NULL WHERE id = $1"
+            await conn.execute(query, self.id)
+            query = "UPDATE guild_gatekeeper_members SET state = 'pending_remove' WHERE guild_id = $1 AND state = 'added';"
+            await conn.execute(query, self.id)
+            for member_id in self.members:
+                self.queue.put((member_id), (member_id, GatekeeperRoleState.pending_remove))
+            self.members.clear()
+
+    @property
+    def role(self) -> discord.Role | None:
+        guild = self.bot.get_guild(self.id)
+        return guild and self.role_id and guild.get_role(self.role_id)  # type: ignore
+
+    @property
+    def channel(self) -> discord.TextChannel | None:
+        guild = self.bot.get_guild(self.id)
+        return guild and guild.get_channel(self.channel_id)  # type: ignore
+
+    @property
+    def message(self) -> discord.PartialMessage | None:
+        if self.channel_id is None or self.message_id is None:
+            return None
+
+        channel = self.bot.get_partial_messageable(self.channel_id)
+        return channel.get_partial_message(self.message_id)
+
+    @property
+    def requires_setup(self) -> bool:
+        return self.role_id is None or self.channel_id is None or self.message_id is None
+
+    def is_blocked(self, user_id: int, /) -> bool:
+        return user_id in self.members
+
+    def is_bypassing(self, member: discord.Member) -> bool:
+        if self.started_at is None:
+            return False
+        if member.joined_at is None:
+            return False
+
+        return member.joined_at >= self.started_at and self.is_blocked(member.id)
+
+    async def block(self, member: discord.Member) -> None:
+        self.members.add(member.id)
+        query = "INSERT INTO guild_gatekeeper_members(guild_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+        await self.bot.pool.execute(query, self.id, member.id)
+        self.queue.put(member.id, (member.id, GatekeeperRoleState.pending_add))
+
+    async def force_enable_with(self, members: Sequence[discord.Member]) -> None:
+        self.members.update(m.id for m in members)
+        now = datetime.datetime.utcnow()
+        async with self.bot.pool.acquire(timeout=300.0) as conn, conn.transaction():
+            query = "UPDATE guild_gatekeeper SET started_at = $2 WHERE id = $1"
+            await conn.execute(query, self.id, now)
+            query = "INSERT INTO guild_gatekeeper_members(guild_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+            await conn.executemany(query, [(self.id, m.id) for m in members])
+
+        self.started_at = now
+        for member in members:
+            self.queue.put(member.id, (member.id, GatekeeperRoleState.pending_add))
+
+    async def unblock(self, member: discord.Member) -> None:
+        self.members.discard(member.id)
+        if self.queue.is_pending(member.id):
+            query = "DELETE FROM guild_gatekeeper_members WHERE guild_id = $1 AND user_id = $2"
+            await self.bot.pool.execute(query, self.id, member.id)
+            self.queue.cancel(member.id)
+        else:
+            query = "UPDATE guild_gatekeeper_members SET state = 'pending_remove' WHERE guild_id = $1 AND user_id = $2"
+            await self.bot.pool.execute(query, self.id, member.id)
+            self.queue.put(member.id, (member.id, GatekeeperRoleState.pending_remove))
+
+
+## Views
+
+
+class MigrateJoinLogView(discord.ui.View):
     def __init__(self, cog: Mod) -> None:
         super().__init__(timeout=None)
         self.cog: Mod = cog
 
     @discord.ui.button(label="Migrate", custom_id="migrate_robomod_join_logs", style=discord.ButtonStyle.green)
-    async def migrate(self, interaction: Interaction, button: discord.ui.Button) -> None:
+    async def migrate(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         assert interaction.message is not None
-        assert interaction.guild_id
-        assert isinstance(interaction.channel, discord.TextChannel)
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         try:
-            await self.cog.migrate_automod_broadcast(interaction.user, interaction.channel, interaction.guild_id)
+            await self.cog.migrate_automod_broadcast(interaction.user, interaction.channel, interaction.guild_id)  # type: ignore
         except RuntimeError as e:
             await interaction.followup.send(str(e), ephemeral=True)
         else:
@@ -145,7 +533,7 @@ class MigrateJoinLogView(BaseView):
             await interaction.followup.send("Successfully migrated to new join logs!", ephemeral=True)
 
 
-class PreExistingMuteRoleView(BaseView):
+class PreExistingMuteRoleView(discord.ui.View):
     message: discord.Message
 
     def __init__(self, user: discord.abc.User) -> None:
@@ -160,32 +548,32 @@ class PreExistingMuteRoleView(BaseView):
         except:
             pass
 
-    async def interaction_check(self, interaction: Interaction) -> bool:
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user.id:
             await interaction.response.send_message("Sorry, these buttons aren't for you", ephemeral=True)
             return False
         return True
 
     @discord.ui.button(label="Merge", style=discord.ButtonStyle.blurple)
-    async def merge_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
+    async def merge_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.merge = True
 
     @discord.ui.button(label="Replace", style=discord.ButtonStyle.grey)
-    async def replace_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
+    async def replace_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.merge = False
 
     @discord.ui.button(label="Quit", style=discord.ButtonStyle.red)
-    async def abort_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
+    async def abort_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_message("Aborting", ephemeral=True)
         self.merge = None
         await self.message.delete()
 
 
-class LockdownPermissionIssueView(BaseView):
+class LockdownPermissionIssueView(discord.ui.View):
     message: discord.Message
 
     def __init__(self, me: discord.Member, channel: discord.abc.GuildChannel) -> None:
@@ -203,7 +591,7 @@ class LockdownPermissionIssueView(BaseView):
             pass
 
     @discord.ui.button(label="Resolve Permission Issue", style=discord.ButtonStyle.green)
-    async def resolve_permissions(self, interaction: Interaction, button: discord.ui.Button) -> None:
+    async def resolve_permissions(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         overwrites = self.channel.overwrites
         ow = overwrites.setdefault(self.me, discord.PermissionOverwrite())
         ow.send_messages = True
@@ -213,8 +601,8 @@ class LockdownPermissionIssueView(BaseView):
             await self.channel.set_permissions(self.me, overwrite=ow)
         except discord.HTTPException:
             await interaction.response.send_message(
-                "Could not successfully edit permissions, please give the bot Send Messages "
-                f"and Send Messages in Threads in {self.channel.mention}",
+                f"Could not successfully edit permissions, please give the bot Send Messages "
+                f"and Send Messages in Threads in {self.channel.mention}"
             )
         else:
             await self.message.delete(delay=3)
@@ -223,13 +611,787 @@ class LockdownPermissionIssueView(BaseView):
             self.stop()
 
     @discord.ui.button(label="Quit", style=discord.ButtonStyle.red)
-    async def abort_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
+    async def abort_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         self.abort = True
         await interaction.response.send_message(
-            "Alright, feel free to edit the permissions yourself to give the bot Send Messages and Send Messages in"
-            " Threads!",
+            "Alright, feel free to edit the permissions yourself to give the bot Send Messages and Send Messages in Threads!"
         )
         self.stop()
+
+
+# [Role Select Menu]
+# -> Sync permissions? [Yes] [No]
+# [Create New Role Instead]
+# -> Confirm? [Yes] [No]
+
+
+class GatekeeperSetupRoleView(discord.ui.View):
+    message: discord.Message
+
+    def __init__(
+        self, parent: GatekeeperSetUpView, selected_role: discord.Role | None, created_role: discord.Role | None
+    ) -> None:
+        super().__init__(timeout=300.0)
+        self.selected_role: discord.Role | None = selected_role
+        self.created_role = created_role
+        self.parent = parent
+        if selected_role is not None:
+            self.role_select.default_values = [discord.SelectDefaultValue.from_role(selected_role)]
+
+        if self.created_role is not None:
+            self.create_role.disabled = True
+
+    @discord.ui.select(
+        cls=discord.ui.RoleSelect, min_values=1, max_values=1, placeholder="Choose the automatically assigned role"
+    )
+    async def role_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect) -> None:
+        assert interaction.message is not None
+        assert interaction.guild is not None
+        assert isinstance(interaction.channel, discord.abc.Messageable)
+        assert isinstance(interaction.user, discord.Member)
+
+        role = select.values[0]
+        if role >= interaction.guild.me.top_role:
+            await interaction.response.send_message(
+                "Cannot use this role as it is higher than my role in the hierarchy.", ephemeral=True
+            )
+            return
+
+        if role >= interaction.user.top_role:
+            await interaction.response.send_message(
+                "Cannot use this role as it is higher than your role in the hierarchy.", ephemeral=True
+            )
+            return
+
+        channels = [
+            ch
+            for ch in interaction.guild.channels
+            if isinstance(ch, discord.abc.Messageable) and not ch.permissions_for(role).read_messages
+        ]
+
+        if channels:
+            msg = (
+                "In order for this role to work, it requires editing the permissions in every applicable channel.\n"
+                f"Would you like to edit the permissions of potentially {plural(len(channels)):channel}?"
+            )
+            confirm = ConfirmationView(timeout=180.0, author_id=interaction.user.id, delete_after=True)
+            await interaction.response.send_message(msg, view=confirm, ephemeral=True)
+            await confirm.wait()
+            if not confirm.value:
+                msg = (
+                    f"Successfully set the automatically assigned role to {role.mention}.\n\n"
+                    "\u26a0\ufe0f This role might not work properly unless manually edited to have proper permissions.\n"
+                    "Please edit the permissions of applicable channels to block the user from accessing it when possible."
+                )
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                async with interaction.channel.typing():
+                    success, failure, skipped = await Mod.update_role_permissions(
+                        role, self.parent.guild, interaction.user, update_read_permissions=True, channels=channels
+                    )
+                    total = success + failure + skipped
+                    msg = (
+                        f"Successfully set the automatically assigned role to {role.mention}.\n\n"
+                        f"Attempted to update {total} channel permissions: "
+                        f"[Success: {success}, Failure: {failure}, Skipped (no permissions): {skipped}]"
+                    )
+                    await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(
+                f"Successfully set the automatically assigned role to {role.mention}", ephemeral=True
+            )
+
+        self.selected_role = role
+        self.stop()
+        await interaction.message.delete()
+
+    @discord.ui.button(label="Create New Role", style=discord.ButtonStyle.blurple)
+    async def create_role(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        assert interaction.message is not None
+        assert isinstance(interaction.channel, discord.abc.Messageable)
+
+        try:
+            role = await self.parent.guild.create_role(name="Unverified")
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"Could not create role: {e}", ephemeral=True)
+            return
+
+        self.created_role = role
+        self.selected_role = role
+        channels = [ch for ch in self.parent.guild.channels if isinstance(ch, discord.abc.Messageable)]
+        msg = (
+            "In order for this role to work, it requires editing the permissions in every applicable channel.\n"
+            f"Would you like to edit the permissions of potentially {plural(len(channels)):channel}?"
+        )
+        confirm = ConfirmationView(timeout=180.0, author_id=interaction.user.id, delete_after=False)
+        await interaction.response.send_message(msg, view=confirm, ephemeral=True)
+        await confirm.wait()
+        if not confirm.value:
+            msg = (
+                f"Role {role.mention} successfully created.\n\n"
+                "\u26a0\ufe0f This role might not work properly unless manually edited to have proper permissions.\n"
+                "Please edit the permissions of applicable channels to block the user from accessing it when possible."
+            )
+            await interaction.followup.send(msg, ephemeral=True)
+            self.stop()
+            await interaction.message.delete()
+            return
+
+        async with interaction.channel.typing():
+            success, failure, skipped = await Mod.update_role_permissions(
+                role, self.parent.guild, interaction.user, update_read_permissions=True, channels=channels
+            )
+            total = success + failure + skipped
+            msg = (
+                f"Role {role.mention} successfully created.\n\n"
+                f"Attempted to update {total} channel permissions: "
+                f"[Success: {success}, Failure: {failure}, Skipped (no permissions): {skipped}]"
+            )
+            await interaction.followup.send(msg, ephemeral=True)
+
+        self.stop()
+        await interaction.message.delete()
+
+
+class GatekeeperRateLimitModal(discord.ui.Modal, title="Join Rate Trigger"):
+    rate = discord.ui.TextInput(label="Number of Joins", placeholder="5", min_length=1, max_length=3)
+    per = discord.ui.TextInput(label="Number of seconds", placeholder="5", min_length=1, max_length=2)
+
+    def __init__(self) -> None:
+        super().__init__(custom_id="gatekeeper-rate-limit-modal")
+        self.final_rate: tuple[int, int] | None = None
+
+    async def on_submit(self, interaction: Interaction, /) -> None:
+        try:
+            rate = int(self.rate.value)
+        except Exception:
+            await interaction.response.send_message("Invalid number of joins given, must be a number.", ephemeral=True)
+            return
+
+        try:
+            per = int(self.per.value)
+        except Exception:
+            await interaction.response.send_message("Invalid number of seconds given, must be a number.", ephemeral=True)
+            return
+
+        if rate <= 0 or per <= 0:
+            await interaction.response.send_message("Joins and seconds cannot be negative or zero", ephemeral=True)
+            return
+
+        # if rate <= 4:
+        #     await interaction.response.send_message('Join rate cannot be less than 5')
+
+        self.final_rate = (rate, per)
+        await interaction.response.send_message(
+            f"Successfully set auto trigger join rate to more than {plural(rate):member join} in {per} seconds",
+            ephemeral=True,
+        )
+
+
+class GatekeeperMessageModal(discord.ui.Modal, title="Starter Message"):
+    header = discord.ui.TextInput(
+        label="Title", style=discord.TextStyle.short, max_length=256, default="Verification Required"
+    )
+    message = discord.ui.TextInput(label="Content", style=discord.TextStyle.long, max_length=2000)
+
+    def __init__(self, default: str) -> None:
+        super().__init__()
+        self.message.default = default
+
+    async def on_submit(self, interaction: Interaction, /) -> None:
+        await interaction.response.defer()
+        self.stop()
+
+
+class GatekeeperRateLimitConfirmationView(discord.ui.View):
+    def __init__(self, *, existing_rate: tuple[int, int], author_id: int) -> None:
+        super().__init__()
+        self.author_id: int = author_id
+        self.message: discord.Message | None = None
+        self.existing_rate: tuple[int, int] = existing_rate
+        self.value: tuple[int, int] | None = existing_rate
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user and interaction.user.id == self.author_id:
+            return True
+        else:
+            await interaction.response.send_message("This confirmation dialog is not for you.", ephemeral=True)
+            return False
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            await self.message.delete()
+
+    @discord.ui.button(label="Update", style=discord.ButtonStyle.green)
+    async def update(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        modal = GatekeeperRateLimitModal()
+        rate, per = self.existing_rate
+        modal.rate.default = str(rate)
+        modal.per.default = str(per)
+        await interaction.response.send_modal(modal)
+        await interaction.delete_original_response()
+        await modal.wait()
+        if modal.final_rate:
+            self.value = modal.final_rate
+
+        self.stop()
+
+    @discord.ui.button(label="Remove", style=discord.ButtonStyle.red)
+    async def remove(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.value = None
+        await interaction.response.defer()
+        await interaction.delete_original_response()
+        self.stop()
+
+
+class GatekeeperChannelSelect(discord.ui.ChannelSelect["GatekeeperSetUpView"]):
+    def __init__(self, gatekeeper: Gatekeeper) -> None:
+        channel = gatekeeper.channel_id
+        if channel is not None:
+            default_values = [discord.SelectDefaultValue(id=channel, type=discord.SelectDefaultValueType.channel)]
+        else:
+            default_values = []
+        super().__init__(
+            channel_types=[discord.ChannelType.text, discord.ChannelType.news],
+            default_values=default_values,
+            placeholder="Select a channel to force members to see when joining",
+            row=0,
+        )
+        self.bot = gatekeeper.bot
+        self.gatekeeper = gatekeeper
+        self.selected_channel: discord.TextChannel | None = None
+
+    @staticmethod
+    async def request_permission_sync(
+        channel: discord.TextChannel, role: discord.Role, interaction: discord.Interaction
+    ) -> None:
+        assert interaction.guild is not None
+
+        role_perms = channel.permissions_for(role)
+        everyone_perms = channel.permissions_for(interaction.guild.default_role)
+        if not everyone_perms.read_messages and role_perms.read_messages:
+            return
+
+        msg = (
+            f"The permissions for {channel.mention} seem to not be properly set up, would you like the bot to set it up for you?\n"
+            f"The channel requires the {role.mention} role to have access to it but the @everyone role should not."
+        )
+        confirm = ConfirmationView(timeout=180.0, author_id=interaction.user.id, delete_after=True)
+        await interaction.followup.send(msg, allowed_mentions=discord.AllowedMentions.none(), ephemeral=True, view=confirm)
+        await confirm.wait()
+        if not confirm.value:
+            return
+
+        reason = f"Gatekeeper permission sync requested by {interaction.user} (ID: {interaction.user.id})"
+        try:
+            if everyone_perms.read_messages:
+                overwrite = channel.overwrites_for(interaction.guild.default_role)
+                overwrite.read_messages = False
+                await channel.set_permissions(interaction.guild.default_role, overwrite=overwrite, reason=reason)
+            if not role_perms.read_messages:
+                overwrite = channel.overwrites_for(role)
+                guild_perms = interaction.guild.me.guild_permissions
+                merge_permissions(
+                    overwrite,
+                    guild_perms,
+                    read_messages=True,
+                    send_messages=False,
+                    add_reactions=False,
+                    use_application_commands=False,
+                    create_private_threads=False,
+                    create_public_threads=False,
+                    send_messages_in_threads=False,
+                )
+                await channel.set_permissions(role, overwrite=overwrite, reason=reason)
+        except discord.HTTPException as e:
+            await interaction.followup.send(f"Could not edit permissions: {e}", ephemeral=True)
+
+    async def callback(self, interaction: Interaction) -> Any:
+        assert self.view is not None
+        assert interaction.message is not None
+        assert interaction.guild is not None
+
+        channel = self.values[0].resolve()
+        if channel is None:
+            await interaction.response.send_message("Sorry, somehow this channel did not resolve on my end.", ephemeral=True)
+            return
+
+        assert isinstance(channel, discord.TextChannel)
+        perms = channel.permissions_for(self.view.guild.me)
+        if not perms.send_messages or not perms.embed_links:
+            await interaction.response.send_message(
+                "Cannot send messages or embeds to this channel, please select another channel or provide those permissions",
+                ephemeral=True,
+            )
+            return
+
+        manage_roles = has_manage_roles_overwrite(self.view.guild.me, channel)
+        if not perms.administrator and not manage_roles:
+            await interaction.response.send_message(
+                "Since I do not have Administrator permission, I require Manage Permissions permission in that channel.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        role = self.gatekeeper.role
+        if role is not None:
+            await self.request_permission_sync(channel, role, interaction)
+
+        message = self.gatekeeper.message
+        if message is not None:
+            await message.delete()
+
+        await self.gatekeeper.edit(channel_id=channel.id, message_id=None)
+        await interaction.followup.send(f"Successfully changed channel to {channel.mention}", ephemeral=True)
+        self.view.update_state()
+        await interaction.edit_original_response(view=self.view)
+
+
+class GatekeeperSetUpView(discord.ui.View):
+    message: discord.Message
+
+    def __init__(self, cog: Mod, user: discord.abc.User, config: ModConfig, gatekeeper: Gatekeeper) -> None:
+        super().__init__(timeout=900.0)
+        self.user = user
+        self.cog = cog
+        self.config = config
+        self.gatekeeper = gatekeeper
+        self.created_role: discord.Role | None = None
+        self.selected_role: discord.Role | None = gatekeeper.role
+        self.selected_message_id: int | None = gatekeeper.message_id
+
+        guild = gatekeeper.bot.get_guild(gatekeeper.id)
+        assert guild is not None
+        self.guild: discord.Guild = guild
+
+        self.channel_select = GatekeeperChannelSelect(gatekeeper)
+        self.add_item(self.channel_select)
+        self.setup_bypass_action.options = [
+            discord.SelectOption(
+                label="Kick User",
+                value="kick",
+                emoji="\N{WOMANS BOOTS}",
+                description="Kick the member if they talk before verifying",
+            ),
+            discord.SelectOption(
+                label="Ban User",
+                value="ban",
+                emoji="\N{HAMMER}",
+                description="Ban the member if they talk before verifying",
+            ),
+        ]
+        self.update_state(invalidate=False)
+
+    def update_state(self, *, invalidate: bool = True) -> None:
+        if invalidate:
+            self.cog.invalidate_gatekeeper(self.gatekeeper.id)
+
+        role = self.gatekeeper.role
+        if role is not None:
+            label = f"Change Role: {role.name}"
+            self.setup_role.label = "Change Role" if len(label) > 80 else label
+            self.setup_role.style = discord.ButtonStyle.grey
+        else:
+            self.setup_role.label = "Set up Role"
+            self.setup_role.style = discord.ButtonStyle.blurple
+
+        rate = self.gatekeeper.rate
+        if rate is not None:
+            rate, per = rate
+            self.setup_auto.label = f"Auto: {rate}/{per} seconds"
+            self.setup_auto.style = discord.ButtonStyle.grey
+        else:
+            self.setup_auto.label = "Auto"
+            self.setup_auto.style = discord.ButtonStyle.blurple
+
+        enabled = self.config.automod_flags.gatekeeper and self.gatekeeper.started_at is not None
+        if enabled:
+            self.toggle_flag.label = "Disable"
+            self.toggle_flag.style = discord.ButtonStyle.red
+        else:
+            self.toggle_flag.label = "Enable"
+            self.toggle_flag.style = discord.ButtonStyle.green
+
+        for option in self.setup_bypass_action.options:
+            option.default = option.value == self.gatekeeper.bypass_action
+
+        # Initial state before editing it
+        self.setup_message.disabled = False
+        self.channel_select.disabled = False
+        self.setup_role.disabled = False
+
+        channel_id = self.gatekeeper.channel_id
+        if channel_id is None:
+            self.setup_message.disabled = True
+
+        if self.gatekeeper.message_id is not None:
+            self.setup_message.disabled = True
+
+        # Can't update channel/role information if it's started
+        if self.gatekeeper.started_at is not None:
+            self.channel_select.disabled = True
+            self.setup_role.disabled = True
+            self.setup_message.disabled = True
+
+        if not enabled:
+            self.toggle_flag.disabled = self.gatekeeper.requires_setup
+
+    async def interaction_check(self, interaction: discord.Interaction, /) -> bool:
+        if self.user.id != interaction.user.id:
+            await interaction.response.send_message("This set up form is not for you.", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self) -> None:
+        try:
+            await self.message.delete()
+        except:
+            pass
+
+    def stop(self) -> None:
+        super().stop()
+        self.cog._gatekeeper_menus.pop(self.gatekeeper.id, None)
+
+    @discord.ui.button(label="Set up Role", style=discord.ButtonStyle.blurple, row=2)
+    async def setup_role(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        assert interaction.message is not None
+
+        if not interaction.app_permissions.manage_roles:
+            await interaction.response.send_message("Bot requires Manage Roles permission for this to work.")
+            return
+
+        view = GatekeeperSetupRoleView(self, self.selected_role, self.created_role)
+        await interaction.response.send_message(
+            "Please either select a pre-existing role or create a new role to automatically assign to new members.",
+            view=view,
+            ephemeral=True,
+        )
+        await view.wait()
+        self.created_role = view.created_role
+        self.selected_role = view.selected_role
+        if self.selected_role is not None:
+            await self.gatekeeper.edit(role_id=self.selected_role.id)
+
+            channel = self.gatekeeper.channel
+            if channel is not None:
+                await GatekeeperChannelSelect.request_permission_sync(channel, self.selected_role, interaction)
+
+        self.update_state()
+        await interaction.message.edit(view=self)
+
+    @discord.ui.button(label="Send Starter Message", style=discord.ButtonStyle.blurple, row=2)
+    async def setup_message(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        assert interaction.message is not None
+
+        channel = self.gatekeeper.channel
+        if self.gatekeeper.role is None:
+            await interaction.response.send_message(
+                "Somehow you managed to press this while no role is set up.", ephemeral=True
+            )
+            return
+
+        if self.gatekeeper.message is not None:
+            await interaction.response.send_message(
+                "Somehow you managed to press this while a message is already is set up.", ephemeral=True
+            )
+            return
+
+        if channel is None:
+            await interaction.response.send_message(
+                "Somehow you managed to press this while no channel is set up.", ephemeral=True
+            )
+            return
+
+        modal = GatekeeperMessageModal(
+            "This server requires verification in order to continue participating.\n**Press the button below to verify your account.**"
+        )
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+
+        embed = discord.Embed(colour=discord.Colour.blurple(), description=modal.message.value, title=modal.header.value)
+        embed.set_footer(
+            text="\u26a0\ufe0f This message was set up by the moderators of this server. This bot will never ask for your personal information, nor is it related to Discord"
+        )
+
+        view = discord.ui.View(timeout=None)
+        view.add_item(GatekeeperVerifyButton(self.config, self.gatekeeper))
+        try:
+            message = await channel.send(view=view, embed=embed)
+        except discord.HTTPException as e:
+            await interaction.followup.send(f"The message could not be sent: {e}", ephemeral=True)
+        else:
+            await self.gatekeeper.edit(message_id=message.id)
+            await interaction.followup.send("Starter message successfully sent", ephemeral=True)
+
+        self.update_state()
+        await interaction.message.edit(view=self)
+
+    @discord.ui.select(placeholder="Select a bypass action...", row=1, min_values=1, max_values=1, options=[])
+    async def setup_bypass_action(self, interaction: discord.Interaction, select: discord.ui.Select) -> None:
+        await interaction.response.defer(ephemeral=True)
+        value = select.values[0]
+        await self.gatekeeper.edit(bypass_action=value)
+        await interaction.followup.send(f"Successfully set bypass action to {value}", ephemeral=True)
+
+    @discord.ui.button(label="Auto", style=discord.ButtonStyle.blurple, row=2)
+    async def setup_auto(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        assert interaction.message is not None
+
+        rate = self.gatekeeper.rate
+        if rate is not None:
+            view = GatekeeperRateLimitConfirmationView(existing_rate=rate, author_id=interaction.user.id)
+            await interaction.response.send_message(
+                "You already have auto gatekeeper set up, what would you like to do?", view=view, ephemeral=True
+            )
+            view.message = await interaction.original_response()
+            await view.wait()
+            await self.gatekeeper.edit(rate=view.value)
+        else:
+            modal = GatekeeperRateLimitModal()
+            await interaction.response.send_modal(modal)
+            await modal.wait()
+            if modal.final_rate is not None:
+                await self.gatekeeper.edit(rate=modal.final_rate)
+
+        self.update_state()
+        await interaction.message.edit(view=self)
+
+    @discord.ui.button(label="Enable", style=discord.ButtonStyle.green, row=2)
+    async def toggle_flag(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        assert interaction.message is not None
+
+        enabled = self.gatekeeper.started_at is not None
+        if enabled:
+            # get newest info
+            newest = await self.cog.get_guild_gatekeeper(self.gatekeeper.id)
+            if newest is not None:
+                self.gatekeeper = newest
+
+            members = self.gatekeeper.pending_members
+            if members:
+                confirm = ConfirmationView(timeout=180.0, author_id=interaction.user.id, delete_after=True)
+                msg = (
+                    f"There {plural(members):is|are!} still {plural(members):member} either waiting for their role "
+                    "or still solving captcha.\n\n"
+                    "Are you sure you want to remove the role from all of them? "
+                    "**This has potential to be very slow and will be done in the background**"
+                )
+                await interaction.response.send_message(msg, view=confirm, ephemeral=True)
+                await confirm.wait()
+                if not confirm.value:
+                    await interaction.followup.send("Aborting", ephemeral=True)
+                    return
+            else:
+                await interaction.response.defer()
+
+            await self.gatekeeper.disable()
+            await interaction.followup.send("Successfully disabled gatekeeper.")
+        else:
+            try:
+                await self.gatekeeper.enable()
+            except asyncpg.IntegrityConstraintViolationError:
+                await interaction.response.send_message(
+                    "Could not enable gatekeeper due to either a role or channel being unset or the message failing to send"
+                )
+            except Exception as e:
+                await interaction.response.send_message(f"Could not enable gatekeeper: {e}")
+            else:
+                await interaction.response.send_message("Successfully enabled gatekeeper.")
+
+        self.update_state()
+        await interaction.message.edit(view=self)
+
+    @discord.ui.button(emoji="\N{WHITE QUESTION MARK ORNAMENT}", row=2)
+    async def help_message(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        msg = (
+            "Gatekeeper is a feature that automatically assigns a role to a member when they join, "
+            "for the sole purpose of blocking them from accessing the server.\n"
+            "The user must press a button in order to verify themselves and have their role removed.\n\n"
+            "In order to set up gatekeeper, a few things are required:\n"
+            "- A channel that locked users will see but regular users will not.\n"
+            "- A role that is assigned when users join.\n"
+            "- A message that the bot sends in the channel with the verify button.\n\n"
+            "There are also settings to help configure some aspects of it:\n"
+            '- "Auto" automatically triggers the gatekeeper if N members join in a span of M seconds\n'
+            '- "Bypass Action" configures what action is taken when a user talks or joins voice before verifying\n\n'
+            "Note that once gatekeeper is enabled, even by auto, it must be manually disabled."
+        )
+        await interaction.response.send_message(msg, ephemeral=True)
+
+
+class GatekeeperVerifyButton(discord.ui.DynamicItem[discord.ui.Button], template="gatekeeper:verify:captcha"):
+    def __init__(self, config: ModConfig | None, gatekeeper: Gatekeeper | None) -> None:
+        super().__init__(
+            discord.ui.Button(label="Verify", style=discord.ButtonStyle.blurple, custom_id="gatekeeper:verify:captcha")
+        )
+        self.config = config
+        self.gatekeeper = gatekeeper
+
+    @classmethod
+    async def from_custom_id(cls, interaction: Interaction, item: discord.ui.Button, match: re.Match[str], /) -> Self:
+        cog: Mod | None = interaction.client.get_cog("Mod")  # type: ignore
+        if cog is None:
+            await interaction.response.send_message(
+                "Sorry, this button does not work at the moment. Try again later", ephemeral=True
+            )
+            raise AssertionError("Mod cog is not loaded")
+
+        config = await cog.get_guild_config(interaction.guild_id)
+        if config is None:
+            return cls(None, None)
+        gatekeeper = await cog.get_guild_gatekeeper(interaction.guild_id)
+        return cls(config, gatekeeper)
+
+    async def interaction_check(self, interaction: Interaction, /) -> bool:
+        if interaction.guild_id is None:
+            return False
+
+        if self.config is None or not self.config.automod_flags.gatekeeper:
+            await interaction.response.send_message("Gatekeeper is not enabled.", ephemeral=True)
+            return False
+
+        if self.gatekeeper is None or self.gatekeeper.started_at is None:
+            await interaction.response.send_message("Gatekeeper is not enabled.", ephemeral=True)
+            return False
+
+        return True
+
+    async def callback(self, interaction: Interaction) -> Any:
+        assert self.gatekeeper is not None
+        assert isinstance(interaction.user, discord.Member)
+        await interaction.response.defer(ephemeral=True)
+        await self.gatekeeper.unblock(interaction.user)
+        await interaction.followup.send("Successfully verified! Thanks.", ephemeral=True)
+
+
+class GatekeeperAlertResolveButton(discord.ui.DynamicItem[discord.ui.Button], template="gatekeeper:alert:resolve"):
+    def __init__(self, gatekeeper: Gatekeeper | None) -> None:
+        super().__init__(
+            discord.ui.Button(label="Resolve", style=discord.ButtonStyle.blurple, custom_id="gatekeeper:alert:resolve")
+        )
+        self.gatekeeper = gatekeeper
+
+    @classmethod
+    async def from_custom_id(cls, interaction: Interaction, item: discord.ui.Button, match: re.Match[str], /) -> Self:
+        cog: Mod | None = interaction.client.get_cog("Mod")  # type: ignore
+        if cog is None:
+            await interaction.response.send_message(
+                "Sorry, this button does not work at the moment. Try again later", ephemeral=True
+            )
+            raise AssertionError("Mod cog is not loaded")
+
+        gatekeeper = await cog.get_guild_gatekeeper(interaction.guild_id)
+        return cls(gatekeeper)
+
+    async def interaction_check(self, interaction: Interaction, /) -> bool:
+        if interaction.guild_id is None:
+            return False
+
+        if self.gatekeeper is None or self.gatekeeper.started_at is None:
+            await interaction.response.send_message("Gatekeeper is not enabled anymore.", ephemeral=True)
+            return False
+
+        return True
+
+    async def callback(self, interaction: Interaction) -> Any:
+        assert self.gatekeeper is not None
+        assert interaction.message is not None
+        assert self.view is not None
+
+        members = self.gatekeeper.pending_members
+        if members:
+            confirm = ConfirmationView(timeout=180.0, author_id=interaction.user.id, delete_after=True)
+            msg = (
+                f"There {plural(members):is|are!} still {plural(members):member} either waiting for their role "
+                "or still solving captcha.\n\n"
+                "Are you sure you want to remove the role from all of them? "
+                "**This has potential to be very slow and will be done in the background**"
+            )
+            await interaction.response.send_message(msg, view=confirm, ephemeral=True)
+            await confirm.wait()
+            if not confirm.value:
+                await interaction.followup.send("Aborting", ephemeral=True)
+                return
+        else:
+            await interaction.response.defer()
+
+        await self.gatekeeper.disable()
+        await interaction.followup.send("Successfully disabled gatekeeper.", ephemeral=True)
+        await interaction.message.edit(view=None)
+
+
+class GatekeeperAlertMassbanButton(discord.ui.DynamicItem[discord.ui.Button], template="gatekeeper:alert:massban"):
+    def __init__(self, cog: Mod) -> None:
+        super().__init__(
+            discord.ui.Button(
+                label="Ban Detected Raiders", style=discord.ButtonStyle.red, custom_id="gatekeeper:alert:massban"
+            )
+        )
+        self.cog: Mod = cog
+
+    @classmethod
+    async def from_custom_id(cls, interaction: Interaction, item: discord.ui.Button, match: re.Match[str], /) -> Self:
+        cog: Mod | None = interaction.client.get_cog("Mod")  # type: ignore
+        if cog is None:
+            await interaction.response.send_message(
+                "Sorry, this button does not work at the moment. Try again later", ephemeral=True
+            )
+            raise AssertionError("Mod cog is not loaded")
+        return cls(cog)
+
+    async def interaction_check(self, interaction: Interaction, /) -> bool:
+        if interaction.guild_id is None:
+            return False
+
+        if not interaction.app_permissions.ban_members:
+            await interaction.response.send_message("I do not have permissions to ban these members.")
+            return False
+
+        if not interaction.permissions.ban_members:
+            await interaction.response.send_message("You do not have permissions to ban these members.")
+            return False
+
+        return True
+
+    async def callback(self, interaction: Interaction) -> None:
+        assert interaction.guild_id is not None
+        assert interaction.guild is not None
+        assert interaction.message is not None
+
+        members = self.cog._spam_check[interaction.guild_id].flagged_users
+        if not members:
+            await interaction.response.send_message("No detected raiders found at the moment.")
+            return
+
+        now = interaction.created_at
+        members = sorted(members.values(), key=lambda m: m.joined_at or now)
+        fmt = "\n".join(f"{m.id}\tJoined: {m.joined_at}\tCreated: {m.created_at}\t{m}" for m in members)
+        content = f"Current Time: {discord.utils.utcnow()}\nTotal members: {len(members)}\n{fmt}"
+        file = discord.File(io.BytesIO(content.encode("utf-8")), filename="members.txt")
+        confirm = ConfirmationView(timeout=180.0, author_id=interaction.user.id, delete_after=True)
+        await interaction.response.send_message(
+            f"This will ban the following **{plural(len(members)):member}**. Are you sure?", view=confirm, file=file
+        )
+        await confirm.wait()
+        if not confirm.value:
+            await interaction.followup.send("Aborting.")
+            return
+
+        count = 0
+        total = len(members)
+        reason = f"{interaction.user} (ID: {interaction.user.id}): Raid detected"
+        guild = interaction.guild
+        for member in members:
+            try:
+                await guild.ban(member, reason=reason)
+            except discord.HTTPException:
+                pass
+            else:
+                count += 1
+
+        await interaction.followup.send(f"Banned {count}/{total}")
 
 
 ## Converters
@@ -239,16 +1401,8 @@ def can_execute_action(ctx: GuildContext, user: discord.Member, target: discord.
     return user.id == ctx.bot.owner_id or user == ctx.guild.owner or user.top_role > target.top_role
 
 
-class _Hackban:
-    def __init__(self, id_: int) -> None:
-        self.id_ = id_
-
-    def __str__(self) -> str:
-        return f"Member ID: {self.id_}"
-
-
-class MemberID(commands.Converter[_Hackban | discord.Member]):
-    async def convert(self, ctx: GuildContext, argument: str) -> _Hackban | discord.Member:
+class MemberID(commands.Converter):
+    async def convert(self, ctx: GuildContext, argument: str) -> discord.abc.Snowflake:
         try:
             m = await commands.MemberConverter().convert(ctx, argument)
         except commands.BadArgument:
@@ -257,17 +1411,16 @@ class MemberID(commands.Converter[_Hackban | discord.Member]):
             except ValueError:
                 raise commands.BadArgument(f"{argument} is not a valid member or member ID.") from None
             else:
-                m = ctx.guild.get_member(member_id) or await ctx.guild.fetch_member(member_id)
+                m = await ctx.bot.get_or_fetch_member(ctx.guild, member_id)
                 if m is None:
-                    # hackban case
-                    return _Hackban(member_id)
+                    return discord.Object(id=member_id, type=discord.Member)
 
         if not can_execute_action(ctx, ctx.author, m):
             raise commands.BadArgument("You cannot do this action on this user due to role hierarchy.")
         return m
 
 
-class BannedMember(commands.Converter[discord.BanEntry]):
+class BannedMember(commands.Converter):
     async def convert(self, ctx: GuildContext, argument: str) -> discord.BanEntry:
         if argument.isdigit():
             member_id = int(argument, base=10)
@@ -283,7 +1436,7 @@ class BannedMember(commands.Converter[discord.BanEntry]):
         return entity
 
 
-class ActionReason(commands.Converter[str]):
+class ActionReason(commands.Converter):
     async def convert(self, ctx: GuildContext, argument: str) -> str:
         ret = f"{ctx.author} (ID: {ctx.author.id}): {argument}"
 
@@ -296,7 +1449,7 @@ class ActionReason(commands.Converter[str]):
 IgnoreableEntity = discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.User | discord.Role
 
 
-class IgnoreEntity(commands.Converter[Any]):
+class IgnoreEntity(commands.Converter):
     async def convert(self, ctx: GuildContext, argument: str) -> Any:
         # Hybrid commands (justifiably) does not support union types
         # since Discord doesn't support it, so we just need to run
@@ -306,7 +1459,7 @@ class IgnoreEntity(commands.Converter[Any]):
 
 
 def safe_reason_append(base: str, to_append: str) -> str:
-    appended = base + f"({to_append})"
+    appended = f"{base} ({to_append})"
     if len(appended) > 512:
         return base
     return appended
@@ -314,34 +1467,27 @@ def safe_reason_append(base: str, to_append: str) -> str:
 
 class MassbanFlags(commands.FlagConverter):
     channel: discord.TextChannel | discord.Thread | discord.VoiceChannel | None = commands.flag(
-        description="The channel to search for message history",
-        default=None,
+        description="The channel to search for message history", default=None
     )
     reason: str | None = commands.flag(description="The reason to ban the members for", default=None)
     username: str | None = commands.flag(description="The regex that usernames must match", default=None)
     created: int | None = commands.flag(
-        description="Matches users whose accounts were created less than specified minutes ago.",
-        default=None,
+        description="Matches users whose accounts were created less than specified minutes ago.", default=None
     )
     joined: int | None = commands.flag(
-        description="Matches users that joined less than specified minutes ago.",
-        default=None,
+        description="Matches users that joined less than specified minutes ago.", default=None
     )
     joined_before: discord.Member | None = commands.flag(
-        description="Matches users who joined before this member",
-        default=None,
-        name="joined-before",
+        description="Matches users who joined before this member", default=None, name="joined-before"
     )
     joined_after: discord.Member | None = commands.flag(
-        description="Matches users who joined after this member",
-        default=None,
-        name="joined-after",
+        description="Matches users who joined after this member", default=None, name="joined-after"
     )
     avatar: bool | None = commands.flag(
-        description="Matches users depending on whether they have avatars or not",
-        default=None,
+        description="Matches users depending on whether they have avatars or not", default=None
     )
     roles: bool | None = commands.flag(description="Matches users depending on whether they have roles or not", default=None)
+    raid: bool = commands.flag(description="Matches users that are internally flagged as potential raiders", default=False)
     show: bool = commands.flag(description="Show members instead of banning them", default=False)
 
     # Message history related flags
@@ -350,13 +1496,11 @@ class MassbanFlags(commands.FlagConverter):
     ends: str | None = commands.flag(description="The substring to search if the message ends with.", default=None)
     match: str | None = commands.flag(description="The regex to match the message content to.", default=None)
     search: commands.Range[int, 1, 2000] = commands.flag(description="How many messages to search for", default=100)
-    after: Annotated[int, Snowflake] | None = commands.flag(
-        description="Messages must come after this message ID.",
-        default=None,
+    after: Annotated[int | None, Snowflake] = commands.flag(
+        description="Messages must come after this message ID.", default=None
     )
-    before: Annotated[int, Snowflake] | None = commands.flag(
-        description="Messages must come before this message ID.",
-        default=None,
+    before: Annotated[int | None, Snowflake] = commands.flag(
+        description="Messages must come before this message ID.", default=None
     )
     files: bool | None = commands.flag(description="Whether the message should have attachments.", default=None)
     embeds: bool | None = commands.flag(description="Whether the message should have embeds.", default=None)
@@ -365,24 +1509,19 @@ class MassbanFlags(commands.FlagConverter):
 class PurgeFlags(commands.FlagConverter):
     user: discord.User | None = commands.flag(description="Remove messages from this user", default=None)
     contains: str | None = commands.flag(
-        description="Remove messages that contains this string (case sensitive)",
-        default=None,
+        description="Remove messages that contains this string (case sensitive)", default=None
     )
     prefix: str | None = commands.flag(
-        description="Remove messages that start with this string (case sensitive)",
-        default=None,
+        description="Remove messages that start with this string (case sensitive)", default=None
     )
     suffix: str | None = commands.flag(
-        description="Remove messages that end with this string (case sensitive)",
-        default=None,
+        description="Remove messages that end with this string (case sensitive)", default=None
     )
-    after: Annotated[int, Snowflake] | None = commands.flag(
-        description="Search for messages that come after this message ID",
-        default=None,
+    after: Annotated[int | None, Snowflake] = commands.flag(
+        description="Search for messages that come after this message ID", default=None
     )
-    before: Annotated[int, Snowflake] | None = commands.flag(
-        description="Search for messages that come before this message ID",
-        default=None,
+    before: Annotated[int | None, Snowflake] = commands.flag(
+        description="Search for messages that come before this message ID", default=None
     )
     bot: bool = commands.flag(description="Remove messages from bots (not webhooks!)", default=False)
     webhooks: bool = commands.flag(description="Remove messages from webhooks", default=False)
@@ -396,19 +1535,169 @@ class PurgeFlags(commands.FlagConverter):
     )
 
 
-class CooldownByContent(commands.CooldownMapping):
-    def _bucket_key(self, message: discord.Message) -> tuple[int, str]:
-        return (message.channel.id, message.content)
+## Spam detector
+
+
+class FlaggedMember:
+    __slots__ = ("id", "joined_at", "display_name", "messages")
+
+    def __init__(self, user: discord.abc.User, joined_at: datetime.datetime) -> None:
+        self.id = user.id
+        self.display_name = str(user)
+        self.joined_at = joined_at
+        self.messages: int = 0
+
+    @property
+    def created_at(self) -> datetime.datetime:
+        return discord.utils.snowflake_time(self.id)
+
+    def __str__(self) -> str:
+        return self.display_name
+
+
+class SpamCheckerResult:
+    def __init__(self, reason: str) -> None:
+        self.reason: str = reason
+
+    def __str__(self) -> str:
+        return self.reason
+
+    @classmethod
+    def spammer(cls) -> SpamCheckerResult:
+        return cls("Auto-ban for spamming")
+
+    @classmethod
+    def flagged_mention(cls) -> SpamCheckerResult:
+        return cls("Auto-ban for suspicious mentions")
+
+
+class MultipleSpammers(SpamCheckerResult):
+    def __init__(self, members: Sequence[discord.abc.Snowflake], *, reason: str = "Auto-ban for spamming") -> None:
+        super().__init__(reason)
+        self.members: Sequence[discord.abc.Snowflake] = members
+
+
+class RateLimit(Generic[V]):
+    def __init__(self, rate: int, per: float, *, key: Callable[[discord.Message], V], maxsize: int = 256) -> None:
+        self.lookup = LRU(maxsize)
+        self.rate = rate
+        self.per = per
+        self.key = key
+
+    @property
+    def ratio(self) -> float:
+        return self.per / self.rate
+
+    def is_ratelimited(self, message: discord.Message) -> bool:
+        now = message.created_at
+        key = self.key(message)
+        tat = max(self.lookup.get(key) or now, now)
+        diff = (tat - now).total_seconds()
+        max_interval = self.per - self.ratio
+        if diff > max_interval:
+            return True
+
+        new_tat = max(tat, now) + datetime.timedelta(seconds=self.ratio)
+        self.lookup[key] = new_tat
+        return False
+
+
+class GatekeeperRateLimit:
+    def __init__(self, rate: int, per: float) -> None:
+        self.rate = rate
+        self.per = per
+        self.tat = discord.utils.utcnow()
+        self.members: set[discord.Member] = set()
+
+    @property
+    def ratio(self) -> float:
+        return self.per / self.rate
+
+    def is_ratelimited(self, member: discord.Member) -> list[discord.Member]:
+        now = member.joined_at or discord.utils.utcnow()
+        tat = max(self.tat, now)
+        diff = (tat - now).total_seconds()
+        max_interval = self.per - self.ratio
+
+        if self.tat < now:
+            self.members.clear()
+
+        self.members.add(member)
+
+        if diff > max_interval:
+            copy = list(self.members)
+            self.members.clear()
+            return copy
+
+        new_tat = max(tat, now) + datetime.timedelta(seconds=self.ratio)
+        self.tat = new_tat
+        return []
+
+
+class TaggedRateLimit(Generic[V, HashableT]):
+    def __init__(
+        self,
+        rate: int,
+        per: float,
+        *,
+        key: Callable[[discord.Message], V],
+        tagger: Callable[[discord.Message], HashableT],
+        maxsize: int = 256,
+    ) -> None:
+        self.lookup: MutableMapping[V, tuple[datetime.datetime, set[HashableT]]] = LRU(maxsize)  # type: ignore # thanks lru
+        self.rate = rate
+        self.per = per
+        self.key = key
+        self.tagger = tagger
+
+    @property
+    def ratio(self) -> float:
+        return self.per / self.rate
+
+    def is_ratelimited(self, message: discord.Message) -> list[HashableT] | None:
+        now = message.created_at
+        key = self.key(message)
+        value = self.lookup.get(key)
+        if value is None:
+            tat = now
+            tagged = set()
+        else:
+            tat = max(value[0], now)
+            tagged = value[1]
+
+            # Clear tagged members that were there from the previous window
+            # Honestly, unsure how this works but from testing it works as I expect
+            if value[0] < now:
+                tagged.clear()
+
+        tag = self.tagger(message)
+        tagged.add(tag)
+
+        diff = (tat - now).total_seconds()
+        max_interval = self.per - self.ratio
+        if diff > max_interval:
+            copy = list(tagged)
+            tagged.clear()
+            return copy
+
+        new_tat = max(tat, now) + datetime.timedelta(seconds=self.ratio)
+        self.lookup[key] = (new_tat, tagged)
+        return None
+
+
+class MemberJoinType(enum.Enum):
+    fast = 1
+    suspicious = 2
 
 
 class SpamChecker:
     """This spam checker does a few things.
 
     1) It checks if a user has spammed more than 10 times in 12 seconds
-    2) It checks if the content has been spammed 15 times in 17 seconds.
+    2) It checks if the content has been spammed 5 times in 10 seconds.
     3) It checks if new users have spammed 30 times in 35 seconds.
-    4) It checks if "fast joiners" have spammed 10 times in 12 seconds.
-    5) It checks if a member spammed `config.mention_count * 2` mentions in 12 seconds.
+    4) It checks if "fast joiners" have spammed 5 times in 7 seconds.
+    5) It checks if a member spammed `config.mention_count` mentions in 15 seconds.
 
     The second case is meant to catch alternating spam bots while the first one
     just catches regular singular spam bots.
@@ -417,24 +1706,38 @@ class SpamChecker:
     """
 
     def __init__(self) -> None:
-        self.by_content = CooldownByContent.from_cooldown(15, 17.0, commands.BucketType.member)
-        self.by_user = commands.CooldownMapping.from_cooldown(10, 12.0, commands.BucketType.user)
+        self.by_content = RateLimit(5, 15.0, key=lambda msg: (msg.channel.id, msg.content))
+        self.by_user = RateLimit(10, 12.0, key=lambda msg: msg.author.id)
         self.last_join: datetime.datetime | None = None
-        self.new_user = commands.CooldownMapping.from_cooldown(30, 35.0, commands.BucketType.channel)
+        self.last_member: discord.Member | None = None
+        self.new_user = RateLimit(30, 35.0, key=lambda msg: msg.channel.id)
         self._by_mentions: commands.CooldownMapping | None = None
         self._by_mentions_rate: int | None = None
+        self._join_rate: tuple[int, int] | None = None
+        self.auto_gatekeeper: GatekeeperRateLimit | None = None
+        # Enabled if alerts are on but gatekeeper isn't
+        self._default_join_spam = GatekeeperRateLimit(10, 5)
 
-        # user_id flag mapping (for about 30 minutes)
-        self.fast_joiners: MutableMapping[int, bool] = cache.ExpiringCache(seconds=1800.0)
-        self.hit_and_run = commands.CooldownMapping.from_cooldown(10, 12, commands.BucketType.channel)
+        # user_id flag mapping (for about 45 minutes)
+        self.flagged_users: MutableMapping[int, FlaggedMember] = cache.ExpiringCache(seconds=2700.0)
+        self.hit_and_run = TaggedRateLimit(5, 15, key=lambda msg: msg.channel.id, tagger=lambda msg: msg.author)
+
+    def get_flagged_member(self, user_id: int, /) -> FlaggedMember | None:
+        return self.flagged_users.get(user_id)
+
+    def is_flagged(self, user_id: int, /) -> bool:
+        return user_id in self.flagged_users
+
+    def flag_member(self, member: discord.Member, /) -> None:
+        self.flagged_users[member.id] = FlaggedMember(member, member.joined_at or discord.utils.utcnow())
 
     def by_mentions(self, config: ModConfig) -> commands.CooldownMapping | None:
         if not config.mention_count:
             return None
 
-        mention_threshold = config.mention_count * 2
+        mention_threshold = config.mention_count
         if self._by_mentions_rate != mention_threshold:
-            self._by_mentions = commands.CooldownMapping.from_cooldown(mention_threshold, 12, commands.BucketType.member)
+            self._by_mentions = commands.CooldownMapping.from_cooldown(mention_threshold, 15, commands.BucketType.member)
             self._by_mentions_rate = mention_threshold
         return self._by_mentions
 
@@ -444,42 +1747,68 @@ class SpamChecker:
         ninety_days_ago = now - datetime.timedelta(days=90)
         return member.created_at > ninety_days_ago and member.joined_at is not None and member.joined_at > seven_days_ago
 
-    def is_spamming(self, message: discord.Message) -> bool:
+    def is_spamming(self, message: discord.Message) -> SpamCheckerResult | None:
         if message.guild is None:
-            return False
+            return None
 
-        current = message.created_at.timestamp()
+        flagged = self.flagged_users.get(message.author.id)
+        if flagged is not None:
+            flagged.messages += 1
+            spammers = self.hit_and_run.is_ratelimited(message)
+            if spammers:
+                return MultipleSpammers(spammers)
 
-        if message.author.id in self.fast_joiners:
-            bucket = self.hit_and_run.get_bucket(message)
-            if bucket and bucket.update_rate_limit(current):
-                return True
+            # Special case for joining and just spamming mentions at some point
+            if (
+                flagged.messages <= 10
+                and message.raw_mentions
+                or "@everyone" in message.content
+                or "@here" in message.content
+            ):
+                return SpamCheckerResult.flagged_mention()
 
-        if self.is_new(message.author):  # type: ignore
-            new_bucket = self.new_user.get_bucket(message)
-            if new_bucket and new_bucket.update_rate_limit(current):
-                return True
+        if self.is_new(message.author) and self.new_user.is_ratelimited(message):  # type: ignore
+            return SpamCheckerResult.spammer()
 
-        user_bucket = self.by_user.get_bucket(message)
-        if user_bucket and user_bucket.update_rate_limit(current):
-            return True
+        if self.by_user.is_ratelimited(message):
+            return SpamCheckerResult.spammer()
 
-        content_bucket = self.by_content.get_bucket(message)
-        if content_bucket and content_bucket.update_rate_limit(current):
-            return True
+        if self.by_content.is_ratelimited(message):
+            return SpamCheckerResult.spammer()
 
-        return False
+        return None
 
-    def is_fast_join(self, member: discord.Member) -> bool:
+    def get_join_type(self, member: discord.Member) -> MemberJoinType | None:
         joined = member.joined_at or discord.utils.utcnow()
-        if self.last_join is None:
+
+        if self.last_member is None:
+            self.last_member = member
             self.last_join = joined
-            return False
-        is_fast = (joined - self.last_join).total_seconds() <= 2.0
-        self.last_join = joined
-        if is_fast:
-            self.fast_joiners[member.id] = True
-        return is_fast
+            return None
+
+        # Check if the member is a fast joiner
+        if self.last_join is not None:
+            is_fast = (joined - self.last_join).total_seconds() <= 2.0
+            self.last_join = joined
+            if is_fast:
+                self.flagged_users[member.id] = FlaggedMember(member, joined)
+                if self.last_member.id not in self.flagged_users:
+                    self.flag_member(self.last_member)
+                self.last_member = member
+                return MemberJoinType.fast
+
+        # Check if the member is a suspicious joiner
+        threshold = datetime.timedelta(days=3).total_seconds()
+        is_suspicious = abs((member.created_at - self.last_member.created_at).total_seconds()) <= threshold
+        if is_suspicious:
+            self.flagged_users[member.id] = FlaggedMember(member, joined)
+            if self.last_member.id not in self.flagged_users:
+                self.flag_member(self.last_member)
+            self.last_member = member
+            return MemberJoinType.suspicious
+
+        self.last_member = member
+        return None
 
     def is_mention_spam(self, message: discord.Message, config: ModConfig) -> bool:
         mapping = self.by_mentions(config)
@@ -490,6 +1819,35 @@ class SpamChecker:
         mention_bucket = mapping.get_bucket(message, current)
         mention_count = sum(not m.bot and m.id != message.author.id for m in message.mentions)
         return mention_bucket is not None and mention_bucket.update_rate_limit(current, tokens=mention_count) is not None
+
+    def check_gatekeeper(self, member: discord.Member, gatekeeper: Gatekeeper) -> list[discord.Member]:
+        # If it's already started then there's no need to check for it
+        if gatekeeper.started_at is not None:
+            return []
+
+        rate = gatekeeper.rate
+        if rate is None:
+            self._join_rate = None
+            return []
+
+        if rate != self._join_rate:
+            # Might be worth considering swapping over the tat/member list? Probably complicated though
+            self.auto_gatekeeper = GatekeeperRateLimit(rate[0], rate[1])
+            self._join_rate = rate
+
+        if self.auto_gatekeeper is not None:
+            return self.auto_gatekeeper.is_ratelimited(member)
+
+        return []
+
+    def is_alertable_join_spam(self, member: discord.Member) -> list[discord.Member]:
+        if self.auto_gatekeeper is not None:
+            return []
+
+        return self._default_join_spam.is_ratelimited(member)
+
+    def remove_member(self, user: discord.abc.User) -> None:
+        self.flagged_users.pop(user.id, None)
 
 
 ## Checks
@@ -513,7 +1871,7 @@ def can_mute() -> Check[ModGuildContext]:
         ctx.guild_config = config = await ctx.cog.get_guild_config(ctx.guild.id)  # type: ignore
         role = config and config.mute_role
         if role is None:
-            raise NoMuteRole
+            raise NoMuteRole()
         return ctx.author.top_role > role
 
     return commands.check(predicate)
@@ -546,21 +1904,35 @@ class Mod(commands.Cog):
         self._batch_message_lock = asyncio.Lock()
         self.bulk_send_messages.start()
 
+        self._gatekeeper_menus: dict[int, GatekeeperSetUpView] = {}
+        self._gatekeepers: dict[int, Gatekeeper] = {}
+
         self._automod_migration_view = MigrateJoinLogView(self)
         bot.add_view(self._automod_migration_view)
-        bot.loop.create_task(self._load_avatar())
+        bot.add_dynamic_items(GatekeeperVerifyButton, GatekeeperAlertMassbanButton, GatekeeperAlertResolveButton)
+
+    @property
+    def display_emoji(self) -> discord.PartialEmoji:
+        return discord.PartialEmoji(name="DiscordCertifiedModerator", id=1055367895326130226)
 
     def __repr__(self) -> str:
         return "<cogs.Mod>"
 
-    async def _load_avatar(self) -> None:
-        await self.bot.wait_until_ready()
+    async def cog_load(self) -> None:
         self._avatar: bytes = await self.bot.user.display_avatar.read()
 
-    def cog_unload(self) -> None:
+    async def cog_unload(self) -> None:
         self.batch_updates.stop()
         self.bulk_send_messages.stop()
         self._automod_migration_view.stop()
+        self.bot.remove_dynamic_items(GatekeeperVerifyButton, GatekeeperAlertMassbanButton, GatekeeperAlertResolveButton)
+
+        for gatekeeper in self._gatekeepers.values():
+            gatekeeper.task.cancel()
+
+        for menu in list(self._gatekeeper_menus.values()):
+            await menu.on_timeout()
+            menu.stop()
 
     async def cog_command_error(self, ctx: GuildContext, error: commands.CommandError) -> None:
         if isinstance(
@@ -576,6 +1948,23 @@ class Mod(commands.Cog):
                 await ctx.send(f"This entity does not exist: {original.text}")
             elif isinstance(original, discord.HTTPException):
                 await ctx.send("Somehow, an unexpected error occurred. Try again later?")
+
+    async def bot_check(self, ctx: commands.Context) -> bool:
+        if ctx.guild is None:
+            return True
+
+        # Just so we don't get locked out of the bot in case of bugs
+        full_bypass = ctx.permissions.manage_guild or await self.bot.is_owner(ctx.author)
+        if full_bypass:
+            return True
+
+        guild_id = ctx.guild.id
+        config = await self.get_guild_config(guild_id)
+        if config is None or not config.automod_flags.value:
+            return True
+
+        checker = self._spam_check[guild_id]
+        return not checker.is_flagged(ctx.author.id)
 
     async def bulk_insert(self) -> None:
         query = """UPDATE guild_mod_config
@@ -644,20 +2033,50 @@ class Mod(commands.Cog):
                 return ModConfig.from_record(record, self.bot)
             return None
 
-    async def check_raid(self, config: ModConfig, guild_id: int, member: discord.Member, message: discord.Message) -> None:
+    async def get_guild_gatekeeper(self, guild_id: int | None) -> Gatekeeper | None:
+        if guild_id is None:
+            return None
+
+        cached = self._gatekeepers.get(guild_id)
+        if cached is not None:
+            return cached
+
+        query = """SELECT * FROM guild_gatekeeper WHERE id=$1;"""
+        async with self.bot.pool.acquire(timeout=300.0) as con:
+            record = await con.fetchrow(query, guild_id)
+            if record is not None:
+                query = """SELECT * FROM guild_gatekeeper_members WHERE guild_id=$1"""
+                members = await con.fetch(query, guild_id)
+                self._gatekeepers[guild_id] = gatekeeper = Gatekeeper(record, members, self)
+                return gatekeeper
+            return None
+
+    def invalidate_gatekeeper(self, guild_id: int) -> None:
+        previous = self._gatekeepers.pop(guild_id, None)
+        if previous is not None:
+            previous.task.cancel()
+
+    async def check_raid(
+        self, config: ModConfig, guild: discord.Guild, member: discord.Member, message: discord.Message
+    ) -> None:
         if not config.automod_flags.raid:
             return
 
+        guild_id = guild.id
         checker = self._spam_check[guild_id]
-        if not checker.is_spamming(message):
+        result = checker.is_spamming(message)
+        if result is None:
             return
 
-        try:
-            await member.ban(reason="Auto-ban for spamming")
-        except discord.HTTPException:
-            LOGGER.info("[RoboMod] Failed to ban %s (ID: %s) from server %s.", member, member.id, member.guild)
-        else:
-            LOGGER.info("[RoboMod] Banned %s (ID: %s) from server %s.", member, member.id, member.guild)
+        members = result.members if isinstance(result, MultipleSpammers) else [member]
+
+        for user in members:
+            try:
+                await guild.ban(user, reason=result.reason)
+            except discord.HTTPException:
+                log.info("[RoboMod] Failed to ban %s (ID: %s) from server %s.", member, member.id, member.guild)
+            else:
+                log.info("[RoboMod] Banned %s (ID: %s) from server %s.", member, member.id, member.guild)
 
     async def ban_for_mention_spam(
         self,
@@ -675,13 +2094,13 @@ class Mod(commands.Cog):
         try:
             await member.ban(reason=reason)
         except Exception:
-            LOGGER.info("[Mention Spam] Failed to ban member %s (ID: %s) in guild ID %s", member, member.id, guild_id)
+            log.info("[Mention Spam] Failed to ban member %s (ID: %s) in guild ID %s", member, member.id, guild_id)
         else:
             to_send = f"Banned {member} (ID: {member.id}) for spamming {mention_count} mentions."
             async with self._batch_message_lock:
                 self.message_batches[(guild_id, message.channel.id)].append(to_send)
 
-            LOGGER.info("[Mention Spam] Member %s (ID: %s) has been banned from guild ID %s", member, member.id, guild_id)
+            log.info("[Mention Spam] Member %s (ID: %s) has been banned from guild ID %s", member, member.id, guild_id)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -690,6 +2109,9 @@ class Mod(commands.Cog):
             return
 
         if message.guild is None:
+            return
+
+        if message.is_system():
             return
 
         if not isinstance(author, discord.Member):
@@ -717,7 +2139,19 @@ class Mod(commands.Cog):
             return
 
         # check for raid mode stuff
-        await self.check_raid(config, guild_id, author, message)
+        await self.check_raid(config, message.guild, author, message)
+
+        if config.automod_flags.gatekeeper:
+            gatekeeper = await self.get_guild_gatekeeper(guild_id)
+            if gatekeeper is not None and gatekeeper.is_bypassing(author):
+                reason = "Bypassing gatekeeper by messaging early"
+                coro = author.ban if gatekeeper.bypass_action == "ban" else author.kick
+                try:
+                    await coro(reason=reason)
+                except discord.HTTPException:
+                    pass
+                else:
+                    return
 
         if not config.mention_count:
             return
@@ -743,31 +2177,71 @@ class Mod(commands.Cog):
         guild_id = member.guild.id
         config = await self.get_guild_config(guild_id)
         if config is None:
-            return None
+            return
 
         if config.is_muted(member):
             return await config.apply_mute(member, "Member was previously muted.")
 
-        if not config.automod_flags.joins:
-            return None
+        if not config.automod_flags.joins and not config.automod_flags.gatekeeper:
+            return
 
         now = discord.utils.utcnow()
 
         is_new = member.created_at > (now - datetime.timedelta(days=7))
         checker = self._spam_check[guild_id]
 
+        if config.automod_flags.gatekeeper:
+            gatekeeper = await self.get_guild_gatekeeper(guild_id)
+            if gatekeeper is not None:
+                if gatekeeper.started_at is not None:
+                    await gatekeeper.block(member)
+                elif not gatekeeper.requires_setup:
+                    spammers = checker.check_gatekeeper(member, gatekeeper)
+                    if spammers:
+                        await gatekeeper.force_enable_with(spammers)
+                        for member in spammers:
+                            checker.flag_member(member)
+
+                        if config.automod_flags.alerts:
+                            msg = (
+                                f"Detected {plural(len(spammers)):member} joining in rapid succession. "
+                                "The following actions have been automatically taken:\n"
+                                "- Enabled Gatekeeper to block them from participating.\n"
+                                # '- Disabled invites for an hour to prevent any more users from joining\n'
+                            )
+                            view = discord.ui.View(timeout=None)
+                            view.add_item(GatekeeperAlertMassbanButton(self))
+                            view.add_item(GatekeeperAlertResolveButton(gatekeeper))
+                            await config.send_alert(content=msg, view=view)
+
+        if not config.automod_flags.joins:
+            return
+
         # Do the broadcasted message to the channel
         title = "Member Joined"
-        if checker.is_fast_join(member):
+        flag = checker.get_join_type(member)
+        if flag is MemberJoinType.fast:
             colour = 0xDD5F53  # red
             if is_new:
                 title = "Member Joined (Very New Member)"
+        elif flag is MemberJoinType.suspicious:
+            colour = 0xDDA453  # yellow
+            title = "Member Joined (Suspicious Member)"
         else:
             colour = 0x53DDA4  # green
 
             if is_new:
+                checker.flag_member(member)
                 colour = 0xDDA453  # yellow
                 title = "Member Joined (Very New Member)"
+
+        if config.automod_flags.alerts:
+            spammers = checker.is_alertable_join_spam(member)
+            if spammers:
+                msg = f"Detected {plural(len(spammers)):member} joining in rapid succession. Please review."
+                view = discord.ui.View(timeout=None)
+                view.add_item(GatekeeperAlertMassbanButton(self))
+                await config.send_alert(content=msg, view=view)
 
         e = discord.Embed(title=title, colour=colour)
         e.timestamp = now
@@ -779,14 +2253,22 @@ class Mod(commands.Cog):
 
         if config.requires_migration:
             await self.suggest_automod_migration(config, e, guild_id)
-            return None
+            return
 
         if config.broadcast_webhook:
             try:
                 await config.broadcast_webhook.send(embed=e)
-            except discord.Forbidden:
+            except (discord.Forbidden, discord.NotFound):
                 async with self._disable_lock:
                     await self.disable_automod_broadcast(guild_id)
+
+    @commands.Cog.listener()
+    async def on_raw_member_remove(self, payload: discord.RawMemberRemoveEvent) -> None:
+        checker = self._spam_check.get(payload.guild_id)
+        if checker is None:
+            return
+
+        checker.remove_member(payload.user)
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
@@ -820,12 +2302,100 @@ class Mod(commands.Cog):
     async def on_guild_role_delete(self, role: discord.Role) -> None:
         guild_id = role.guild.id
         config = await self.get_guild_config(guild_id)
-        if config is None or config.mute_role_id != role.id:
+        if config is None:
             return
 
-        query = """UPDATE guild_mod_config SET (mute_role_id, muted_members) = (NULL, '{}'::bigint[]) WHERE id=$1;"""
-        await self.bot.pool.execute(query, guild_id)
-        self.get_guild_config.invalidate(self, guild_id)
+        if role.id == config.mute_role_id:
+            query = """UPDATE guild_mod_config SET (mute_role_id, muted_members) = (NULL, '{}'::bigint[]) WHERE id=$1;"""
+            await self.bot.pool.execute(query, guild_id)
+            self.get_guild_config.invalidate(self, guild_id)
+
+        if config.automod_flags.gatekeeper:
+            gatekeeper = await self.get_guild_gatekeeper(guild_id)
+            if gatekeeper is not None and gatekeeper.role_id == role.id:
+                if gatekeeper.started_at is not None:
+                    await config.send_alert(
+                        "Gatekeeper role has been deleted while it's active, therefore it's been automatically disabled."
+                    )
+
+                await gatekeeper.edit(started_at=None, role_id=None)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
+        guild_id = channel.guild.id
+        config = await self.get_guild_config(guild_id)
+        if config is None:
+            return
+
+        if not config.automod_flags.gatekeeper:
+            return
+
+        gatekeeper = await self.get_guild_gatekeeper(guild_id)
+        if gatekeeper is not None and gatekeeper.channel_id == channel.id:
+            if gatekeeper.started_at is not None:
+                await config.send_alert(
+                    "Gatekeeper channel has been deleted while it's active, therefore it's been automatically disabled."
+                )
+            await gatekeeper.edit(started_at=None, channel_id=None)
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
+        config = await self.get_guild_config(payload.guild_id)
+        if config is None:
+            return
+
+        if not config.automod_flags.gatekeeper:
+            return
+
+        gatekeeper = await self.get_guild_gatekeeper(payload.guild_id)
+        if gatekeeper is not None and gatekeeper.message_id == payload.message_id:
+            if gatekeeper.started_at is not None:
+                await config.send_alert(
+                    "Gatekeeper starter message has been deleted while it's active, therefore it's been automatically disabled."
+                )
+            await gatekeeper.edit(started_at=None, message_id=None)
+
+    @commands.Cog.listener()
+    async def on_raw_bulk_message_delete(self, payload: discord.RawBulkMessageDeleteEvent) -> None:
+        config = await self.get_guild_config(payload.guild_id)
+        if config is None:
+            return
+
+        if not config.automod_flags.gatekeeper:
+            return
+
+        gatekeeper = await self.get_guild_gatekeeper(payload.guild_id)
+        if gatekeeper is not None and gatekeeper.message_id in payload.message_ids:
+            if gatekeeper.started_at is not None:
+                await config.send_alert(
+                    "Gatekeeper starter message has been deleted while it's active, therefore it's been automatically disabled."
+                )
+            await gatekeeper.edit(started_at=None, message_id=None)
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(
+        self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+    ) -> None:
+        joined_voice = before.channel is None and after.channel is not None
+        if not joined_voice:
+            return
+
+        config = await self.get_guild_config(member.guild.id)
+        if config is None:
+            return
+
+        if not config.automod_flags.gatekeeper:
+            return
+
+        gatekeeper = await self.get_guild_gatekeeper(member.guild.id)
+        # Joined VC and is bypassing gatekeeper
+        if gatekeeper is not None and gatekeeper.is_bypassing(member):
+            reason = "Bypassing gatekeeper by joining a voice channel early"
+            coro = member.ban if gatekeeper.bypass_action == "ban" else member.kick
+            try:
+                await coro(reason=reason)
+            except discord.HTTPException:
+                pass
 
     @commands.command(aliases=["newmembers"])
     @commands.guild_only()
@@ -890,10 +2460,9 @@ class Mod(commands.Cog):
 
         config = await self.get_guild_config(ctx.guild.id)
         if config is None:
-            await ctx.send("This server does not have RoboMod set up!")
-            return
+            return await ctx.send("This server does not have RoboMod set up!")
 
-        e = discord.Embed(title="RoboMod Information")
+        e = discord.Embed(title="RoboMod Information", colour=discord.Colour.blurple())
         if config.automod_flags.joins:
             channel = f"<#{config.broadcast_channel_id}>"
             if config.requires_migration:
@@ -908,11 +2477,22 @@ class Mod(commands.Cog):
         else:
             broadcast = "Disabled"
 
+        alerts = f"Enabled on <#{config.alert_channel_id}>" if config.automod_flags.alerts else "Disabled"
+
         e.add_field(name="Join Logs", value=broadcast)
+        e.add_field(name="Mod Alerts", value=alerts)
         e.add_field(name="Raid Protection", value="Enabled" if config.automod_flags.raid else "Disabled")
 
         mention_spam = f"{config.mention_count} mentions" if config.mention_count else "Disabled"
         e.add_field(name="Mention Spam Protection", value=mention_spam)
+
+        if config.automod_flags.gatekeeper:
+            gatekeeper = await self.get_guild_gatekeeper(ctx.guild.id)
+            gatekeeper_status = gatekeeper.status if gatekeeper is not None else "Disabled"
+        else:
+            gatekeeper_status = "Completely Disabled"
+
+        e.add_field(name="Gatekeeper", value=gatekeeper_status, inline=len(gatekeeper_status) <= 25)
 
         if config.safe_automod_entity_ids:
 
@@ -938,7 +2518,7 @@ class Mod(commands.Cog):
     @robomod.command(name="joins")
     @checks.is_mod()
     @app_commands.describe(
-        channel="The channel to broadcast join messages to. The bot must be able to create webhooks in it.",
+        channel="The channel to broadcast join messages to. The bot must be able to create webhooks in it."
     )
     async def robomod_joins(self, ctx: GuildContext, *, channel: discord.TextChannel) -> None:
         """Enables join message logging in the given channel.
@@ -950,7 +2530,7 @@ class Mod(commands.Cog):
         config = await self.get_guild_config(ctx.guild.id)
         if config and config.automod_flags.joins:
             await ctx.send(
-                f'You already have join message logging enabled. To disable, use "{ctx.prefix}robomod disable joins"',
+                f'You already have join message logging enabled. To disable, use "{ctx.prefix}robomod disable joins"'
             )
             return
 
@@ -1009,11 +2589,67 @@ class Mod(commands.Cog):
             raise RuntimeError("The bot does not have permissions to create webhooks.") from None
         except discord.HTTPException:
             raise RuntimeError(
-                "An error occurred while creating the webhook. Note you can only have 10 webhooks per channel.",
+                "An error occurred while creating the webhook. Note you can only have 10 webhooks per channel."
             ) from None
 
         query = "UPDATE guild_mod_config SET broadcast_webhook_url = $2 WHERE id = $1"
         await self.bot.pool.execute(query, guild_id, webhook.url)
+        self.get_guild_config.invalidate(self, guild_id)
+
+    @robomod.command(name="alerts")
+    @checks.is_mod()
+    @app_commands.describe(channel="The channel to send alert messages to. The bot must be able to create webhooks in it.")
+    async def robomod_alerts(self, ctx: GuildContext, *, channel: discord.TextChannel) -> None:
+        """Enables alert message logging in the given channel.
+
+        The bot must have the ability to create webhooks in the given channel.
+        """
+
+        await ctx.defer()
+        config = await self.get_guild_config(ctx.guild.id)
+        if config and config.automod_flags.alerts:
+            await ctx.send(
+                f'You already have alert message logging enabled. To disable, use "{ctx.prefix}robomod disable alerts"'
+            )
+            return
+
+        channel_id = channel.id
+
+        reason = f"{ctx.author} (ID: {ctx.author.id}) enabled RoboMod alert message logging"
+
+        try:
+            webhook = await channel.create_webhook(name="RoboMod Alerts", avatar=self._avatar, reason=reason)
+        except discord.Forbidden:
+            await ctx.send(f"The bot does not have permissions to create webhooks in {channel.mention}.")
+            return
+        except discord.HTTPException:
+            await ctx.send("An error occurred while creating the webhook. Note you can only have 10 webhooks per channel.")
+            return
+
+        query = """INSERT INTO guild_mod_config (id, automod_flags, alert_channel_id, alert_webhook_url)
+                   VALUES ($1, $2, $3, $4) ON CONFLICT (id)
+                   DO UPDATE SET
+                        automod_flags = guild_mod_config.automod_flags | EXCLUDED.automod_flags,
+                        alert_channel_id = EXCLUDED.alert_channel_id,
+                        alert_webhook_url = EXCLUDED.alert_webhook_url;
+                """
+
+        flags = AutoModFlags()
+        flags.alerts = True
+        await ctx.db.execute(query, ctx.guild.id, flags.value, channel_id, webhook.url)
+        self.get_guild_config.invalidate(self, ctx.guild.id)
+        await ctx.send(f"Alert messages enabled. Sending alerts to <#{channel_id}>.")
+
+    async def disable_automod_alerts(self, guild_id: int) -> None:
+        # Note: This is called when the webhook has been deleted
+        query = """UPDATE guild_mod_config SET
+                        alert_channel_id = NULL,
+                        alert_webhook_url = NULL,
+                        automod_flags = guild_mod_config.automod_flags & ~$2::SMALLINT
+                    WHERE id = $1;
+                """
+
+        await self.bot.pool.execute(query, guild_id, AutoModFlags.alerts.flag)
         self.get_guild_config.invalidate(self, guild_id)
 
     @robomod.command(name="disable", aliases=["off"])
@@ -1023,15 +2659,14 @@ class Mod(commands.Cog):
         protection=[
             app_commands.Choice(name="Everything", value="all"),
             app_commands.Choice(name="Join logging", value="joins"),
+            app_commands.Choice(name="Alerts", value="alerts"),
             app_commands.Choice(name="Raid protection", value="raid"),
             app_commands.Choice(name="Mention spam protection", value="mentions"),
-        ],
+            app_commands.Choice(name="Gatekeeper", value="gatekeeper"),
+        ]
     )
     async def robomod_disable(
-        self,
-        ctx: GuildContext,
-        *,
-        protection: Literal["all", "joins", "raid", "mentions"] = "all",
+        self, ctx: GuildContext, *, protection: Literal["all", "joins", "alerts", "raid", "mentions", "gatekeeper"] = "all"
     ) -> None:
         """Disables RoboMod on the server.
 
@@ -1039,40 +2674,74 @@ class Mod(commands.Cog):
 
         - "all" to disable everything
         - "joins" to disable join logging
+        - "alerts" to disable message alerts
         - "raid" to disable raid protection
         - "mentions" to disable mention spam protection
+        - "gatekeeper" to disable gatekeeper
 
         If not given then it defaults to "all".
         """
 
         if protection == "all":
-            updates = "automod_flags = 0, mention_count = 0, broadcast_channel = NULL"
+            updates = "automod_flags = 0, mention_count = 0, broadcast_channel = NULL, alert_channel = NULL"
             message = "RoboMod has been disabled."
         elif protection == "joins":
             updates = (
                 f"automod_flags = guild_mod_config.automod_flags & ~{AutoModFlags.joins.flag}, broadcast_channel = NULL"
             )
             message = "Join logs have been disabled."
+        elif protection == "alerts":
+            updates = f"automod_flags = guild_mod_config.automod_flags & ~{AutoModFlags.alerts.flag}, alert_channel = NULL"
+            message = "Alert messages have been disabled."
         elif protection == "raid":
             updates = f"automod_flags = guild_mod_config.automod_flags & ~{AutoModFlags.raid.flag}"
             message = "Raid protection has been disabled."
         elif protection == "mentions":
             updates = "mention_count = NULL"
-            message = "Mention spam protection has been disabled"
+            message = "Mention spam protection has been disabled."
+        elif protection == "gatekeeper":
+            updates = f"automod_flags = guild_mod_config.automod_flags & ~{AutoModFlags.gatekeeper.flag}"
+            message = "Gatekeeper has been disabled."
 
-        query = f"UPDATE guild_mod_config SET {updates} WHERE id=$1 RETURNING broadcast_webhook_url"
+        query = f"UPDATE guild_mod_config SET {updates} WHERE id=$1 RETURNING broadcast_webhook_url, alert_webhook_url"
 
         guild_id = ctx.guild.id
-        record: tuple[str] | None = await ctx.db.fetchrow(query, guild_id)
+        record: tuple[str | None, str | None] | None = await self.bot.pool.fetchrow(query, guild_id)
         self._spam_check.pop(guild_id, None)
         self.get_guild_config.invalidate(self, guild_id)
-        if record is not None and record[0] is not None and protection in ("all", "joins"):
-            wh = discord.Webhook.from_url(record[0], session=self.bot.session)
-            try:
-                await wh.delete(reason=message)
-            except discord.HTTPException:
-                await ctx.send(f"{message} However the webhook could not be deleted for some reason.")
-                return
+        warnings = []
+        if record is not None:
+            if record[0] is not None and protection in ("all", "joins"):
+                url: str = record[0]
+                wh = discord.Webhook.from_url(url, session=self.bot.session)
+                try:
+                    await wh.delete(reason=message)
+                except discord.HTTPException:
+                    warnings.append("Join broadcast webhook could not be deleted")
+
+            if record[1] is not None and protection in ("all", "alerts"):
+                url: str = record[1]
+                wh = discord.Webhook.from_url(url, session=self.bot.session)
+                try:
+                    await wh.delete(reason=message)
+                except discord.HTTPException:
+                    warnings.append("Message alerts webhook could not be deleted")
+
+        if protection in ("all", "gatekeeper"):
+            gatekeeper = await self.get_guild_gatekeeper(guild_id)
+            if gatekeeper is not None and gatekeeper.started_at is not None:
+                await gatekeeper.disable()
+                warnings.append("Gatekeeper was previously running and has been forcibly disabled.")
+                members = gatekeeper.pending_members
+                if members:
+                    warnings.append(
+                        f"There {plural(members):is|are!} still {plural(members):member} waiting in the role queue."
+                        " **The queue will be paused until gatekeeper is re-enabled**"
+                    )
+
+        if warnings:
+            warning = "\n".join(f"\N{WARNING SIGN}\ufe0f {msg}" for msg in warnings)
+            message = f"{message}\n{warning}"
 
         await ctx.send(message)
 
@@ -1087,8 +2756,7 @@ class Mod(commands.Cog):
 
         perms = ctx.me.guild_permissions
         if not perms.ban_members:
-            await ctx.send("\N{NO ENTRY SIGN} I do not have permissions to ban members.")
-            return
+            return await ctx.send("\N{NO ENTRY SIGN} I do not have permissions to ban members.")
 
         query = """INSERT INTO guild_mod_config (id, automod_flags)
                    VALUES ($1, $2) ON CONFLICT (id)
@@ -1106,6 +2774,46 @@ class Mod(commands.Cog):
         self.get_guild_config.invalidate(self, ctx.guild.id)
         fmt = "enabled" if enabled else "disabled"
         await ctx.send(f"Raid protection {fmt}.")
+
+    @robomod.command(name="gatekeeper")
+    @checks.is_mod()
+    async def robomod_gatekeeper(self, ctx: GuildContext) -> None:
+        """Enables and shows the gatekeeper settings menu for the server.
+
+        Gatekeeper automatically assigns a role to members who join to prevent
+        them from participating in the server until they verify themselves by
+        pressing a button.
+        """
+
+        perms = ctx.me.guild_permissions
+        guild_id = ctx.guild.id
+        if not perms.ban_members:
+            return await ctx.send("\N{NO ENTRY SIGN} I do not have permissions to ban members.")
+
+        previous = self._gatekeeper_menus.pop(guild_id, None)
+        if previous is not None:
+            await previous.on_timeout()
+            previous.stop()
+
+        gatekeeper = await self.get_guild_gatekeeper(guild_id)
+        async with self.bot.pool.acquire(timeout=300.0) as conn, conn.transaction():
+            if gatekeeper is None:
+                query = "INSERT INTO guild_gatekeeper(id) VALUES ($1) ON CONFLICT DO NOTHING RETURNING *"
+                record = await conn.fetchrow(query, guild_id)
+                gatekeeper = Gatekeeper(record, [], self)
+
+            query = """INSERT INTO guild_mod_config (id, automod_flags)
+                           VALUES ($1, $2) ON CONFLICT (id)
+                           DO UPDATE SET automod_flags = guild_mod_config.automod_flags | $2
+                           RETURNING *;
+                        """
+            record = await conn.fetchrow(query, guild_id, AutoModFlags.gatekeeper.flag)
+            config = ModConfig.from_record(record, self.bot)
+
+        self.get_guild_config.invalidate(self, guild_id)
+        msg = "This form allows you to set up the gatekeeper settings. Press the \N{WHITE QUESTION MARK ORNAMENT} button for more information"
+        self._gatekeeper_menus[guild_id] = view = GatekeeperSetUpView(self, ctx.author, config, gatekeeper)
+        view.message = await ctx.send(msg, view=view, wait=True)
 
     @robomod.command(name="mentions")
     @commands.guild_only()
@@ -1141,9 +2849,7 @@ class Mod(commands.Cog):
     @checks.hybrid_permissions_check(ban_members=True)
     @app_commands.describe(entities="Space separated list of roles, members, or channels to ignore")
     async def robomod_ignore(
-        self,
-        ctx: GuildContext,
-        entities: Annotated[list[IgnoreableEntity], commands.Greedy[IgnoreEntity]],
+        self, ctx: GuildContext, entities: Annotated[list[IgnoreableEntity], commands.Greedy[IgnoreEntity]]
     ) -> None:
         """Specifies what roles, members, or channels ignore RoboMod auto-bans.
 
@@ -1172,9 +2878,7 @@ class Mod(commands.Cog):
     @checks.hybrid_permissions_check(ban_members=True)
     @app_commands.describe(entities="Space separated list of roles, members, or channels to take off the ignore list")
     async def robomod_unignore(
-        self,
-        ctx: GuildContext,
-        entities: Annotated[list[IgnoreableEntity], commands.Greedy[IgnoreEntity]],
+        self, ctx: GuildContext, entities: Annotated[list[IgnoreableEntity], commands.Greedy[IgnoreEntity]]
     ) -> None:
         """Specifies what roles, members, or channels to take off the RoboMod ignore list.
 
@@ -1204,9 +2908,8 @@ class Mod(commands.Cog):
         """Lists what channels, roles, and members are in the RoboMod ignore list"""
 
         config = await self.get_guild_config(ctx.guild.id)
-        if config is None:
-            await ctx.send("Nothing is ignored!")
-            return
+        if config is None or not config.safe_automod_entity_ids:
+            return await ctx.send("Nothing is ignored!")
 
         def resolve_entity_id(x: int, *, guild: discord.Guild = ctx.guild) -> str:
             if guild.get_role(x):
@@ -1246,6 +2949,7 @@ class Mod(commands.Cog):
         return Counter(m.author.display_name for m in deleted)
 
     @commands.command()
+    @commands.cooldown(1, 5.0, type=commands.BucketType.channel)
     async def cleanup(self, ctx: GuildContext, search: int = 100) -> None:
         """Cleans up the bot's messages from the channel.
 
@@ -1286,7 +2990,7 @@ class Mod(commands.Cog):
         ctx: GuildContext,
         member: Annotated[discord.abc.Snowflake, MemberID],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Kicks a member from the server.
 
@@ -1309,7 +3013,7 @@ class Mod(commands.Cog):
         ctx: GuildContext,
         member: Annotated[discord.abc.Snowflake, MemberID],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Bans a member from the server.
 
@@ -1335,7 +3039,7 @@ class Mod(commands.Cog):
         ctx: GuildContext,
         members: Annotated[list[discord.abc.Snowflake], commands.Greedy[MemberID]],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Bans multiple members from the server.
 
@@ -1388,6 +3092,7 @@ class Mod(commands.Cog):
         `joined-after:` Matches users who joined after the member ID given.
         `avatar:` Matches users who have no avatar.
         `roles:` Matches users that have no role.
+        `raid:` Matches users that are internally flagged as potential raiders.
         `show:` Show members instead of banning them.
 
         Message history filters (Requires `channel:`):
@@ -1405,12 +3110,12 @@ class Mod(commands.Cog):
 
         await ctx.defer()
         author = ctx.author
-        members = []
+        members: Sequence[discord.Member] = []
 
         if args.channel:
             before = discord.Object(id=args.before) if args.before else None
             after = discord.Object(id=args.after) if args.after else None
-            predicates = []
+            predicates: list[Callable[..., bool]] = []
             if args.contains:
                 predicates.append(lambda m: args.contains in m.content)
             if args.starts:
@@ -1421,18 +3126,17 @@ class Mod(commands.Cog):
                 try:
                     _match = re.compile(args.match)
                 except re.error as e:
-                    await ctx.send(f"Invalid regex passed to `match:` flag: {e}")
-                    return
+                    return await ctx.send(f"Invalid regex passed to `match:` flag: {e}")
                 else:
-                    predicates.append(lambda m, x=_match: x.match(m.content))
+                    predicates.append(lambda m, x=_match: bool(x.match(m.content)))
             if args.embeds:
-                predicates.append(args.embeds)
+                predicates.append(lambda: bool(args.embeds))
             if args.files:
-                predicates.append(args.files)
+                predicates.append(lambda: bool(args.files))
 
             async for message in args.channel.history(limit=args.search, before=before, after=after):
-                if all(p(message) for p in predicates):
-                    members.append(message.author)  # noqa: PERF401
+                assert isinstance(message.author, discord.Member)
+                members.extend([message.author for p in predicates if p(message)])
         else:
             if ctx.guild.chunked:
                 members = ctx.guild.members
@@ -1442,7 +3146,7 @@ class Mod(commands.Cog):
                 members = ctx.guild.members
 
         # member filters
-        predicates = [
+        predicates: list[Callable[..., bool]] = [
             lambda m: isinstance(m, discord.Member) and can_execute_action(ctx, author, m),  # Only if applicable
             lambda m: not m.bot,  # No bots
             lambda m: m.discriminator != "0000",  # No deleted users
@@ -1452,10 +3156,9 @@ class Mod(commands.Cog):
             try:
                 _regex = re.compile(args.username)
             except re.error as e:
-                await ctx.send(f"Invalid regex passed to `username:` flag: {e}")
-                return
+                return await ctx.send(f"Invalid regex passed to `username:` flag: {e}")
             else:
-                predicates.append(lambda m, x=_regex: x.match(m.name))
+                predicates.append(lambda m, x=_regex: bool(x.match(m.name)))
 
         if args.avatar is False:
             predicates.append(lambda m: m.avatar is None)
@@ -1466,69 +3169,72 @@ class Mod(commands.Cog):
         if args.created:
 
             def created(
-                member: discord.Member,
-                *,
-                offset: datetime.datetime = now - datetime.timedelta(minutes=args.created),
+                member: discord.Member, *, offset: datetime.datetime = now - datetime.timedelta(minutes=args.created)
             ) -> bool:
                 return member.created_at > offset
 
-            predicates.append(created)  # type: ignore # reused list
+            predicates.append(created)
         if args.joined:
 
             def joined(
-                member: discord.Member,
-                *,
-                offset: datetime.datetime = now - datetime.timedelta(minutes=args.joined),
-            ) -> bool | None:
+                member: discord.Member, *, offset: datetime.datetime = now - datetime.timedelta(minutes=args.joined)
+            ) -> bool:
                 if isinstance(member, discord.User):
                     # If the member is a user then they left already
                     return True
-                return member.joined_at and member.joined_at > offset
+                return bool(member.joined_at and member.joined_at > offset)
 
-            predicates.append(joined)  # type: ignore # reused list
+            predicates.append(joined)
         if args.joined_after:
 
-            def joined_after(member: discord.Member, *, _other: discord.Member = args.joined_after) -> bool | None:
-                return member.joined_at and _other.joined_at and member.joined_at > _other.joined_at
+            def joined_after(member: discord.Member, *, _other: discord.Member = args.joined_after) -> bool:
+                return bool(member.joined_at and _other.joined_at and member.joined_at > _other.joined_at)
 
-            predicates.append(joined_after)  # type: ignore # reused list
+            predicates.append(joined_after)
         if args.joined_before:
 
-            def joined_before(member: discord.Member, *, _other: discord.Member = args.joined_before) -> bool | None:
-                return member.joined_at and _other.joined_at and member.joined_at < _other.joined_at
+            def joined_before(member: discord.Member, *, _other: discord.Member = args.joined_before) -> bool:
+                return bool(member.joined_at and _other.joined_at and member.joined_at < _other.joined_at)
 
-            predicates.append(joined_before)  # type: ignore # reused list
+            predicates.append(joined_before)
 
-        if len(predicates) == 3:
-            await ctx.send("Missing at least one filter to use")
-            return
+        is_only_raid = args.raid and len(predicates) == 3
+        if len(predicates) == 3 and not args.raid:
+            return await ctx.send("Missing at least one filter to use")
 
-        members = {m for m in members if all(p(m) for p in predicates)}
+        checker = self._spam_check[ctx.guild.id]
+        if is_only_raid:
+            members = checker.flagged_users  # type: ignore
+        else:
+            members = {m.id: m for m in members if all(p(m) for p in predicates)}  # type: ignore
+            if args.raid:
+                members.update(checker.flagged_users)  # type: ignore
+
+        if args.reason is None and args.raid:
+            args.reason = "Raid detected"
+
         if len(members) == 0:
-            await ctx.send("No members found matching criteria.")
-            return
+            return await ctx.send("No members found matching criteria.")
 
         if args.show:
-            members = sorted(members, key=lambda m: m.joined_at or now)
+            members = sorted(members.values(), key=lambda m: m.joined_at or now)  # type: ignore
             fmt = "\n".join(f"{m.id}\tJoined: {m.joined_at}\tCreated: {m.created_at}\t{m}" for m in members)
             content = f"Current Time: {discord.utils.utcnow()}\nTotal members: {len(members)}\n{fmt}"
             file = discord.File(io.BytesIO(content.encode("utf-8")), filename="members.txt")
-            await ctx.send(file=file)
-            return
+            return await ctx.send(file=file)
 
         if args.reason is None:
-            await ctx.send("`reason:` flag is required.")
-            return
+            return await ctx.send("`reason:` flag is required.")
         else:
             reason = await ActionReason().convert(ctx, args.reason)
 
         confirm = await ctx.prompt(f"This will ban **{plural(len(members)):member}**. Are you sure?")
         if not confirm:
-            await ctx.send("Aborting.")
-            return
+            return await ctx.send("Aborting.")
 
         count = 0
-        for member in members:
+        total = len(members)
+        for member in list(members.values()):  # type: ignore
             try:
                 await ctx.guild.ban(member, reason=reason)
             except discord.HTTPException:
@@ -1536,7 +3242,12 @@ class Mod(commands.Cog):
             else:
                 count += 1
 
-        await ctx.send(f"Banned {count}/{len(members)}")
+        await ctx.send(f"Banned {count}/{total}")
+
+    @massban.error
+    async def massban_error(self, ctx: GuildContext, error: commands.CommandError) -> None:
+        if isinstance(error, commands.FlagError):
+            await ctx.send(str(error), ephemeral=True)
 
     @commands.command()
     @commands.guild_only()
@@ -1546,7 +3257,7 @@ class Mod(commands.Cog):
         ctx: GuildContext,
         member: Annotated[discord.abc.Snowflake, MemberID],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Soft bans a member from the server.
 
@@ -1574,7 +3285,7 @@ class Mod(commands.Cog):
         ctx: GuildContext,
         member: Annotated[discord.BanEntry, BannedMember],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Unbans a member from the server.
 
@@ -1604,7 +3315,7 @@ class Mod(commands.Cog):
         duration: time.FutureTime,
         member: Annotated[discord.abc.Snowflake, MemberID],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Temporarily bans a member for the specified duration.
 
@@ -1612,7 +3323,8 @@ class Mod(commands.Cog):
         duration such as "until thursday at 3PM" or a more concrete time
         such as "2024-12-31".
 
-        Note that times are in UTC.
+        Note that times are in UTC unless the timezone is
+        specified using the "timezone set" command.
 
         You can also ban from ID to ban regardless whether they're
         in the server or not.
@@ -1627,8 +3339,7 @@ class Mod(commands.Cog):
 
         reminder = self.bot.reminder
         if reminder is None:
-            await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
-            return
+            return await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
 
         until = f'until {discord.utils.format_dt(duration.dt, "F")}'
         heads_up_message = f"You have been banned from {ctx.guild.name} {until}. Reason: {reason}"
@@ -1641,6 +3352,7 @@ class Mod(commands.Cog):
 
         reason = safe_reason_append(reason, until)
         await ctx.guild.ban(member, reason=reason)
+        zone = await reminder.get_timezone(ctx.author.id)
         await reminder.create_timer(
             duration.dt,
             "tempban",
@@ -1648,6 +3360,7 @@ class Mod(commands.Cog):
             ctx.author.id,
             member.id,
             created=ctx.message.created_at,
+            timezone=zone or "UTC",
         )
         await ctx.send(f"Banned {member} for {discord.utils.format_dt(duration.dt, 'R')}.")
 
@@ -1661,7 +3374,7 @@ class Mod(commands.Cog):
             # RIP
             return
 
-        moderator = guild.get_member(mod_id) or await guild.fetch_member(mod_id)
+        moderator = await self.bot.get_or_fetch_member(guild, mod_id)
         if moderator is None:
             try:
                 moderator = await self.bot.fetch_user(mod_id)
@@ -1681,11 +3394,7 @@ class Mod(commands.Cog):
     @checks.hybrid_permissions_check(manage_messages=True)
     @app_commands.describe(search="How many messages to search for")
     async def purge(
-        self,
-        ctx: GuildContext,
-        search: commands.Range[int, 1, 2000] | None = None,
-        *,
-        flags: PurgeFlags,
+        self, ctx: GuildContext, search: commands.Range[int, 1, 2000] | None = None, *, flags: PurgeFlags
     ) -> None:
         """Removes messages that meet a criteria.
 
@@ -1716,6 +3425,7 @@ class Mod(commands.Cog):
         When the command is done doing its work, you will get a message
         detailing which users got removed and how many messages got removed.
         """
+
         predicates: list[Callable[[discord.Message], Any]] = []
         if flags.bot:
             if flags.webhooks:
@@ -1735,7 +3445,7 @@ class Mod(commands.Cog):
             predicates.append(lambda m: len(m.reactions))
 
         if flags.emoji:
-            custom_emoji = re.compile(r"<:(\w+):(\d+)>")
+            custom_emoji = re.compile(r"<a?:(\w+):(\d+)>")
             predicates.append(lambda m: custom_emoji.search(m.content))
 
         if flags.user:
@@ -1769,10 +3479,9 @@ class Mod(commands.Cog):
             search = 100
 
         if require_prompt:
-            confirm = await ctx.prompt(f"Are you sure you want to delete {plural(search):message}?", timeout=20.0)
+            confirm = await ctx.prompt(f"Are you sure you want to delete {plural(search):message}?", timeout=30)
             if not confirm:
-                await ctx.send("Aborting.")
-                return
+                return await ctx.send("Aborting.")
 
         before = discord.Object(id=flags.before) if flags.before else None
         after = discord.Object(id=flags.after) if flags.after else None
@@ -1787,11 +3496,9 @@ class Mod(commands.Cog):
         try:
             deleted = await ctx.channel.purge(limit=search, before=before, after=after, check=predicate)
         except discord.Forbidden:
-            await ctx.send("I do not have permissions to delete messages.")
-            return
+            return await ctx.send("I do not have permissions to delete messages.")
         except discord.HTTPException as e:
-            await ctx.send(f"Error: {e} (try a smaller search?)")
-            return
+            return await ctx.send(f"Error: {e} (try a smaller search?)")
 
         spammers = Counter(m.author.display_name for m in deleted)
         deleted = len(deleted)
@@ -1828,12 +3535,7 @@ class Mod(commands.Cog):
     # Mute related stuff
 
     async def update_mute_role(
-        self,
-        ctx: GuildContext,
-        config: ModConfig | None,
-        role: discord.Role,
-        *,
-        merge: bool = False,
+        self, ctx: GuildContext, config: ModConfig | None, role: discord.Role, *, merge: bool = False
     ) -> None:
         guild = ctx.guild
         if config and merge:
@@ -1860,25 +3562,37 @@ class Mod(commands.Cog):
         self.get_guild_config.invalidate(self, guild.id)
 
     @staticmethod
-    async def update_mute_role_permissions(
+    async def update_role_permissions(
         role: discord.Role,
         guild: discord.Guild,
         invoker: discord.abc.User,
+        update_read_permissions: bool = False,
+        channels: Sequence[discord.abc.GuildChannel] | None = None,
     ) -> tuple[int, int, int]:
         success = 0
         failure = 0
         skipped = 0
         reason = f"Action done by {invoker} (ID: {invoker.id})"
-        for channel in guild.text_channels:
+        if channels is None:
+            channels = [ch for ch in guild.channels if isinstance(ch, discord.abc.Messageable)]
+
+        guild_perms = guild.me.guild_permissions
+        for channel in channels:
             perms = channel.permissions_for(guild.me)
             if perms.manage_roles:
                 overwrite = channel.overwrites_for(role)
-                overwrite.send_messages = False
-                overwrite.add_reactions = False
-                overwrite.use_application_commands = False
-                overwrite.create_private_threads = False
-                overwrite.create_public_threads = False
-                overwrite.send_messages_in_threads = False
+                perms = {
+                    "send_messages": False,
+                    "add_reactions": False,
+                    "use_application_commands": False,
+                    "create_private_threads": False,
+                    "create_public_threads": False,
+                    "send_messages_in_threads": False,
+                }
+                if update_read_permissions:
+                    perms["read_messages"] = False
+
+                merge_permissions(overwrite, guild_perms, **perms)
                 try:
                     await channel.set_permissions(role, overwrite=overwrite, reason=reason)
                 except discord.HTTPException:
@@ -1896,7 +3610,7 @@ class Mod(commands.Cog):
         ctx: ModGuildContext,
         members: commands.Greedy[discord.Member],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Mutes members using the configured mute role.
 
@@ -1936,7 +3650,7 @@ class Mod(commands.Cog):
         ctx: ModGuildContext,
         members: commands.Greedy[discord.Member],
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Unmutes members using the configured mute role.
 
@@ -1977,7 +3691,7 @@ class Mod(commands.Cog):
         duration: time.FutureTime,
         member: discord.Member,
         *,
-        reason: Annotated[str, ActionReason] | None = None,
+        reason: Annotated[str | None, ActionReason] = None,
     ) -> None:
         """Temporarily mutes a member for the specified duration.
 
@@ -1985,7 +3699,8 @@ class Mod(commands.Cog):
         duration such as "until thursday at 3PM" or a more concrete time
         such as "2024-12-31".
 
-        Note that times are in UTC.
+        Note that times are in UTC unless a timezone is specified
+        using the "timezone set" command.
 
         This has the same permissions as the `mute` command.
         """
@@ -1995,12 +3710,12 @@ class Mod(commands.Cog):
 
         reminder = self.bot.reminder
         if reminder is None:
-            await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
-            return
+            return await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
 
         assert ctx.guild_config.mute_role_id is not None
         role_id = ctx.guild_config.mute_role_id
         await member.add_roles(discord.Object(id=role_id), reason=reason)
+        zone = await reminder.get_timezone(ctx.author.id)
         await reminder.create_timer(
             duration.dt,
             "tempmute",
@@ -2009,6 +3724,7 @@ class Mod(commands.Cog):
             member.id,
             role_id,
             created=ctx.message.created_at,
+            timezone=zone or "UTC",
         )
         await ctx.send(
             f"Muted {discord.utils.escape_mentions(str(member))} for {discord.utils.format_dt(duration.dt, 'R')}."
@@ -2088,16 +3804,13 @@ class Mod(commands.Cog):
         """
 
         if role.is_default():
-            await ctx.send("Cannot use the @everyone role.")
-            return
+            return await ctx.send("Cannot use the @\u200beveryone role.")
 
         if role > ctx.author.top_role and ctx.author.id != ctx.guild.owner_id:
-            await ctx.send("This role is higher than your highest role.")
-            return
+            return await ctx.send("This role is higher than your highest role.")
 
         if role > ctx.me.top_role:
-            await ctx.send("This role is higher than my highest role.")
-            return
+            return await ctx.send("This role is higher than my highest role.")
 
         config = await self.get_guild_config(ctx.guild.id)
         has_pre_existing = config is not None and config.mute_role is not None
@@ -2126,15 +3839,14 @@ class Mod(commands.Cog):
                     merge = None
 
         if merge is None:
-            await ctx.send("Aborting.")
+            return await ctx.send("Aborting.")
 
         async with ctx.typing():
-            assert merge
             await self.update_mute_role(ctx, config, role, merge=merge)
             escaped = discord.utils.escape_mentions(role.name)
             await ctx.send(
                 f"Successfully set the {escaped} role as the mute role.\n\n"
-                "**Note: Permission overwrites have not been changed.**",
+                "**Note: Permission overwrites have not been changed.**"
             )
 
     @_mute_role.command(name="update", aliases=["sync"])
@@ -2152,15 +3864,14 @@ class Mod(commands.Cog):
         config = await self.get_guild_config(ctx.guild.id)
         role = config and config.mute_role
         if role is None:
-            await ctx.send("No mute role has been set up to update.")
-            return
+            return await ctx.send("No mute role has been set up to update.")
 
         async with ctx.typing():
-            success, failure, skipped = await self.update_mute_role_permissions(role, ctx.guild, ctx.author)
+            success, failure, skipped = await self.update_role_permissions(role, ctx.guild, ctx.author)
             total = success + failure + skipped
             await ctx.send(
                 f"Attempted to update {total} channel permissions. "
-                f"[Updated: {success}, Failed: {failure}, Skipped (no permissions): {skipped}]",
+                f"[Updated: {success}, Failed: {failure}, Skipped (no permissions): {skipped}]"
             )
 
     @_mute_role.command(name="create")
@@ -2178,14 +3889,12 @@ class Mod(commands.Cog):
         guild_id = ctx.guild.id
         config = await self.get_guild_config(guild_id)
         if config is not None and config.mute_role is not None:
-            await ctx.send("A mute role already exists.")
-            return
+            return await ctx.send("A mute role already exists.")
 
         try:
             role = await ctx.guild.create_role(name=name, reason=f"Mute Role Created By {ctx.author} (ID: {ctx.author.id})")
         except discord.HTTPException as e:
-            await ctx.send(f"An error happened: {e}")
-            return
+            return await ctx.send(f"An error happened: {e}")
 
         query = """INSERT INTO guild_mod_config (id, mute_role_id)
                    VALUES ($1, $2) ON CONFLICT (id)
@@ -2197,13 +3906,12 @@ class Mod(commands.Cog):
 
         confirm = await ctx.prompt("Would you like to update the channel overwrites as well?")
         if not confirm:
-            await ctx.send("Mute role successfully created.")
-            return
+            return await ctx.send("Mute role successfully created.")
 
         async with ctx.typing():
-            success, failure, skipped = await self.update_mute_role_permissions(role, ctx.guild, ctx.author)
+            success, failure, skipped = await self.update_role_permissions(role, ctx.guild, ctx.author)
             await ctx.send(
-                f"Mute role successfully created. Overwrites: [Updated: {success}, Failed: {failure}, Skipped: {skipped}]",
+                "Mute role successfully created. Overwrites: " f"[Updated: {success}, Failed: {failure}, Skipped: {skipped}]"
             )
 
     @_mute_role.command(name="unbind")
@@ -2217,16 +3925,14 @@ class Mod(commands.Cog):
         guild_id = ctx.guild.id
         config = await self.get_guild_config(guild_id)
         if config is None or config.mute_role is None:
-            await ctx.send("No mute role has been set up.")
-            return
+            return await ctx.send("No mute role has been set up.")
 
         muted_members = len(config.muted_members)
         if muted_members > 0:
             msg = f"Are you sure you want to unbind and unmute {plural(muted_members):member}?"
             confirm = await ctx.prompt(msg)
             if not confirm:
-                await ctx.send("Aborting.")
-                return
+                return await ctx.send("Aborting.")
 
         query = """UPDATE guild_mod_config SET (mute_role_id, muted_members) = (NULL, '{}'::bigint[]) WHERE id=$1;"""
         await self.bot.pool.execute(query, guild_id)
@@ -2247,44 +3953,33 @@ class Mod(commands.Cog):
 
         reminder = self.bot.reminder
         if reminder is None:
-            await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
-            return
+            return await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
 
         config = await self.get_guild_config(ctx.guild.id)
         role_id = config and config.mute_role_id
         if role_id is None:
-            raise NoMuteRole
+            raise NoMuteRole()
 
         if ctx.author._roles.has(role_id):
-            await ctx.send("Somehow you are already muted <:rooThink:596576798351949847>")
-            return
+            return await ctx.send("Somehow you are already muted <:rooThink:596576798351949847>")
 
         created_at = ctx.message.created_at
         if duration.dt > (created_at + datetime.timedelta(days=1)):
-            await ctx.send("Duration is too long. Must be at most 24 hours.")
-            return
+            return await ctx.send("Duration is too long. Must be at most 24 hours.")
 
         if duration.dt < (created_at + datetime.timedelta(minutes=5)):
-            await ctx.send("Duration is too short. Must be at least 5 minutes.")
-            return
+            return await ctx.send("Duration is too short. Must be at least 5 minutes.")
 
         delta = time.human_timedelta(duration.dt, source=created_at)
         warning = f"Are you sure you want to be muted for {delta}?\n**Do not ask the moderators to undo this!**"
         confirm = await ctx.prompt(warning)
         if not confirm:
-            await ctx.send("Aborting", delete_after=5.0)
-            return
+            return await ctx.send("Aborting", delete_after=5.0)
 
         reason = f"Self-mute for {ctx.author} (ID: {ctx.author.id}) for {delta}"
         await ctx.author.add_roles(discord.Object(id=role_id), reason=reason)
         await reminder.create_timer(
-            duration.dt,
-            "tempmute",
-            ctx.guild.id,
-            ctx.author.id,
-            ctx.author.id,
-            role_id,
-            created=created_at,
+            duration.dt, "tempmute", ctx.guild.id, ctx.author.id, ctx.author.id, role_id, created=created_at
         )
 
         await ctx.send(f"\N{OK HAND SIGN} Muted for {delta}. Be sure not to bother anyone about it.")
@@ -2295,9 +3990,7 @@ class Mod(commands.Cog):
             await ctx.send("Missing a duration to selfmute for.")
 
     async def get_lockdown_information(
-        self,
-        guild_id: int,
-        channel_ids: list[int] | None = None,
+        self, guild_id: int, channel_ids: list[int] | None = None
     ) -> dict[int, discord.PermissionOverwrite]:
         rows: list[tuple[int, int, int]]
         if channel_ids is None:
@@ -2317,9 +4010,7 @@ class Mod(commands.Cog):
         }
 
     async def start_lockdown(
-        self,
-        ctx: GuildContext,
-        channels: list[discord.TextChannel | discord.VoiceChannel],
+        self, ctx: GuildContext, channels: list[discord.TextChannel | discord.VoiceChannel]
     ) -> tuple[list[discord.TextChannel | discord.VoiceChannel], list[discord.TextChannel | discord.VoiceChannel]]:
         guild_id = ctx.guild.id
         default_role = ctx.guild.default_role
@@ -2352,7 +4043,7 @@ class Mod(commands.Cog):
                             "channel_id": channel.id,
                             "allow": allow.value,
                             "deny": deny.value,
-                        },
+                        }
                     )
 
         query = """
@@ -2398,9 +4089,7 @@ class Mod(commands.Cog):
         return failures
 
     def is_potential_lockout(
-        self,
-        me: discord.Member,
-        channel: discord.Thread | discord.VoiceChannel | discord.TextChannel,
+        self, me: discord.Member, channel: discord.Thread | discord.VoiceChannel | discord.TextChannel
     ) -> bool:
         if isinstance(channel, discord.Thread):
             parent = channel.parent
@@ -2434,9 +4123,7 @@ class Mod(commands.Cog):
     @commands.cooldown(1, 30.0, commands.BucketType.guild)
     @app_commands.describe(channels="A space separated list of text or voice channels to lock down")
     async def lockdown(
-        self,
-        ctx: GuildContext,
-        channels: commands.Greedy[discord.TextChannel | discord.VoiceChannel],
+        self, ctx: GuildContext, channels: commands.Greedy[discord.TextChannel | discord.VoiceChannel]
     ) -> None:
         """Locks down specific channels.
 
@@ -2459,8 +4146,7 @@ class Mod(commands.Cog):
         """
 
         if not channels:
-            await ctx.send("Missing channels to lockdown")
-            return
+            return await ctx.send("Missing channels to lockdown")
 
         if ctx.channel in channels and self.is_potential_lockout(ctx.me, ctx.channel):
             parent = ctx.channel.parent if isinstance(ctx.channel, discord.Thread) else ctx.channel
@@ -2468,7 +4154,7 @@ class Mod(commands.Cog):
                 await ctx.send(
                     "For some reason, I could not find an an appropriate channel to edit overwrites for."
                     "Note that this lockdown will potentially lock the bot from sending messages. "
-                    "Please explicitly give the bot permissions to send messages in threads and channels.",
+                    "Please explicitly give the bot permissions to send messages in threads and channels."
                 )
                 return
 
@@ -2486,9 +4172,9 @@ class Mod(commands.Cog):
         success, failures = await self.start_lockdown(ctx, channels)
         if failures:
             await ctx.send(
-                f"Successfully locked down {len(success)}/{len(failures)} channels.\n"
-                f"Failed channels: {', '.join(c.mention for c in failures)}\n\n"
-                "Give the bot Manage Roles permissions in those channels and try again.",
+                f'Successfully locked down {len(success)}/{len(failures)} channels.\n'
+                f'Failed channels: {", ".join(c.mention for c in failures)}\n\n'
+                f'Give the bot Manage Roles permissions in those channels and try again.'
             )
         else:
             await ctx.send(f"Successfully locked down {plural(len(success)):channel}")
@@ -2530,12 +4216,10 @@ class Mod(commands.Cog):
 
         reminder = self.bot.reminder
         if reminder is None:
-            await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
-            return
+            return await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
 
         if not channels:
-            await ctx.send("Missing channels to lockdown")
-            return
+            return await ctx.send("Missing channels to lockdown")
 
         if ctx.channel in channels and self.is_potential_lockout(ctx.me, ctx.channel):
             parent = ctx.channel.parent if isinstance(ctx.channel, discord.Thread) else ctx.channel
@@ -2543,7 +4227,7 @@ class Mod(commands.Cog):
                 await ctx.send(
                     "For some reason, I could not find an an appropriate channel to edit overwrites for."
                     "Note that this lockdown will potentially lock the bot from sending messages. "
-                    "Please explicitly give the bot permissions to send messages in threads and channels.",
+                    "Please explicitly give the bot permissions to send messages in threads and channels."
                 )
                 return
 
@@ -2572,10 +4256,10 @@ class Mod(commands.Cog):
         formatted_time = discord.utils.format_dt(timer.expires, "f" if long else "T")
         if failures:
             await ctx.send(
-                f"Successfully locked down {len(success)}/{len(channels)} channels until {formatted_time}.\n"
-                f"Failed channels: {', '.join(c.mention for c in failures)}\n"
-                f"Give the bot Manage Roles permissions in {plural(len(failures)):the channel|those channels} and try "
-                f"the lockdown command on the failed {plural(len(failures)):channel} again.",
+                f'Successfully locked down {len(success)}/{len(channels)} channels until {formatted_time}.\n'
+                f'Failed channels: {", ".join(c.mention for c in failures)}\n'
+                f'Give the bot Manage Roles permissions in {plural(len(failures)):the channel|those channels} and try '
+                f'the lockdown command on the failed {plural(len(failures)):channel} again.'
             )
         else:
             await ctx.send(f"Successfully locked down {plural(len(success)):channel} until {formatted_time}")
@@ -2627,7 +4311,7 @@ class Mod(commands.Cog):
             if failures:
                 formatted = [c.mention for c in failures]
                 await channel.send(
-                    f'Lockdown ended. However, I failed to properly edit {human_join(formatted, final="and")}',
+                    f'Lockdown ended. However, I failed to properly edit {human_join(formatted, final="and")}'
                 )
             else:
                 valid = [f"<#{c}>" for c in channel_ids]
@@ -2635,4 +4319,4 @@ class Mod(commands.Cog):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(Mod(bot), guilds=[discord.Object(id=0)])
+    await bot.add_cog(Mod(bot))
