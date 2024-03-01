@@ -15,7 +15,7 @@ import sys
 import traceback
 from collections import Counter, deque
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import aiohttp
 import asyncpg
@@ -161,10 +161,6 @@ class LogHandler:
 class Mipha(commands.Bot):
     """Mipha's bot class."""
 
-    DEV_GUILDS: ClassVar[list[discord.Object]] = [
-        discord.Object(id=705500489248145459, type=discord.Guild),
-    ]
-
     log_handler: LogHandler
     pool: asyncpg.Pool
     user: discord.ClientUser
@@ -206,6 +202,9 @@ class Mipha(commands.Bot):
         )
 
         self.config: RootConfig = config
+        self.dev_guilds: list[discord.Object] = [
+            discord.Object(id=item, type=discord.Guild) for item in config["bot"].get("dev_guilds", [])
+        ]
 
         self._prefix_data: Config[list[str]] = Config(pathlib.Path("configs/prefixes.json"))
         self._blacklist_data: Config[bool] = Config(pathlib.Path("configs/blacklist.json"))
