@@ -185,9 +185,12 @@ class Admin(commands.Cog):
                 ctx.bot.tree.copy_global_to(guild=ctx.guild)
                 fmt = await ctx.bot.tree.sync(guild=ctx.guild)
             elif spec == "^":
+                current_ = ctx.bot.tree.get_commands(guild=ctx.guild)
                 ctx.bot.tree.clear_commands(guild=ctx.guild)
                 await ctx.bot.tree.sync(guild=ctx.guild)
                 fmt = []
+                for cmd in current_:
+                    ctx.bot.tree.add_command(cmd, guild=ctx.guild, override=True)
             else:
                 fmt = await ctx.bot.tree.sync()
 
