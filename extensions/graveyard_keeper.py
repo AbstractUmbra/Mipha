@@ -86,8 +86,12 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
         return finder(query, self.cached_pages, key=lambda p: p.label)
 
     @app_commands.command()
-    async def wiki(self, interaction: Interaction, item: str) -> None:
-        await interaction.response.send_message(f"Here's the Graveyard Keeper wiki page you requested!\n\n<{item}>")
+    @app_commands.describe(item="The item to search for (please choose one of the options)")
+    async def wiki(self, interaction: Interaction, item: str, suppress: bool = True) -> None:
+        """Select an item from the Graveyard Keeper wiki to get a link for it!"""
+        await interaction.response.send_message(
+            f"[Here]({item})'s the Graveyard Keeper wiki page you requested!", suppress_embeds=suppress
+        )
 
     @wiki.autocomplete("item")
     async def wiki_autocomplete(self, interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
@@ -98,5 +102,5 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
 
 
 async def setup(bot: Mipha, /) -> None:
-    # await bot.add_cog(GYK(bot), guilds=bot.DEV_GUILDS)
+    # await bot.add_cog(GYK(bot), guilds=bot.dev_guilds)
     await bot.add_cog(GYK(bot))
