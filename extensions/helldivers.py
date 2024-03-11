@@ -93,8 +93,9 @@ class StrategemGame:
         if not self.start_time:
             raise ValueError("Game has not begun.")
         if not self.end_time:
-            raise ValueError("")
-        return self.end_time - self.start_time
+            raise ValueError("Game has not finished.")
+
+        return round(self.end_time - self.start_time, 2)
 
 
 class Helldivers(commands.Cog):
@@ -146,7 +147,7 @@ class Helldivers(commands.Cog):
             return await ctx.send("Sorry, your time to create liberty has elapsed.")
 
         results: list[str] = []
-        results.append(f"Total game time taken was **{round(game.end_time - game.start_time, ndigits=2)} seconds**.")
+        results.append(f"Total game time taken was **{game.total_time()} seconds**.")
         results.append("\n")
 
         for idx, (strategem, resolution) in enumerate(zip(game.strategems, game.resolutions), start=1):
