@@ -35,6 +35,7 @@ numpy = "*"
 tabulate = "*"
 "imagetext-py" = "*"
 orjson = "*"
+uvloop = "*"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "*"

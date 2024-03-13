@@ -26,6 +26,13 @@ from discord import app_commands
 from discord.ext import commands
 from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
 
+try:
+    import uvloop
+except ModuleNotFoundError:
+    HAS_UVLOOP = False
+else:
+    HAS_UVLOOP = True
+
 from extensions import EXTENSIONS
 from utilities.context import Context, Interaction
 from utilities.prefix import callable_prefix as _callable_prefix
@@ -325,8 +332,7 @@ class Mipha(commands.Bot):
         retry_after: float,
         *,
         autoblock: Literal[True],
-    ) -> Coroutine[None, None, discord.WebhookMessage]:
-        ...
+    ) -> Coroutine[None, None, discord.WebhookMessage]: ...
 
     @overload
     def _log_spammer(
@@ -336,12 +342,10 @@ class Mipha(commands.Bot):
         retry_after: float,
         *,
         autoblock: Literal[False],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
-    def _log_spammer(self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: bool = ...) -> None:
-        ...
+    def _log_spammer(self, ctx: Context, message: discord.Message, retry_after: float, *, autoblock: bool = ...) -> None: ...
 
     def _log_spammer(
         self,
@@ -423,12 +427,10 @@ class Mipha(commands.Bot):
                     yield member
 
     @overload
-    async def get_context(self, origin: Interaction | discord.Message, /) -> Context:
-        ...
+    async def get_context(self, origin: Interaction | discord.Message, /) -> Context: ...
 
     @overload
-    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT:
-        ...
+    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT: ...
 
     async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT] = MISSING) -> ContextT:
         if cls is MISSING:
@@ -520,14 +522,17 @@ async def main() -> None:
     config = CONFIG_PATH.read_text("utf-8")
     raw_cfg: RootConfig = discord.utils._from_json(config)
 
-    async with Mipha(raw_cfg) as bot, aiohttp.ClientSession(
-        json_serialize=discord.utils._to_json
-    ) as session, asyncpg.create_pool(
-        dsn=bot.config["postgresql"]["dsn"],
-        command_timeout=60,
-        max_inactive_connection_lifetime=0,
-        init=db_init,
-    ) as pool, LogHandler() as log_handler:
+    async with (
+        Mipha(raw_cfg) as bot,
+        aiohttp.ClientSession(json_serialize=discord.utils._to_json) as session,
+        asyncpg.create_pool(
+            dsn=bot.config["postgresql"]["dsn"],
+            command_timeout=60,
+            max_inactive_connection_lifetime=0,
+            init=db_init,
+        ) as pool,
+        LogHandler() as log_handler,
+    ):
         bot.log_handler = log_handler
         bot.pool = pool
 
@@ -548,4 +553,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run = uvloop.run if HAS_UVLOOP else asyncio.run
+    run(main())
