@@ -686,6 +686,7 @@ class Stats(commands.Cog):
         exc = "".join(traceback.format_exception(type(error), error, error.__traceback__, chain=False))
         e.description = f"```py\n{exc}\n```"
         e.timestamp = discord.utils.utcnow()
+        e.set_footer(text=f"Ray ID: {ctx.ray_id}")
         await self.webhook.send(embed=e)
         await self.bot.owner.send(embed=e)
 

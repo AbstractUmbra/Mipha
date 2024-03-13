@@ -151,6 +151,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
     def __init__(self, **kwargs) -> None:  # noqa: ANN003
         super().__init__(**kwargs)
         self.pool = self.bot.pool
+        self.ray_id: str = secrets.token_urlsafe()
 
     def __repr__(self) -> str:
         return "<Context>"
