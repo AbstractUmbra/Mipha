@@ -20,6 +20,7 @@ from lru import LRU
 
 from utilities.context import ConfirmationView
 from utilities.shared import cache, checks, flags, time
+from utilities.shared.converters import Snowflake  # noqa: TCH001 # dpy converters
 from utilities.shared.formats import human_join, plural
 from utilities.shared.paginator import SimplePages
 from utilities.shared.queue import CancellableQueue
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
 
     from bot import Mipha
     from utilities.context import GuildContext, Interaction
-    from utilities.shared.converters import Snowflake
 
     from .reminders import Timer
 
@@ -1911,15 +1911,11 @@ class Mod(commands.Cog):
         bot.add_view(self._automod_migration_view)
         bot.add_dynamic_items(GatekeeperVerifyButton, GatekeeperAlertMassbanButton, GatekeeperAlertResolveButton)
 
-    @property
-    def display_emoji(self) -> discord.PartialEmoji:
-        return discord.PartialEmoji(name="DiscordCertifiedModerator", id=1055367895326130226)
-
     def __repr__(self) -> str:
         return "<cogs.Mod>"
 
     async def cog_load(self) -> None:
-        self._avatar: bytes = await self.bot.user.display_avatar.read()
+        _ = asyncio.create_task(self._set_avatar())
 
     async def cog_unload(self) -> None:
         self.batch_updates.stop()
@@ -2032,6 +2028,10 @@ class Mod(commands.Cog):
             if record is not None:
                 return ModConfig.from_record(record, self.bot)
             return None
+
+    async def _set_avatar(self) -> None:
+        await self.bot.wait_until_ready()
+        self._avatar = await self.bot.user.display_avatar.read()
 
     async def get_guild_gatekeeper(self, guild_id: int | None) -> Gatekeeper | None:
         if guild_id is None:
