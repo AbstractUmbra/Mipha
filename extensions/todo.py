@@ -237,7 +237,7 @@ class Todo(commands.Cog):
     async def todo_list(self, interaction: Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
 
-        records = await self.get_todos(interaction)
+        records = await self.get_todos(interaction.user.id)
 
         if not records:
             return await interaction.followup.send("You don't seem to have any recorded things to-do.", ephemeral=True)
