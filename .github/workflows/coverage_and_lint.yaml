@@ -70,7 +70,7 @@ jobs:
         uses: jakebailey/pyright-action@v2
         with:
           warnings: false
-          annotate: ${{ matrix.python-version != '3.x' }}
+          annotate: "${{ matrix.python-version != '3.x' }}"
 
       - name: Lint check
         if: ${{ always() && steps.install-deps.outcome == 'success' }}
