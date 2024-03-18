@@ -1,6 +1,8 @@
 import pathlib
 from pkgutil import ModuleInfo, iter_modules
 
+assert __package__
+
 _ext: list[ModuleInfo] = [
     module for module in iter_modules(__path__, prefix=__package__ + ".") if not module.name.rsplit(".")[-1].startswith("_")
 ]
