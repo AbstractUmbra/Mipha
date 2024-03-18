@@ -20,6 +20,18 @@ EMOJI = {
     "d": "<:HDRight:1216530291401687141>",
     "a": "<:HDLeft:1216530265363451904>",
 }
+HJKL_INPUT = {
+    "k": "w",
+    "j": "s",
+    "l": "d",
+    "h": "a",
+}
+HJKL_INPUT_REV = {v: k for k, v in HJKL_INPUT.items()}
+HJKL_TRANSLATE = str.maketrans(HJKL_INPUT)
+
+
+def _translate_wasd_hjkl(input_: str) -> str:
+    return input_.translate(HJKL_TRANSLATE)
 
 
 class GameElapsed(commands.CommandError):
@@ -33,6 +45,10 @@ class Strategem(NamedTuple):
     @property
     def emoji(self) -> list[str]:
         return [EMOJI[char] for char in self.input]
+
+    @property
+    def hjkl(self) -> str:
+        return "".join([HJKL_INPUT_REV[char] for char in self.input])
 
     def clean_emoji(self) -> str:
         return " ".join(self.emoji)
@@ -123,7 +139,7 @@ class Helldivers(commands.Cog):
                 check=lambda m: m.author.id == game.owner
                 and m.channel.id == ctx.channel.id
                 and m.content
-                and m.content == item.input,
+                and _translate_wasd_hjkl(m.content.casefold()) == item.input,
                 timeout=45,
             )
             after_game = time.perf_counter()
@@ -185,7 +201,7 @@ class Helldivers(commands.Cog):
         await ctx.send(
             "An example run of the game is that we send the name and input for the strategem:-"
             f"\n## {strategem.name} :: {strategem.clean_emoji()}"
-            f"\nYou would then send the WASD equivalent input as a message, like so:-\n### {strategem.input}"
+            f"\nYou would then send the WASD/HJKL equivalent input as a message, like so:-\n### {strategem.input} // {strategem.hjkl}"
             "\nand this would be counted and recorded if correct. An emoji will be added when correct. We average the time taken per keystroke to remove the one used to hit 'enter'."
             f"\n\nNow you can the game with '{ctx.clean_prefix}{ctx.invoked_parents[0]}'"
         )
