@@ -1915,7 +1915,7 @@ class Mod(commands.Cog):
         return "<cogs.Mod>"
 
     async def cog_load(self) -> None:
-        _ = asyncio.create_task(self._set_avatar())
+        asyncio.create_task(self._set_avatar())  # noqa: RUF006
 
     async def cog_unload(self) -> None:
         self.batch_updates.stop()
