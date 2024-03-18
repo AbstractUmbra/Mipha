@@ -56,43 +56,71 @@ class Strategem(NamedTuple):
 
 class StrategemGame:
     STRATEGEMS: ClassVar[list[Strategem]] = [
-        # region: support
+        # region: mission-items
         Strategem("Resupply", input="sswd"),
         Strategem("Reinforce", input="wsdaw"),
-        # Strategem("Eagle Rearm", input=""),
         Strategem("NUX-223 Hellbomb", input="swaswdsw"),
-        # endregion: support
-        # region: backpacks
-        Strategem("AX/LAS-5 'Guard Dog' Rover", input="swawdd"),
-        Strategem("AD-334 Guard Dog", input="swawds"),
-        Strategem("LIFT-850 Jump Pack", input="swwsw"),
-        Strategem("B-1 Supply Pack", input="swssd"),
-        Strategem("SH-32 Shield Generator Pack", input="swadad"),
-        Strategem("SH-20 Ballistic Shield Backpack", input="sasswa"),
-        # endregion: backpacks
-        # region: secondaries
-        Strategem("AC-8 Autocannon", input="saswwd"),
-        Strategem("EAT-17 Expendable Anti-Tank", input="sadws"),
-        Strategem("FLAM-40 'Incinerator' Flamethrower", input="sasda"),
-        Strategem("LAS-98 Laser Cannon", input="saswa"),
-        Strategem("M-105 Stalwart", input="saswwa"),
+        # endregion: mission-items
+        # region: patriotic-adminstration-centre
         Strategem("MG-43 Machine Gun", input="saswd"),
-        Strategem("ARC-3 Arc Thrower", input="sdswaa"),
-        Strategem("GL-21 Grenade Launcher", input="sawas"),
         Strategem("APW-1 Anti-Materiel Rifle", input="sadws"),
-        Strategem("RS-422 Railgun", input="sdswad"),
+        Strategem("M-105 Stalwart", input="saswwa"),
+        Strategem("EAT-17 Expendable Anti-Tank", input="sadws"),
         Strategem("GR-8 Recoilless Rifle", input="sadda"),
+        Strategem("FLAM-40 'Incinerator' Flamethrower", input="sasda"),
+        Strategem("AC-8 Autocannon", input="saswwd"),
+        Strategem("RS-422 Railgun", input="sdswad"),
         Strategem("FAF-14 Spear", input="saswwd"),
-        # endregion: secondaries
-        # region: vehicles
+        # endregion: patriotic-administration-centre
+        # region: orbital-cannons
+        Strategem("Orbital Gatling Barrage", input="dsaww"),
+        Strategem("Orbital Airburst Strike", input="ddd"),
+        Strategem("Orbital 120MM HE Barrage", input="ddsads"),
+        Strategem("Orbital 380MM HE Barrage", input="dswwass"),
+        Strategem("Orbital Walking Barrage", input="dsdsds"),
+        Strategem("Orgital Laser", input="dswds"),
+        Strategem("Orbital Railcannon Strike", input="dwssd"),
+        # endregion: orbital-cannons
+        # region: hangar
+        # Strategem("Eagle Rearm", input=""),
+        Strategem("Eagle Strafing Run", input="wdd"),
+        Strategem("Eagle Airstrike", input="wdsd"),
+        Strategem("Eagle Cluster Bomb", input="wdssd"),
+        Strategem("Eagle Napalm Airstrike", input="wdsw"),
+        Strategem("LIFT-850 Jump Pack", input="swwsw"),
+        Strategem("Eagle Smoke Strike", input="wdws"),
+        Strategem("Eagle 110MM Rocket Pods", input="wdwa"),
+        Strategem("Eagle 500KG Bomb", input="wdsss"),
+        # endregion: hangar
+        # region: bridge
+        Strategem("Orbital Precision Strike", input="ddw"),
+        Strategem("Orbital Gas Strike", input="ddsd"),
+        Strategem("Orbital EMS Strike", input="ddas"),
+        Strategem("E/MG-101 HMG Emplacement", input="swadda"),
+        Strategem("FX-12 Shield Generator Relay", input="ssadad"),
+        Strategem("A/Arc-3 Tesla Tower", input="swdwad"),
+        # endregion: bridge
+        # region: engineering-bay
+        Strategem("MD-6 Anti-Personnel Minefield", input="sawd"),
+        Strategem("B-1 Supply Pack", input="swssd"),
+        Strategem("GL-21 Grenade Launcher", input="sawas"),
+        Strategem("LAS-98 Laser Cannon", input="saswa"),
+        Strategem("MD-I4 Incendiary Mines", input="saas"),
+        Strategem("AX/LAS-5 'Guard Dog' Rover", input="swawdd"),
+        Strategem("SH-20 Ballistic Shield Backpack", input="sasswa"),
+        Strategem("ARC-3 Arc Thrower", input="sdswaa"),
+        Strategem("SH-32 Shield Generator Pack", input="swadad"),
+        # endregion: engineering-bay
+        # region: robotics-workshop
+        Strategem("A/MG-43 Machine Gun Sentry", input="swddw"),
+        Strategem("A/G-16 Gatling Sentry", input="swda"),
+        Strategem("A/M-12 Mortar Sentry", input="swdds"),
+        Strategem("AX/AR-23 'Guard Dog'", input="swawds"),
+        Strategem("A/AC-8 Autocannon Sentry", input="swdwaw"),
+        Strategem("A/MLS-4X Rocket Sentry", input="swdda"),
+        Strategem("A/M-23 EMS Mortar Sentry", input="swdsd"),
         Strategem("EXO-45 Patriot Exosuit", input="asdwass"),
-        # endregion: vehicles
-        # region: defensive
-        # endregion: defensive
-        # region: orbital
-        # endregion: orbital
-        # region: eagle
-        # endregion: eagle
+        # endregion: robotics-workshop
     ]
     start_time: float
     end_time: float
