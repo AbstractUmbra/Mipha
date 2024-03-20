@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-from typing import TYPE_CHECKING, ClassVar, NamedTuple
+from typing import TYPE_CHECKING, ClassVar, NamedTuple, Self
 
 from discord.ext import commands
 
@@ -52,6 +52,13 @@ class Strategem(NamedTuple):
 
     def clean_emoji(self) -> str:
         return " ".join(self.emoji)
+
+    @classmethod
+    def random(cls) -> Self:
+        amnt = random.randint(3, 10)
+        keys = random.choices(["w", "a", "s", "d"], k=amnt)
+
+        return cls("Randomly Generated", input="".join(keys))
 
 
 class StrategemGame:
@@ -121,11 +128,9 @@ class StrategemGame:
         Strategem("A/M-23 EMS Mortar Sentry", input="swdsd"),
         Strategem("EXO-45 Patriot Exosuit", input="asdwass"),
         # endregion: robotics-workshop
-    ]
+    ] + [Strategem.random()] * 10
     start_time: float
     end_time: float
-    last_success: float
-    _total_reductions: float
 
     __slots__ = (
         "owner",
@@ -133,21 +138,18 @@ class StrategemGame:
         "resolutions",
         "start_time",
         "end_time",
-        "last_success",
-        "_total_reductions",
     )
 
     def __init__(self, *, owner: int, limit: int) -> None:
         self.owner: int = owner
         self.strategems: list[Strategem] = self._choose_strategems(limit)
         self.resolutions: list[tuple[int, float]] = []
-        self._total_reductions: float = 0
 
     def _choose_strategems(self, limit: int) -> list[Strategem]:
         return random.choices(self.STRATEGEMS, k=limit)
 
     def total_time(self) -> float:
-        return round(sum(r[1] for r in self.resolutions) - self._total_reductions, 2)
+        return round(sum(r[1] for r in self.resolutions), 2)
 
 
 class Helldivers(commands.Cog):
@@ -159,7 +161,6 @@ class Helldivers(commands.Cog):
             await ctx.send(f"## {item.name} :: {item.clean_emoji()}")
             if idx == 0:
                 game.start_time = time.time()
-                game.last_success = game.start_time
 
             pre_game = time.perf_counter()
             message: discord.Message = await self.bot.wait_for(
@@ -172,7 +173,6 @@ class Helldivers(commands.Cog):
             )
             after_game = time.perf_counter()
             game.resolutions.append((idx, after_game - pre_game))
-            game.last_success = time.time()
             await message.add_reaction(ctx.tick(True))
 
     async def _game_handler(self, ctx: Context, amount: int, /) -> StrategemGame:
