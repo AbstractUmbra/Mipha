@@ -12,6 +12,7 @@ python = "^3.11"
     "speedup",
 ], rev = "master" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
+async-rediscache = { version = "1.0.0rc2", extras = ["fakeredis"] }
 great-asset = { git = "https://github.com/AbstractUmbra/GreatAsset.git", rev = "main" }
 rcon = { git = "https://github.com/conqp/rcon.git", rev = "master" }
 jishaku = "*"
@@ -20,7 +21,7 @@ asyncpg = "*"
 psutil = "*"
 lru_dict = "*"
 pykakasi = "*"
-beautifulsoup4 = "*"
+beautifulsoup4 = "4.12.3"
 Pillow = "*"
 pygit2 = "*"
 yt-dlp = "*"
@@ -28,7 +29,7 @@ typing-extensions = "*"
 parsedatetime = "*"
 python-dateutil = "*"
 python-a2s = "*"
-lxml = "*"
+lxml = "5.1.0"
 legofy = "*"
 mcrcon = "*"
 numpy = "*"
@@ -36,6 +37,7 @@ tabulate = "*"
 "imagetext-py" = "*"
 orjson = "*"
 uvloop = "*"
+markdownify = "0.11.6"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "*"

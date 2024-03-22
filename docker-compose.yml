@@ -7,6 +7,9 @@ services:
     extra_hosts:
       - "database:host-gateway"
     restart: unless-stopped
+    networks:
+      default:
+      main:
     volumes:
       - ./configs/:/app/configs/:rw
       - ./logs/:/app/logs/:rw
@@ -19,11 +22,15 @@ services:
     container_name: "duckling"
     image: ghcr.io/abstractumbra/duckling:latest
     restart: unless-stopped
+    networks:
+      default:
 
   synth:
     container_name: synth-engine
     image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
     restart: unless-stopped
+    networks:
+      default:
 
   db:
     image: postgres
@@ -37,6 +44,23 @@ services:
       # - ./schemas/:/docker-entrypoint-initdb.d/
     profiles:
       - db
+    networks:
+      default:
+
+  redis:
+    image: redis:latest
+    networks:
+      default:
+    volumes:
+      - ./configs/redis.conf:/config/redis.conf:ro
+    command: ["redis-server", "/config/redis.conf"]
+
 
 volumes:
   pgdata:
+
+networks:
+  default:
+    external: false
+  main:
+    external: true
