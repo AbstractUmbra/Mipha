@@ -108,6 +108,7 @@ class Hyrule(commands.Cog):
         self.bot.loop.create_task(self._assign_view())
 
     async def _assign_view(self) -> None:
+        await self.bot.wait_until_ready()
         self.view: HyruleRoleAssignmentView = HyruleRoleAssignmentView(self.bot)
         self.bot.add_view(self.view, message_id=ROLE_ASSIGNMENT_MESSAGE_ID)
 
