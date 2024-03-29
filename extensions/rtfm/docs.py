@@ -23,6 +23,8 @@ from ._inventory_parser import InvalidHeaderError, InventoryDict, fetch_inventor
 if TYPE_CHECKING:
     from bot import Mipha
     from utilities.context import Context
+    from utilities.shared._types.config import RTFMConfig
+    from utilities.shared.async_config import Config
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
@@ -60,10 +62,11 @@ class DocItem(NamedTuple):
 class DocCog(commands.Cog):
     """A set of commands for querying & displaying documentation."""
 
-    def __init__(self, bot: Mipha) -> None:
+    def __init__(self, bot: Mipha, *, config: Config[RTFMConfig]) -> None:
         # Contains URLs to documentation home pages.
         # Used to calculate inventory diffs on refreshes and to display all currently stored inventories.
         self.bot = bot
+        self._config = config
         self.base_urls = {}
         self.doc_symbols: dict[str, DocItem] = {}  # Maps symbol names to objects containing their metadata.
         self.item_fetcher = _batch_parser.BatchParser(self.bot)
@@ -214,7 +217,7 @@ class DocCog(commands.Cog):
 
         coros = [
             self.update_or_reschedule_inventory(package["package"], package["base_url"], package["inventory_url"])
-            for package in self.bot.config["rtfm"]["packages"]
+            for package in self._config["rtfm"]["packages"]
         ]
         await asyncio.gather(*coros)
         LOGGER.debug("Finished inventory refresh.")
@@ -375,7 +378,7 @@ class DocCog(commands.Cog):
         self.update_single(package_name, base_url, inventory_dict)
         await ctx.send(f"Added the package `{package_name}` to the database and updated the inventories.")
 
-    @docs_group.command(name="deletedoc", aliases=("removedoc", "rm", "d"))
+    @docs_group.command(name="deletedoc", aliases=("removedoc", "rm"))
     @commands.is_owner()
     @lock(NAMESPACE, COMMAND_LOCK_SINGLETON, raise_error=True)  # type: ignore
     async def delete_command(self, ctx: Context, package_name: Annotated[str, PackageName]) -> None:
