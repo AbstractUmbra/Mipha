@@ -67,6 +67,7 @@ class StrategemGame:
         Strategem("Resupply", input="sswd"),
         Strategem("Reinforce", input="wsdaw"),
         Strategem("NUX-223 Hellbomb", input="swaswdsw"),
+        Strategem("Prospector Drill", input="ssadss"),
         # endregion: mission-items
         # region: patriotic-adminstration-centre
         Strategem("MG-43 Machine Gun", input="saswd"),
@@ -76,6 +77,7 @@ class StrategemGame:
         Strategem("GR-8 Recoilless Rifle", input="sadda"),
         Strategem("FLAM-40 'Incinerator' Flamethrower", input="sasda"),
         Strategem("AC-8 Autocannon", input="saswwd"),
+        Strategem("MG-206 Heavy Machine Gun", input="sawss"),
         Strategem("RS-422 Railgun", input="sdswad"),
         Strategem("FAF-14 Spear", input="saswwd"),
         # endregion: patriotic-administration-centre
@@ -116,6 +118,7 @@ class StrategemGame:
         Strategem("AX/LAS-5 'Guard Dog' Rover", input="swawdd"),
         Strategem("SH-20 Ballistic Shield Backpack", input="sasswa"),
         Strategem("ARC-3 Arc Thrower", input="sdswaa"),
+        Strategem("LAS-99 Quasar Cannon", input="sswad"),
         Strategem("SH-32 Shield Generator Pack", input="swadad"),
         # endregion: engineering-bay
         # region: robotics-workshop
