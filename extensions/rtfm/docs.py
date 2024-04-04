@@ -12,12 +12,12 @@ import aiohttp
 import discord
 from discord.ext import commands
 
-from utilities.shared.converters import Inventory, PackageName, ValidURL  # noqa: TCH001
 from utilities.shared.locks import SharedEvent, lock
 from utilities.shared.paginator import LinePaginator
 from utilities.shared.scheduling import Scheduler
 
 from . import NAMESPACE, PRIORITY_PACKAGES, _batch_parser, doc_cache
+from ._converters import Inventory, PackageName, ValidURL  # noqa: TCH001
 from ._inventory_parser import InvalidHeaderError, InventoryDict, fetch_inventory
 
 if TYPE_CHECKING:
