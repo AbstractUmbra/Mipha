@@ -403,7 +403,7 @@ class Time(commands.Cog):
                 SELECT user_id, tz
                 FROM tz_store
                 """
-        records: list[TimezoneRecord] = await self.bot.pool.fetch(query)
+        records: list[TimezoneRecord] = await self.bot.pool.fetch(query)  # type: ignore
         records = [*filter(lambda r: r["user_id"] in [m.id for m in context.guild.members], records)]
         if not records:
             return await interaction.followup.send("Sorry but there are no recorded timezones here!", ephemeral=True)
