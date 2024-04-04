@@ -129,7 +129,7 @@ class Todo(commands.Cog):
                 ORDER BY todo_created_at ASC;
                 """
 
-        return await self.bot.pool.fetch(query, user_id)
+        return await self.bot.pool.fetch(query, user_id)  # type: ignore
 
     async def create_todo(
         self,
@@ -160,7 +160,7 @@ class Todo(commands.Cog):
                 raise commands.CheckFailure("This functionality is currently unavailable.")
 
     async def fetch_todo(self, todo_id: int, /) -> TodoRecord | None:
-        return await self.bot.pool.fetchrow("SELECT * FROM todos WHERE todo_id = $1;", todo_id)
+        return await self.bot.pool.fetchrow("SELECT * FROM todos WHERE todo_id = $1;", todo_id)  # type: ignore
 
     async def delete_todo(self, todo_id: int, /, *, author_id: int) -> bool:
         query = """

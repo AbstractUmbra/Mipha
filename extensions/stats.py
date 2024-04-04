@@ -28,7 +28,7 @@ from utilities.shared.paginator import FieldPageSource, RoboPages
 if TYPE_CHECKING:
     from bot import Mipha
 
-log = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 LOGGING_CHANNEL = 309632009427222529
 
@@ -111,7 +111,7 @@ class Stats(commands.Cog):
             await self.bot.pool.execute(query, self._data_batch)
             total = len(self._data_batch)
             if total > 1:
-                log.info("Registered %s commands to the database.", total)
+                LOGGER.info("Registered %s commands to the database.", total)
             self._data_batch.clear()
 
     def cog_unload(self) -> None:
@@ -150,7 +150,7 @@ class Stats(commands.Cog):
         else:
             content = message.content
 
-        log.info("%s: %s in %s: %s", message.created_at, message.author, destination, content)
+        LOGGER.info("%s: %s in %s: %s", message.created_at, message.author, destination, content)
         async with self._batch_lock:
             self._data_batch.append(
                 {
