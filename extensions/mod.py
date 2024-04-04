@@ -52,7 +52,7 @@ class Arguments(argparse.ArgumentParser):
         raise RuntimeError(message)
 
 
-class AutoModFlags(flags.BaseFlags):
+class AutoModFlags(flags.DpyFlags):
     @flags.flag_value
     def joins(self) -> int:
         """Whether the server is broadcasting joins"""
@@ -131,7 +131,7 @@ class ModConfig:
 
         # the basic configuration
         self.bot = bot
-        self.automod_flags = AutoModFlags(record["automod_flags"] or 0)
+        self.automod_flags = AutoModFlags._from_value(record["automod_flags"] or 0)
         self.id = record["id"]
         self.broadcast_channel_id = record["broadcast_channel"]
         self.broadcast_webhook_url = record["broadcast_webhook_url"]
@@ -2706,7 +2706,7 @@ class Mod(commands.Cog):
         query = f"UPDATE guild_mod_config SET {updates} WHERE id=$1 RETURNING broadcast_webhook_url, alert_webhook_url"
 
         guild_id = ctx.guild.id
-        record: tuple[str | None, str | None] | None = await self.bot.pool.fetchrow(query, guild_id)
+        record: tuple[str | None, str | None] | None = await self.bot.pool.fetchrow(query, guild_id)  # type: ignore
         self._spam_check.pop(guild_id, None)
         self.get_guild_config.invalidate(self, guild_id)
         warnings = []
@@ -3995,14 +3995,14 @@ class Mod(commands.Cog):
         rows: list[tuple[int, int, int]]
         if channel_ids is None:
             query = """SELECT channel_id, allow, deny FROM guild_lockdowns WHERE guild_id=$1;"""
-            rows = await self.bot.pool.fetch(query, guild_id)
+            rows = await self.bot.pool.fetch(query, guild_id)  # type: ignore
         else:
             query = """SELECT channel_id, allow, deny
                        FROM guild_lockdowns
                        WHERE guild_id=$1 AND channel_id = ANY($2::bigint[]);
                     """
 
-            rows = await self.bot.pool.fetch(query, guild_id, channel_ids)
+            rows = await self.bot.pool.fetch(query, guild_id, channel_ids)  # type: ignore
 
         return {
             channel_id: discord.PermissionOverwrite.from_pair(discord.Permissions(allow), discord.Permissions(deny))
