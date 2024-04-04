@@ -22,6 +22,7 @@ import asyncpg
 import discord
 import hondana
 import jishaku
+import redis
 from async_rediscache import RedisSession
 from discord import app_commands
 from discord.ext import commands
@@ -170,7 +171,7 @@ class Mipha(commands.Bot):
     """Mipha's bot class."""
 
     log_handler: LogHandler
-    pool: asyncpg.Pool
+    pool: asyncpg.Pool[asyncpg.Record]
     redis: RedisSession | None
     user: discord.ClientUser
     session: aiohttp.ClientSession
@@ -538,7 +539,10 @@ async def main() -> None:
             decode_responses=True,
         )
 
-        redis_session = await redis_session.connect()
+        try:
+            redis_session = await redis_session.connect()
+        except redis.exceptions.ConnectionError:
+            redis_session = None
 
     async with (
         Mipha(raw_cfg) as bot,
