@@ -310,7 +310,7 @@ class Fun(commands.Cog):
         random.shuffle(channels)
         for channel in channels:
             perms = channel.permissions_for(member)
-            if perms.connect and perms.view_channel:
+            if perms.connect and perms.read_messages:
                 return channel
         return None
 
