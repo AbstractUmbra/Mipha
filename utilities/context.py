@@ -16,7 +16,6 @@ from typing import (
     Generic,
     Literal,
     Protocol,
-    TypeAlias,
     overload,
 )
 
@@ -48,7 +47,7 @@ __all__ = (
 )
 
 T = TypeVar("T")
-Interaction: TypeAlias = discord.Interaction["Mipha"]
+type Interaction = discord.Interaction["Mipha"]
 
 
 # For typing purposes, `Context.db` returns a Protocol type
@@ -343,10 +342,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
                 session=self.session,
             )
 
-            content = (
-                "Sorry, the output was too large but I posted it to a paste for you here:"
-                f" https://paste.abstractumbra.dev/{paste_url}"
-            )
+            content = f"Sorry, the output was too large but I posted it to a paste for you here: {paste_url}"
 
         sent = await super().send(  # type: ignore
             content=content,

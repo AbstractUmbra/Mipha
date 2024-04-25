@@ -12,7 +12,6 @@ from utilities.shared.paginator import RoboPages, SimplePages
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
-    from typing import TypeAlias
 
     from asyncpg import Connection, Pool, Record
 
@@ -52,7 +51,7 @@ class ChannelOrMember(commands.Converter):
 
 
 if TYPE_CHECKING:
-    CommandName: TypeAlias = str
+    type CommandName = str
 else:
 
     class CommandName(commands.Converter):
