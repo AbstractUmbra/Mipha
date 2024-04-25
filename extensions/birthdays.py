@@ -31,7 +31,7 @@ class Birthdays(commands.Cog):
     birthday_group = app_commands.Group(
         name="birthday",
         description="A set of commands to assist you in remembering birthdays!",
-        guild_ids=[1045411522421198939, 705500489248145459, 174702278673039360],
+        guild_ids=[705500489248145459, 774561547930304536, 149998214810959872],
     )
 
     @birthday_group.command(name="set")
