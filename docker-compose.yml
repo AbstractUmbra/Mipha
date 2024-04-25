@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   bot:
     container_name: mipha
@@ -49,12 +47,12 @@ services:
 
   redis:
     image: redis:latest
+    restart: unless-stopped
     networks:
       default:
     volumes:
       - ./configs/redis.conf:/config/redis.conf:ro
     command: ["redis-server", "/config/redis.conf"]
-
 
 volumes:
   pgdata:

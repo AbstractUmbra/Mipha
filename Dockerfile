@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 LABEL org.opencontainers.image.source=https://github.com/abstractumbra/mipha
 LABEL org.opencontainers.image.description="Mipha Discord Bot"
@@ -47,7 +47,8 @@ RUN mkdir -p /etc/apt/keyrings \
     gnutls-dev \
     libmagic-dev \
     ffmpeg \
-    nodejs
+    nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN curl -sSL https://install.python-poetry.org | python -
 RUN npm install -g pyright@latest

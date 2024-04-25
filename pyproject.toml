@@ -6,15 +6,16 @@ authors = ["Alex Nørgaard <umbra@abstractumbra.dev>"]
 license = "MPL 2.0"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 "discord.py" = { git = "https://github.com/Rapptz/discord.py.git", extras = [
     "voice",
     "speedup",
-], rev = "master" }
+], rev = "feature/user_apps" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
 async-rediscache = { version = "1.0.0rc2", extras = ["fakeredis"] }
 great-asset = { git = "https://github.com/AbstractUmbra/GreatAsset.git", rev = "main" }
 rcon = { git = "https://github.com/conqp/rcon.git", rev = "master" }
+asqlite = { git = "https://github.com/Rapptz/asqlite.git", rev = "master" }
 jishaku = "*"
 hondana = "*"
 asyncpg = "*"
@@ -45,7 +46,7 @@ asyncpg-stubs = "*"
 pre-commit = "*"
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 125
 
 [tool.ruff.lint]
@@ -94,7 +95,7 @@ inline-quotes = "single"
 [tool.pyright]
 useLibraryCodeForTypes = true
 typeCheckingMode = "basic"
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 ignore = [
     "extensions/_old_lewd.py",
 ] # let's keep files but ignore their diagnostics
