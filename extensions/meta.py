@@ -13,7 +13,7 @@ import os
 import traceback
 import unicodedata
 from collections import Counter
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
@@ -36,7 +36,7 @@ GuildChannel = (
     | discord.Thread
     | discord.ForumChannel
 )
-MessageableGuildChannel: TypeAlias = discord.TextChannel | discord.Thread | discord.VoiceChannel
+type MessageableGuildChannel = discord.TextChannel | discord.Thread | discord.VoiceChannel
 
 
 class Prefix(commands.Converter):
@@ -90,6 +90,8 @@ class Meta(commands.Cog):
     def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.interpret_as_command_ctx_menu.name, type=self.interpret_as_command_ctx_menu.type)
 
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=False, users=True)
     async def interpret_as_command_callback(self, interaction: Interaction, message: discord.Message, /) -> None:
         if message.author.bot:
             return await interaction.response.send_message(
@@ -447,7 +449,7 @@ class Meta(commands.Cog):
 
         if guild.premium_tier != 0:
             boosts = f"Level {guild.premium_tier}\n{guild.premium_subscription_count} boosts"
-            last_boost = max(guild.members, key=lambda m: m.premium_since or guild.created_at)  # type: ignore # pyright bug
+            last_boost = max(guild.members, key=lambda m: m.premium_since or guild.created_at)
             if last_boost.premium_since is not None:
                 boosts = f"{boosts}\nLast Boost: {last_boost} ({discord.utils.format_dt(last_boost.premium_since, 'R')})"
             e.add_field(name="Boosts", value=boosts, inline=False)
