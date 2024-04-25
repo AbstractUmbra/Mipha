@@ -43,25 +43,44 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
         self.cached_pages = filtered_pages
         self.cached_choices = [page.to_choice() for page in self.cached_pages]
 
+    async def _cache_pages(self, items: list[GYKWikiPage], /) -> None:
+        query = """
+                """
+
+        await self.bot.pool.executemany(query, items)
+
     async def _fetch_index_pages(self) -> list[bs4.BeautifulSoup]:
         ret: list[bs4.BeautifulSoup] = []
         for url in self.INDEX_URLS:
             async with self.bot.session.get(url) as resp:
                 data = await resp.read()
 
-            ret.append(bs4.BeautifulSoup(data))
+            ret.append(bs4.BeautifulSoup(data, features="lxml"))
 
         return ret
 
     @executor_function
     def _filter_all_items(self, root_pages: list[bs4.BeautifulSoup], /) -> list[GYKWikiPage]:
+        """
+        HTML Structure at the time of writing is
+        <div class=mw-allpages-body>
+          <ul>
+            <li>
+              <a href=... title=...>
+            </li>
+            <li>
+              ...
+            </li>
+            ...
+          </ul>
+        </div>
+        """
         ret: list[GYKWikiPage] = []
         for root_page in root_pages:
             index_table = root_page.find("div", class_="mw-allpages-body")
             if not index_table or not isinstance(index_table, bs4.Tag):
                 raise ValueError("Did we get a malformed page response?")
 
-            # table_list = index_table.select("ul", class_="mw-allpages-chunk")
             table_list = index_table.select("ul")
             if not table_list:
                 raise ValueError("Good page but we got a malformed table?")
@@ -86,7 +105,10 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
         return finder(query, self.cached_pages, key=lambda p: p.label)
 
     @app_commands.command()
-    @app_commands.describe(item="The item to search for (please choose one of the options)")
+    @app_commands.describe(
+        item="The item to search for (please choose one of the options)",
+        suppress="If you want to suppress the embed from the webpage, or not.",
+    )
     async def wiki(self, interaction: Interaction, item: str, suppress: bool = True) -> None:
         """Select an item from the Graveyard Keeper wiki to get a link for it!"""
         await interaction.response.send_message(
