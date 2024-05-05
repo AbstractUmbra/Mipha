@@ -22,8 +22,8 @@ from ._inventory_parser import InvalidHeaderError, InventoryDict, fetch_inventor
 
 if TYPE_CHECKING:
     from bot import Mipha
+    from utilities._types.config import RTFMConfig
     from utilities.context import Context
-    from utilities.shared._types.config import RTFMConfig
     from utilities.shared.async_config import Config
 
 LOGGER = logging.getLogger(__name__)

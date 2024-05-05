@@ -8,7 +8,7 @@ from utilities.shared.async_config import Config
 
 if TYPE_CHECKING:
     from bot import Mipha
-    from utilities.shared._types.config import RTFMConfig
+    from utilities._types.config import RTFMConfig
 
 from ._redis_cache import DocRedisCache
 
