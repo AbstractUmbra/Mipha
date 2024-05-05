@@ -10,7 +10,7 @@ python = "^3.12"
 "discord.py" = { git = "https://github.com/Rapptz/discord.py.git", extras = [
     "voice",
     "speedup",
-], rev = "feature/user_apps" }
+], rev = "master" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
 async-rediscache = { version = "1.0.0rc2", extras = ["fakeredis"] }
 great-asset = { git = "https://github.com/AbstractUmbra/GreatAsset.git", rev = "main" }
@@ -22,7 +22,7 @@ asyncpg = "*"
 psutil = "*"
 lru_dict = "*"
 pykakasi = "*"
-beautifulsoup4 = "4.12.3"
+beautifulsoup4 = "*"
 Pillow = "*"
 pygit2 = "*"
 yt-dlp = "*"
@@ -38,7 +38,8 @@ tabulate = "*"
 "imagetext-py" = "*"
 orjson = "*"
 uvloop = "*"
-markdownify = "0.11.6"
+markdownify = "*"
+matplotlib = "*"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "*"
