@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, Any, Literal, overload
 import aiohttp
 import asyncpg
 import discord
-import hondana
 import jishaku
 import redis
 from async_rediscache import RedisSession
@@ -51,7 +50,7 @@ if TYPE_CHECKING:
 
     from extensions.config import Config as ConfigCog
     from extensions.reminders import Reminder
-    from utilities.shared._types.config import RootConfig
+    from utilities._types.config import RootConfig
 
 jishaku.Flags.HIDE = True
 jishaku.Flags.RETAIN = True
@@ -175,7 +174,6 @@ class Mipha(commands.Bot):
     redis: RedisSession | None
     user: discord.ClientUser
     session: aiohttp.ClientSession
-    md_client: hondana.Client
     start_time: datetime.datetime
     command_stats: Counter[str]
     socket_stats: Counter[Any]
@@ -186,7 +184,6 @@ class Mipha(commands.Bot):
 
     __slots__ = (
         "session",
-        "md_client",
         "start_time",
         "pool",
         "log_handler",
@@ -560,12 +557,6 @@ async def main() -> None:
         bot.redis = redis_session
 
         bot.session = session
-
-        bot.md_client = hondana.Client(
-            username=bot.config["mangadex"]["username"],
-            password=bot.config["mangadex"]["password"],
-            session=session,
-        )
 
         await bot.load_extension("jishaku")
         for extension in EXTENSIONS:

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from typing import Self
 
     from bot import Mipha
+    from utilities._types.config import MangaDexConfig
     from utilities.context import Context, Interaction
 
 
@@ -38,23 +39,25 @@ LOGGER = logging.getLogger(__name__)
 class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hondana.Author]):
     def lookup(
         self,
-        bot: Mipha,
+        cog: MangaCog,
         item: str,
     ) -> Callable[[str], Coroutine[None, None, hondana.Manga | hondana.Chapter | hondana.Author]] | None:
         table = {
-            "title": bot.md_client.get_manga,
-            "chapter": bot.md_client.get_chapter,
-            "author": bot.md_client.get_author,
+            "title": cog.client.get_manga,
+            "chapter": cog.client.get_chapter,
+            "author": cog.client.get_author,
         }
 
         return table.get(item)
 
-    async def convert(self, ctx: Context, argument: str) -> hondana.Manga | hondana.Chapter | hondana.Author | None:
+    async def convert(
+        self, ctx: Context[MangaCog], argument: str
+    ) -> hondana.Manga | hondana.Chapter | hondana.Author | None:
         search = hondana.MANGADEX_URL_REGEX.search(argument)
         if search is None:
             return None
 
-        item = self.lookup(ctx.bot, search["type"])
+        item = self.lookup(ctx.cog, search["type"])
         if item is None:
             return None
 
@@ -63,9 +66,9 @@ class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hon
 
 
 class MangaView(BaseView):
-    def __init__(self, user: discord.abc.Snowflake, bot: Mipha, manga: list[hondana.Manga], /) -> None:
+    def __init__(self, user: discord.abc.Snowflake, cog: MangaCog, manga: list[hondana.Manga], /) -> None:
         self.user: discord.abc.Snowflake = user
-        self.bot: Mipha = bot
+        self.cog: MangaCog = cog
         self.manga_id: str | None = None
         options: list[discord.SelectOption] = []
         for idx, mango in enumerate(manga, start=1):
@@ -87,7 +90,7 @@ class MangaView(BaseView):
 
         embed = await MangaDexEmbed.from_manga(self._lookup[item.values[0]], nsfw_allowed=is_nsfw)
         self.manga_id = item.values[0]
-        if await self.bot.is_owner(interaction.user):
+        if await self.cog.bot.is_owner(interaction.user):
             self.follow.disabled = False
 
         await interaction.response.edit_message(content=None, embed=embed, view=self)
@@ -95,11 +98,11 @@ class MangaView(BaseView):
     @discord.ui.button(label="Follow?", disabled=True)
     async def follow(self, interaction: Interaction, _: discord.ui.Button[Self]) -> None:
         assert interaction.user is not None
-        if not await self.bot.is_owner(interaction.user):
+        if not await self.cog.bot.is_owner(interaction.user):
             raise commands.CheckFailure("You can't follow manga unless you're Umbra.")
 
         assert self.manga_id is not None
-        await self.bot.md_client.follow_manga(self.manga_id)
+        await self.cog.client.follow_manga(self.manga_id)
         await interaction.response.send_message("You now follow this!", ephemeral=True)
 
     async def interaction_check(self, interaction: Interaction) -> bool:
@@ -124,8 +127,9 @@ class MangaCog(commands.Cog, name="Manga"):
     Cog to assist with Mangadex related things.
     """
 
-    def __init__(self, bot: Mipha, /, *, webhook_url: str | None = None) -> None:
+    def __init__(self, bot: Mipha, /, *, config: MangaDexConfig, webhook_url: str | None = None) -> None:
         self.bot: Mipha = bot
+        self.client = hondana.Client(**config, session=bot.session)
         if not webhook_url:
             LOGGER.warning("No webhook defined for MangaDex logging. Skipping.")
             return
@@ -169,7 +173,7 @@ class MangaCog(commands.Cog, name="Manga"):
     async def perform_search(self, search_query: str) -> list[hondana.Manga] | None:
         order = MangaListOrderQuery(relevance=Order.descending)
 
-        collection = await self.bot.md_client.manga_list(limit=5, title=search_query, order=order)
+        collection = await self.client.manga_list(limit=5, title=search_query, order=order)
 
         if not collection.manga:
             return None
@@ -184,7 +188,7 @@ class MangaCog(commands.Cog, name="Manga"):
             await ctx.send("No results found!")
             return
 
-        view = MangaView(ctx.author, ctx.bot, manga)
+        view = MangaView(ctx.author, self, manga)
         view.message = await ctx.send(view=view, wait=True)
 
     @mangadex_group.command(name="search")
@@ -197,7 +201,7 @@ class MangaCog(commands.Cog, name="Manga"):
             await interaction.followup.send("No results found!", ephemeral=True)
             return
 
-        view = MangaView(interaction.user, self.bot, manga)
+        view = MangaView(interaction.user, self, manga)
         await interaction.followup.send(view=view, ephemeral=True)
         view.message = await interaction.original_response()
 
@@ -213,7 +217,7 @@ class MangaCog(commands.Cog, name="Manga"):
         """
         Uses a MangaDex UUID (for manga) to retrieve the data for it.
         """
-        manga = await self.bot.md_client.get_manga(manga_id)
+        manga = await self.client.get_manga(manga_id)
 
         if manga.content_rating in (
             hondana.ContentRating.pornographic,
@@ -232,7 +236,7 @@ class MangaCog(commands.Cog, name="Manga"):
     async def slash_manga(self, interaction: Interaction, manga_id: str) -> None:
         """Fetch details about a manga from MangaDex."""
         await interaction.response.defer()
-        manga = await self.bot.md_client.get_manga(manga_id)
+        manga = await self.client.get_manga(manga_id)
 
         if manga.content_rating in (
             hondana.ContentRating.pornographic,
@@ -251,7 +255,7 @@ class MangaCog(commands.Cog, name="Manga"):
         """
         Returns data on a MangaDex chapter.
         """
-        chapter = await self.bot.md_client.get_chapter(chapter_id)
+        chapter = await self.client.get_chapter(chapter_id)
 
         if chapter.manga is None:
             await chapter.get_parent_manga()
@@ -271,7 +275,7 @@ class MangaCog(commands.Cog, name="Manga"):
         """
         order = FeedOrderQuery(created_at=Order.ascending)
         one_h_ago = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=1)
-        feed = await self.bot.md_client.get_my_feed(
+        feed = await self.client.get_my_feed(
             limit=32,
             translated_language=["en", "ja"],
             order=order,
@@ -330,5 +334,9 @@ class MangaCog(commands.Cog, name="Manga"):
 
 
 async def setup(bot: Mipha) -> None:
+    md_config = bot.config.get("mangadex")
+    if not md_config:
+        return
+
     mangadex_webhook = bot.config["webhooks"].get("mangadex")
-    await bot.add_cog(MangaCog(bot, webhook_url=mangadex_webhook))
+    await bot.add_cog(MangaCog(bot, config=md_config, webhook_url=mangadex_webhook))
