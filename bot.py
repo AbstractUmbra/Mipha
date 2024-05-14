@@ -21,6 +21,7 @@ import aiohttp
 import asyncpg
 import discord
 import jishaku
+import mystbin
 import redis
 from async_rediscache import RedisSession
 from discord import app_commands
@@ -87,7 +88,7 @@ class MiphaCommandTree(app_commands.CommandTree):
         clean = "".join(trace)
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
-            paste = await create_paste(content=clean, password=password, session=interaction.client.session)
+            paste = await create_paste(content=clean, password=password, mb_client=interaction.client.mb_client)
             e.description = (
                 f"Error was too long to send in a codeblock, so I have pasted it [here]({paste})."
                 f"\nThe password is `{password}`."
@@ -179,6 +180,7 @@ class Mipha(commands.Bot):
     socket_stats: Counter[Any]
     command_types_used: Counter[bool]
     bot_app_info: discord.AppInfo
+    mb_client: mystbin.Client
     _original_help_command: commands.HelpCommand | None  # for help command overriding
     _stats_cog_gateway_handler: logging.Handler
 
@@ -516,6 +518,7 @@ class Mipha(commands.Bot):
 
         self.bot_app_info = await self.application_info()
         self.owner_ids = self.config["owner_ids"]
+        self.mb_client = mystbin.Client(session=self.session)
 
 
 async def main() -> None:
