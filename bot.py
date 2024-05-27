@@ -41,7 +41,6 @@ from utilities.prefix import callable_prefix as _callable_prefix
 from utilities.shared.async_config import Config
 from utilities.shared.db import db_init
 from utilities.shared.formats import to_json
-from utilities.shared.paste import create_paste
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Coroutine, Iterable
@@ -88,7 +87,7 @@ class MiphaCommandTree(app_commands.CommandTree):
         clean = "".join(trace)
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
-            paste = await create_paste(content=clean, password=password, mb_client=interaction.client.mb_client)
+            paste = await interaction.client.create_paste(content=clean, password=password)
             e.description = (
                 f"Error was too long to send in a codeblock, so I have pasted it [here]({paste})."
                 f"\nThe password is `{password}`."
@@ -519,6 +518,26 @@ class Mipha(commands.Bot):
         self.bot_app_info = await self.application_info()
         self.owner_ids = self.config["owner_ids"]
         self.mb_client = mystbin.Client(session=self.session)
+
+    async def create_paste(
+        self,
+        *,
+        content: str | None = None,
+        files: list[tuple[str, str]] | None = None,
+        password: str | None = None,
+        expires: datetime.datetime | None = None,
+    ) -> str:
+        if not content and not files:
+            raise ValueError("Either `content` or `files` must be provided.")
+
+        if content:
+            post_files = [mystbin.File(filename="output.py", content=content)]
+        elif files:
+            post_files = [mystbin.File(filename=name, content=content) for name, content in files]
+
+        paste = await self.mb_client.create_paste(files=post_files, password=password, expires=expires)
+
+        return paste.url
 
 
 async def main() -> None:

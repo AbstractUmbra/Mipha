@@ -23,7 +23,6 @@ import discord
 from discord.ext import commands
 from typing_extensions import TypeVar
 
-from .shared.paste import create_paste
 from .shared.ui import BaseView, ConfirmationView
 
 if TYPE_CHECKING:
@@ -124,10 +123,6 @@ class DisambiguatorView(BaseView, Generic[T]):
         self.stop()
 
 
-class SupportsStr(Protocol):
-    def __str__(self) -> str: ...
-
-
 class Context(commands.Context["Mipha"], Generic[CogT]):
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
     bot: Mipha
@@ -186,7 +181,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
 
     async def prompt(
         self,
-        message: SupportsStr,
+        message: str,
         *,
         timeout: float = 60.0,
         delete_after: bool = True,
@@ -236,7 +231,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
     @overload
     async def send(
         self,
-        content: SupportsStr | None = None,
+        content: str | None = None,
         *,
         tts: bool = ...,
         embed: discord.Embed | None = ...,
@@ -260,7 +255,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
     @overload
     async def send(
         self,
-        content: SupportsStr | None = None,
+        content: str | None = None,
         *,
         tts: bool = ...,
         embed: discord.Embed | None = ...,
@@ -284,7 +279,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
     @overload
     async def send(
         self,
-        content: SupportsStr | None = None,
+        content: str | None = None,
         *,
         tts: bool = ...,
         embed: discord.Embed | None = ...,
@@ -307,7 +302,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
 
     async def send(
         self,
-        content: SupportsStr | None = None,
+        content: str | None = None,
         *,
         tts: bool = False,
         embed: discord.Embed | None = None,
@@ -330,11 +325,10 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         content = str(content) if content is not None else None
         if (paste and content) or (content and len(content) >= 2000):
             password = secrets.token_urlsafe(10)
-            paste_url = await create_paste(
+            paste_url = await self.bot.create_paste(
                 content=content,
                 password=password,
-                expiry=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
-                mb_client=self.bot.mb_client,
+                expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
             )
 
             content = f"Sorry, the output was too large but I posted it to a paste for you here: {paste_url}"
