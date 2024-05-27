@@ -335,7 +335,7 @@ class DocCog(commands.Cog):
             async with ctx.typing():
                 doc_embed = await self.create_symbol_embed(symbol)
 
-            await ctx.send(embed=doc_embed)
+            await ctx.send(embed=doc_embed or discord.Embed(title=f"Cannot find {symbol}"))
 
     @staticmethod
     def base_url_from_inventory_url(inventory_url: str) -> str:
