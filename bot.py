@@ -374,22 +374,14 @@ class Mipha(commands.Bot):
 
     async def get_or_fetch_member(self, guild: discord.Guild, member_id: int) -> discord.Member | None:
         member = guild.get_member(member_id)
-        if member is not None:
+        if member:
             return member
 
-        shard: discord.ShardInfo = self.get_shard(guild.shard_id)  # type: ignore  # will never be None
-        if shard.is_ws_ratelimited():
-            try:
-                member = await guild.fetch_member(member_id)
-            except discord.HTTPException:
-                return None
-            else:
-                return member
-
-        members = await guild.query_members(limit=1, user_ids=[member_id], cache=True)
-        if not members:
+        try:
+            member = await guild.fetch_member(member_id)
+        except discord.NotFound:
             return None
-        return members[0]
+        return member
 
     async def resolve_member_ids(self, guild: discord.Guild, member_ids: Iterable[int]) -> AsyncIterator[discord.Member]:
         needs_resolution: list[int] = []
