@@ -6,133 +6,82 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
-import inspect
-import operator
 import os
 import pathlib
-import sys
-from textwrap import dedent
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Self
 
-import asyncpg  # type: ignore # rtfs
 import discord
-import hondana  # type: ignore # rtfs
-import jishaku  # type: ignore # rtfs
-from discord import app_commands, ui  # type: ignore # rtfs
-from discord.ext import commands, menus, tasks  # type: ignore # rtfs
+from discord import app_commands
+from discord.ext import commands
 from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
 
 from utilities.shared.formats import from_json, to_codeblock, to_json
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from types import ModuleType
-
     from bot import Mipha
-    from utilities.context import Context
+    from utilities.context import Context, Interaction
+    from utilities.shared._types.rtfs import RTFSResponse
 
-RTFS = (
-    "discord",
-    "discord.ext.commands",
-    "commands",
-    "discord.app_commands",
-    "app_commands",
-    "discord.ext.tasks",
-    "tasks",
-    "discord.ext.menus",
-    "menus",
-    "discord.ui",
-    "ui",
-    "asyncpg",
-    "hondana",
-)
+RTFS_URL = "https://rtfs.abstractumbra.dev"
 
 
-class BadSource(commands.CommandError):
-    pass
+class Libraries(discord.Enum):
+    discord = "discord.py"
+    hondana = "hondana"
+    aiohttp = "aiohttp"
+    jishaku = "jishaku"
+    wavelink = "wavelink"
 
 
-class SourceConverter(commands.Converter[str]):
-    async def convert(self, ctx: Context, argument: str) -> str | None:
-        args = argument.split(".")
-        top_level = args.pop(0)
-        if top_level in (
-            "app_commands",
-            "ui",
-        ):
-            top_level = f"discord.{top_level}"
-        elif top_level in ("commands", "tasks"):
-            top_level = f"discord.ext.{top_level}"
+class RTFSView(discord.ui.View):
+    def __init__(self, payload: RTFSResponse, /, *, lib: str) -> None:
+        super().__init__(timeout=60)
+        self.payload = payload
+        options = [discord.SelectOption(label=name, value=name, description=lib) for name in payload["nodes"]]
+        self.select_object.options = options
 
-        if top_level not in RTFS:
-            raise BadSource(f"`{top_level}` is not an allowed sourceable module.")
+    @discord.ui.select(min_values=1, max_values=1)
+    async def select_object(self, interaction: Interaction, item: discord.ui.Select[Self]) -> None:
+        await interaction.response.defer()
+        source_item = self.payload["nodes"][item.values[0]]
+        content = to_codeblock(source_item["source"], escape_md=False)
+        if len(content) >= 2000:
+            content = f"Sorry, the output would be too long so I'll give you the relevant URL:\n\n{source_item['url']}"
 
-        module = sys.modules[top_level]
+        await interaction.edit_original_response(content=content, view=self)
 
-        if not args:
-            return inspect.getsource(module)
-
-        current = top_level
-
-        recur: ModuleType | Callable[[Any], Any] | property | None = None
-
-        for item in args:
-            if item == "":
-                raise BadSource("Don't even try.")
-
-            recur = inspect.getattr_static(recur, item, None) if recur else inspect.getattr_static(module, item, None)
-            current += f".{item}"
-
-            if recur is None:
-                raise BadSource(f"{current} is not a valid module path.")
-
-        if isinstance(recur, property):
-            recur = recur.fget
-        elif inspect.ismemberdescriptor(recur):
-            raise BadSource(f"`{current}` seems like it's an instance attribute, can't source those")
-
-        if isinstance(recur, operator.attrgetter):
-            prop = argument.rsplit(".")[-1]
-            return await self.convert(ctx, f"discord.User.{prop}")
-        # ctx.bot.log_handler.log.info("Recur is %s (type %s)", recur, type(recur))
-        return inspect.getsource(recur)  # type: ignore # unreachable
+    @discord.ui.button(emoji="\U0001f5d1\U0000fe0f", style=discord.ButtonStyle.danger)
+    async def stop_view(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
+        if interaction.message:
+            await interaction.message.delete()
+        self.stop()
 
 
 class RTFX(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
 
+    async def _get_rtfs(self, *, library: Libraries, search: str) -> RTFSResponse:
+        async with self.bot.session.get(
+            RTFS_URL, params={"format": "source", "library": library.value, "search": search}
+        ) as resp:
+            return await resp.json()
+
+    @app_commands.command(name="rtfs")
+    @app_commands.describe(library="Which library to search the source for.", search="Your search query.")
+    async def rtfs_callback(self, interaction: Interaction, library: Libraries, search: str) -> None:
+        """RTFM command for loading source code/searching from libraries."""
+        rtfs = await self._get_rtfs(library=library, search=search)
+        if not rtfs["nodes"]:
+            return await interaction.response.send_message("Sorry, that search returned no results.")
+
+        view = RTFSView(rtfs, lib=library.value)
+        await interaction.response.send_message(view=view)
+
     @commands.command(name="rtfs")
-    async def rtfs(
-        self,
-        ctx: Context,
-        *,
-        target: str | None = commands.param(converter=SourceConverter, default=None),
-    ) -> None:
-        """
-        This command will provide the source code of a given entity.
-        If called without an argument it will show all possible sources.
-
-        Note that special dunders and whatnot are not sourceable, nor are any Python objects implemented in C.
-        """
-        if target is None:
-            await ctx.send(embed=discord.Embed(title="Available sources of rtfs", description="\n".join(RTFS)))
-            return
-
-        new_target = dedent(target)
-
-        if len(new_target) < 2000:
-            new_target = to_codeblock(new_target, language="py", escape_md=False)
-
-        await ctx.send(new_target)
-
-    @rtfs.error
-    async def rtfs_error(self, ctx: Context, error: commands.CommandError) -> None:
-        error = getattr(error, "original", error)
-
-        if isinstance(error, (TypeError, BadSource)):
-            await ctx.send(f"Not a valid source-able type or path:-\n\n{error}.")
+    async def rtfs_prefix(self, ctx: Context, *args: str) -> None:
+        return await ctx.send("Migrated to a slash command, sorry. Use /rtfs")
 
     @commands.command(name="pyright", aliases=["pr"])
     async def _pyright(
