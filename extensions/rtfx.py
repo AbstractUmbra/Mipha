@@ -70,6 +70,8 @@ class RTFX(commands.Cog):
 
     @app_commands.command(name="rtfs")
     @app_commands.describe(library="Which library to search the source for.", search="Your search query.")
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=True, users=True)
     async def rtfs_callback(self, interaction: Interaction, library: Libraries, search: str) -> None:
         """RTFM command for loading source code/searching from libraries."""
         rtfs = await self._get_rtfs(library=library, search=search)
