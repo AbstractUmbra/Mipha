@@ -35,19 +35,33 @@ class Libraries(discord.Enum):
 
 
 class RTFSView(discord.ui.View):
-    def __init__(self, payload: RTFSResponse, /, *, lib: str) -> None:
+    __slots__ = (
+        "owner_id",
+        "_payload",
+    )
+
+    def __init__(self, payload: RTFSResponse, /, *, lib: str, owner_id: int) -> None:
         super().__init__(timeout=60)
-        self.payload = payload
+        self.owner_id: int = owner_id
+        self._payload = payload
         options = [discord.SelectOption(label=name, value=name, description=lib) for name in payload["nodes"]]
         self.select_object.options = options
+
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("Sorry, you cannot control this menu.")
+            return False
+        return True
 
     @discord.ui.select(min_values=1, max_values=1)
     async def select_object(self, interaction: Interaction, item: discord.ui.Select[Self]) -> None:
         await interaction.response.defer()
-        source_item = self.payload["nodes"][item.values[0]]
-        content = to_codeblock(source_item["source"], escape_md=False)
-        if len(content) >= 2000:
+        source_item = self._payload["nodes"][item.values[0]]
+        codeblock = to_codeblock(source_item["source"], escape_md=False)
+        if len(codeblock) >= 2000:
             content = f"Sorry, the output would be too long so I'll give you the relevant URL:\n\n{source_item['url']}"
+        else:
+            content = f"[Relevant Source URL]({source_item['url']})\n{codeblock}"
 
         await interaction.edit_original_response(content=content, view=self)
 
@@ -78,7 +92,7 @@ class RTFX(commands.Cog):
         if not rtfs["nodes"]:
             return await interaction.response.send_message("Sorry, that search returned no results.")
 
-        view = RTFSView(rtfs, lib=library.value)
+        view = RTFSView(rtfs, lib=library.value, owner_id=interaction.user.id)
         await interaction.response.send_message(view=view)
 
     @commands.command(name="rtfs")
