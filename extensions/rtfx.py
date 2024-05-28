@@ -97,7 +97,7 @@ class RTFX(commands.Cog):
 
     @commands.command(name="rtfs")
     async def rtfs_prefix(self, ctx: Context, *args: str) -> None:
-        return await ctx.send("Migrated to a slash command, sorry. Use /rtfs")
+        return await ctx.send("Migrated to a slash command, sorry. Use </rtfs:1244441015792701481> instead.")
 
     @commands.command(name="pyright", aliases=["pr"])
     async def _pyright(
