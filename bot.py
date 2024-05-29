@@ -63,22 +63,76 @@ CONFIG_PATH = pathlib.Path("configs/bot.json")
 
 class MiphaCommandTree(app_commands.CommandTree):
     client: Mipha
+    _mention_app_commands: dict[int | None, list[app_commands.AppCommand]]
 
     async def sync(self, *, guild: discord.abc.Snowflake | None = None) -> list[app_commands.AppCommand]:
-        commands = await super().sync(guild=guild)
-        local_commands = list(self.walk_commands(guild=guild, type=discord.AppCommandType.chat_input))
+        """Method overwritten to store the commands."""
+        ret = await super().sync(guild=guild)
+        self._mention_app_commands[guild.id if guild else None] = ret
+        return ret
 
-        for command in commands:
-            local_command_match = discord.utils.get(local_commands, name=command.name)
-            if local_command_match:
-                self.client.log_handler.debug(
-                    "Found local command match with remote app command: (%r and %r)", local_command_match, command
-                )
-                local_command_match.extras.update({"mention": command.mention})
-            else:
-                self.client.log_handler.error("No match found for remote command name: %r", command)
+    async def fetch_commands(self, *, guild: discord.abc.Snowflake | None = None) -> list[app_commands.AppCommand]:
+        """Method overwritten to store the commands."""
+        ret = await super().fetch_commands(guild=guild)
+        self._mention_app_commands[guild.id if guild else None] = ret
+        return ret
 
-        return commands
+    async def find_mention_for(
+        self,
+        command: app_commands.Command | app_commands.Group | str,
+        *,
+        guild: discord.abc.Snowflake | None = None,
+    ) -> str | None:
+        """Retrieves the mention of an AppCommand given a specific command name, and optionally, a guild.
+        Parameters
+        ----------
+        name: Union[:class:`app_commands.Command`, :class:`app_commands.Group`, str]
+            The command which it's mention we will attempt to retrieve.
+        guild: Optional[:class:`discord.abc.Snowflake`]
+            The scope (guild) from which to retrieve the commands from. If None is given or not passed,
+            only the global scope will be searched, however the global scope will also be searched if
+            a guild is passed.
+        """
+
+        check_global = self.fallback_to_global is True or guild is not None
+
+        if isinstance(command, str):
+            # Try and find a command by that name. discord.py does not return children from tree.get_command, but
+            # using walk_commands and utils.get is a simple way around that.
+            _command = discord.utils.get(self.walk_commands(guild=guild), qualified_name=command)
+
+            if check_global and not _command:
+                _command = discord.utils.get(self.walk_commands(), qualified_name=command)
+
+        else:
+            _command = command
+
+        if not _command:
+            return None
+
+        if guild:
+            try:
+                local_commands = self._mention_app_commands[guild.id]
+            except KeyError:
+                local_commands = await self.fetch_commands(guild=guild)
+
+            app_command_found = discord.utils.get(local_commands, name=(_command.root_parent or _command).name)
+
+        else:
+            app_command_found = None
+
+        if check_global and not app_command_found:
+            try:
+                global_commands = self._mention_app_commands[None]
+            except KeyError:
+                global_commands = await self.fetch_commands()
+
+            app_command_found = discord.utils.get(global_commands, name=(_command.root_parent or _command).name)
+
+        if not app_command_found:
+            return None
+
+        return f"</{_command.qualified_name}:{app_command_found.id}>"
 
     async def on_error(
         self,
@@ -201,6 +255,7 @@ class Mipha(commands.Bot):
     command_types_used: Counter[bool]
     bot_app_info: discord.AppInfo
     mb_client: mystbin.Client
+    tree: MiphaCommandTree
     _original_help_command: commands.HelpCommand | None  # for help command overriding
     _stats_cog_gateway_handler: logging.Handler
 
@@ -229,6 +284,7 @@ class Mipha(commands.Bot):
             intents=INTENTS,
             allowed_mentions=discord.AllowedMentions.none(),
         )
+        self.tree._mention_app_commands = {}
 
         self.config: RootConfig = config
         self.dev_guilds: list[discord.Object] = [

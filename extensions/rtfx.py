@@ -26,6 +26,12 @@ if TYPE_CHECKING:
 RTFS_URL = "https://rtfs.abstractumbra.dev"
 
 
+def _rtfs_cooldown(interaction: Interaction) -> app_commands.Cooldown | None:
+    if interaction.user.id == interaction.client.owner.id:
+        return None
+    return app_commands.Cooldown(1, 60)
+
+
 class Libraries(discord.Enum):
     discord = "discord.py"
     hondana = "hondana"
@@ -75,17 +81,34 @@ class RTFSView(discord.ui.View):
 class RTFX(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
+        self.rtfs_token: str | None = self.bot.config.get("rtfs", {}).get("token")
+
+    group = app_commands.Group(
+        name="rtfs",
+        description="Commands for 'reading the fucking source'",
+        allowed_contexts=app_commands.AppCommandContext(guild=True, dm_channel=True, private_channel=True),
+        allowed_installs=app_commands.AppInstallationType(guild=True, user=True),
+        nsfw=False,
+    )
 
     async def _get_rtfs(self, *, library: Libraries, search: str) -> RTFSResponse:
+        headers = {"Authorization": self.rtfs_token} if self.rtfs_token else None
         async with self.bot.session.get(
-            RTFS_URL, params={"format": "source", "library": library.value, "search": search}
+            RTFS_URL, params={"format": "source", "library": library.value, "search": search}, headers=headers
         ) as resp:
             return await resp.json()
 
-    @app_commands.command(name="rtfs")
+    async def _update_rtfs(self) -> bool:
+        if not self.rtfs_token:
+            return False
+
+        async with self.bot.session.post(RTFS_URL + "/refresh", headers={"Authorization": self.rtfs_token}) as resp:
+            data = await resp.json()
+
+        return data["success"]
+
+    @group.command(name="search")
     @app_commands.describe(library="Which library to search the source for.", search="Your search query.")
-    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-    @app_commands.allowed_installs(guilds=True, users=True)
     async def rtfs_callback(self, interaction: Interaction, library: Libraries, search: str) -> None:
         """RTFM command for loading source code/searching from libraries."""
         rtfs = await self._get_rtfs(library=library, search=search)
@@ -95,10 +118,25 @@ class RTFX(commands.Cog):
         view = RTFSView(rtfs, lib=library.value, owner_id=interaction.user.id)
         await interaction.response.send_message(view=view)
 
+    @group.command(name="refresh")
+    @app_commands.checks.dynamic_cooldown(_rtfs_cooldown)
+    async def rtfs_refresh(self, interaction: Interaction) -> None:
+        """Schedules an update of the RTFS library code in the API."""
+        await interaction.response.defer(ephemeral=True)
+
+        success = await self._update_rtfs()
+        content = "Okay, all done!" if success else "Sorry, something broke here. Ask <@{self.bot.owner.id}> about it."
+
+        return await interaction.followup.send(content, allowed_mentions=discord.AllowedMentions.none())
+
     @commands.command(name="rtfs")
     async def rtfs_prefix(self, ctx: Context, *args: str) -> None:
-        app_command = ctx.bot.tree.get_command("rtfs", type=discord.AppCommandType.chat_input)
-        mention = (app_command and app_command.extras.get("mention")) or "/rtfs"
+        mention = "/rtfs search"
+        app_group = ctx.bot.tree.get_command("rtfs", type=discord.AppCommandType.chat_input)
+        if app_group and isinstance(app_group, app_commands.Group):
+            app_command = app_group.get_command("search")
+            if app_command:
+                mention = await ctx.bot.tree.find_mention_for(app_command)
         return await ctx.send(f"Migrated to a slash command, sorry. Use {mention}")
 
     @commands.command(name="pyright", aliases=["pr"])

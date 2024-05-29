@@ -33,6 +33,10 @@ class DatabaseConfig(TypedDict, total=False):
     port: int
 
 
+class RTFSConfig(TypedDict):
+    token: str
+
+
 class RedisConfig(TypedDict):
     url: str
     port: int
@@ -105,6 +109,7 @@ class RootConfig(TypedDict, total=False):
     owner_ids: Required[list[int]]
     intents: int
     postgresql: Required[DatabaseConfig]
+    rtfs: RTFSConfig
     redis: RedisConfig
     webhooks: Required[WebhookConfig]
     tokens: TokenConfig
