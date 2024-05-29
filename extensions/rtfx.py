@@ -129,6 +129,13 @@ class RTFX(commands.Cog):
 
         return await interaction.followup.send(content, allowed_mentions=discord.AllowedMentions.none())
 
+    @rtfs_refresh.error
+    async def refresh_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
+        if isinstance(error, app_commands.CommandOnCooldown):
+            return await interaction.response.send_message(
+                f"Sorry, this has already been requested recently. Please wait at least {round(error.retry_after), 2}s before trying again."
+            )
+
     @commands.command(name="rtfs")
     async def rtfs_prefix(self, ctx: Context, *args: str) -> None:
         mention = "/rtfs search"
