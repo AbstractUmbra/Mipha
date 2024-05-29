@@ -64,6 +64,22 @@ CONFIG_PATH = pathlib.Path("configs/bot.json")
 class MiphaCommandTree(app_commands.CommandTree):
     client: Mipha
 
+    async def sync(self, *, guild: discord.abc.Snowflake | None = None) -> list[app_commands.AppCommand]:
+        commands = await super().sync(guild=guild)
+        local_commands = list(self.walk_commands(guild=guild, type=discord.AppCommandType.chat_input))
+
+        for command in commands:
+            local_command_match = discord.utils.get(local_commands, name=command.name)
+            if local_command_match:
+                self.client.log_handler.info(
+                    "Found local command match with remote app command: (%r and %r)", local_command_match, command
+                )
+                local_command_match.extras.update({"mention": command.mention})
+            else:
+                self.client.log_handler.error("No match found for remote command name: %r", command)
+
+        return commands
+
     async def on_error(
         self,
         interaction: Interaction,
@@ -124,6 +140,11 @@ class LogHandler:
         self.logging_path = pathlib.Path("./logs/")
         self.logging_path.mkdir(exist_ok=True)
         self.stream: bool = stream
+
+        self.info = self.log.info
+        self.error = self.log.error
+        self.warning = self.log.warning
+        self.debug = self.log.debug
 
     async def __aenter__(self) -> Self:
         return self.__enter__()

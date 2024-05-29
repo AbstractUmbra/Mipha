@@ -97,7 +97,9 @@ class RTFX(commands.Cog):
 
     @commands.command(name="rtfs")
     async def rtfs_prefix(self, ctx: Context, *args: str) -> None:
-        return await ctx.send("Migrated to a slash command, sorry. Use /rtfs")
+        app_command = ctx.bot.tree.get_command("rtfs", type=discord.AppCommandType.chat_input)
+        mention = (app_command and app_command.extras.get("mention")) or "/rtfs"
+        return await ctx.send(f"Migrated to a slash command, sorry. Use {mention}")
 
     @commands.command(name="pyright", aliases=["pr"])
     async def _pyright(
