@@ -113,7 +113,7 @@ class RTFX(commands.Cog):
         """RTFM command for loading source code/searching from libraries."""
         rtfs = await self._get_rtfs(library=library, search=search)
         if not rtfs["nodes"]:
-            return await interaction.response.send_message("Sorry, that search returned no results.")
+            return await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
 
         view = RTFSView(rtfs, lib=library.value, owner_id=interaction.user.id)
         await interaction.response.send_message(view=view)
@@ -125,7 +125,7 @@ class RTFX(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         success = await self._update_rtfs()
-        content = "Okay, all done!" if success else "Sorry, something broke here. Ask <@{self.bot.owner.id}> about it."
+        content = "Okay, all done!" if success else f"Sorry, something broke here. Ask <@{self.bot.owner.id}> about it."
 
         return await interaction.followup.send(content, allowed_mentions=discord.AllowedMentions.none())
 
@@ -133,7 +133,7 @@ class RTFX(commands.Cog):
     async def refresh_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         if isinstance(error, app_commands.CommandOnCooldown):
             return await interaction.response.send_message(
-                f"Sorry, this has already been requested recently. Please wait at least {round(error.retry_after), 2}s before trying again."
+                f"Sorry, this has already been requested recently. Please wait at least {round(error.retry_after, 2)}s before trying again."
             )
 
     @commands.command(name="rtfs")
