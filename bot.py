@@ -71,7 +71,7 @@ class MiphaCommandTree(app_commands.CommandTree):
         for command in commands:
             local_command_match = discord.utils.get(local_commands, name=command.name)
             if local_command_match:
-                self.client.log_handler.info(
+                self.client.log_handler.debug(
                     "Found local command match with remote app command: (%r and %r)", local_command_match, command
                 )
                 local_command_match.extras.update({"mention": command.mention})
