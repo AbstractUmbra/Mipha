@@ -38,6 +38,7 @@ class Libraries(discord.Enum):
     aiohttp = "aiohttp"
     jishaku = "jishaku"
     wavelink = "wavelink"
+    mystbin = "mystbin.py"
 
 
 class RTFSView(discord.ui.View):
