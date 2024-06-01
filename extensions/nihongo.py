@@ -16,13 +16,12 @@ from collections import defaultdict
 from functools import partial
 from io import BytesIO
 from textwrap import dedent, fill
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import quote
 
 import aiohttp
 import bs4
 import discord
-import pykakasi
 from discord.ext import commands, tasks
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -391,19 +390,11 @@ class Nihongo(commands.Cog):
 
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
-        self.kakasi = pykakasi.kakasi()
         # self.nihongo_study_reminders.start()
 
     def cog_unload(self) -> None:
         # self.nihongo_study_reminders.cancel()
         pass
-
-    @commands.command()
-    async def romaji(self, ctx: Context, *, text: Annotated[str, commands.clean_content]) -> None:
-        """Sends the Romaji version of passed Kana."""
-        ret = await self.bot.loop.run_in_executor(None, self.kakasi.convert, text)
-        conjoined = " ".join(piece["hepburn"] for piece in ret)
-        await ctx.send(conjoined)
 
     @commands.group(name="kanji", aliases=["かんじ", "漢字"], invoke_without_command=True)
     async def kanji(self, ctx: Context, character: str) -> None:
