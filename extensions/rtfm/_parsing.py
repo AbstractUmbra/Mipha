@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from .docs import DocItem
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
 
 _WHITESPACE_AFTER_NEWLINES_RE = re.compile(r"(?<=\n\n)(\s+)")
 _PARAMETERS_RE = re.compile(r"\((.+)\)")

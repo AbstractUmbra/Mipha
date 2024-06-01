@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from bot import Mipha
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
 
 
 class StaleInventoryNotifier:

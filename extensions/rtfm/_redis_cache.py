@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 WEEK_SECONDS = int(datetime.timedelta(weeks=1).total_seconds())
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
 
 
 def serialize_resource_id_from_doc_item(bound_args: dict) -> str:

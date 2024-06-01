@@ -7,7 +7,6 @@ from collections.abc import AsyncIterator
 import aiohttp
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
 
 FAILED_REQUEST_ATTEMPTS = 3
 _V2_LINE_RE = re.compile(r"(?x)(.+?)\s+(\S*:\S*)\s+(-?\d+)\s+?(\S*)\s+(.*)")

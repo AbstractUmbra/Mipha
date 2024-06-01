@@ -8,7 +8,6 @@ from bs4.element import NavigableString, PageElement, SoupStrainer, Tag
 from . import MAX_SIGNATURE_AMOUNT
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
 
 _SEARCH_END_TAG_ATTRS = (
     "data",

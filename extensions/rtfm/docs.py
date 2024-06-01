@@ -27,7 +27,6 @@ if TYPE_CHECKING:
     from utilities.shared.async_config import Config
 
 LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
 
 # symbols with a group contained here will get the group prefixed on duplicates
 FORCE_PREFIX_GROUPS = (
