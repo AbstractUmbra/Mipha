@@ -56,7 +56,7 @@ class RTFSView(discord.ui.View):
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.owner_id:
-            await interaction.response.send_message("Sorry, you cannot control this menu.")
+            await interaction.response.send_message("Sorry, you cannot control this menu.", ephemeral=True)
             return False
         return True
 
@@ -110,14 +110,16 @@ class RTFX(commands.Cog):
 
     @group.command(name="search")
     @app_commands.describe(library="Which library to search the source for.", search="Your search query.")
-    async def rtfs_callback(self, interaction: Interaction, library: Libraries, search: str) -> None:
+    async def rtfs_callback(
+        self, interaction: Interaction, library: Libraries, search: str, ephemeral: bool = False
+    ) -> None:
         """RTFM command for loading source code/searching from libraries."""
         rtfs = await self._get_rtfs(library=library, search=search)
         if not rtfs["nodes"]:
             return await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
 
         view = RTFSView(rtfs, lib=library.value, owner_id=interaction.user.id)
-        await interaction.response.send_message(view=view)
+        await interaction.response.send_message(view=view, ephemeral=ephemeral)
 
     @group.command(name="refresh")
     @app_commands.checks.dynamic_cooldown(_rtfs_cooldown)
