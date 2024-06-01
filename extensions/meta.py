@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
     from bot import Mipha
 
-GuildChannel = (
+type GuildChannel = (
     discord.TextChannel
     | discord.VoiceChannel
     | discord.StageChannel
