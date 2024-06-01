@@ -50,26 +50,22 @@ class ChannelOrMember(commands.Converter):
             return await commands.MemberConverter().convert(ctx, argument)
 
 
-if TYPE_CHECKING:
-    type CommandName = str
-else:
+class CommandName(commands.Converter):
+    async def convert(self, ctx: Context, argument: str) -> str:
+        lowered = argument.lower()
 
-    class CommandName(commands.Converter):
-        async def convert(self, ctx: Context, argument: str) -> str:
-            lowered = argument.lower()
+        # fmt: off
+        valid_commands = {
+            c.qualified_name
+            for c in ctx.bot.walk_commands()
+            if c.cog_name not in ('Config', 'Admin')
+        }
+        # fmt: on
 
-            # fmt: off
-            valid_commands = {
-                c.qualified_name
-                for c in ctx.bot.walk_commands()
-                if c.cog_name not in ('Config', 'Admin')
-            }
-            # fmt: on
+        if lowered not in valid_commands:
+            raise commands.BadArgument(f"Command {lowered!r} is not valid.")
 
-            if lowered not in valid_commands:
-                raise commands.BadArgument(f"Command {lowered!r} is not valid.")
-
-            return lowered
+        return lowered
 
 
 class ResolvedCommandPermissions:
@@ -437,7 +433,7 @@ class Config(commands.Cog):
                 raise RuntimeError(msg)
 
     @channel.command(name="disable")
-    async def channel_disable(self, ctx: GuildContext, *, command: CommandName) -> None:
+    async def channel_disable(self, ctx: GuildContext, *, command: str = commands.param(converter=CommandName)) -> None:
         """Disables a command for this channel."""
 
         try:
@@ -448,7 +444,7 @@ class Config(commands.Cog):
             await ctx.send("Command successfully disabled for this channel.")
 
     @channel.command(name="enable")
-    async def channel_enable(self, ctx: GuildContext, *, command: CommandName) -> None:
+    async def channel_enable(self, ctx: GuildContext, *, command: str = commands.param(converter=CommandName)) -> None:
         """Enables a command for this channel."""
 
         try:
@@ -459,7 +455,7 @@ class Config(commands.Cog):
             await ctx.send("Command successfully enabled for this channel.")
 
     @server.command(name="disable")
-    async def server_disable(self, ctx: GuildContext, *, command: CommandName) -> None:
+    async def server_disable(self, ctx: GuildContext, *, command: str = commands.param(converter=CommandName)) -> None:
         """Disables a command for this server."""
 
         try:
@@ -470,7 +466,7 @@ class Config(commands.Cog):
             await ctx.send("Command successfully disabled for this server")
 
     @server.command(name="enable")
-    async def server_enable(self, ctx: GuildContext, *, command: CommandName) -> None:
+    async def server_enable(self, ctx: GuildContext, *, command: str = commands.param(converter=CommandName)) -> None:
         """Enables a command for this server."""
 
         try:
@@ -482,7 +478,9 @@ class Config(commands.Cog):
 
     @config.command(name="enable")
     @checks.is_mod()
-    async def config_enable(self, ctx: GuildContext, channel: discord.TextChannel | None, *, command: CommandName) -> None:
+    async def config_enable(
+        self, ctx: GuildContext, channel: discord.TextChannel | None, *, command: str = commands.param(converter=CommandName)
+    ) -> None:
         """Enables a command the server or a channel."""
 
         channel_id = channel.id if channel else None
@@ -496,7 +494,9 @@ class Config(commands.Cog):
 
     @config.command(name="disable")
     @checks.is_mod()
-    async def config_disable(self, ctx: GuildContext, channel: discord.TextChannel | None, *, command: CommandName) -> None:
+    async def config_disable(
+        self, ctx: GuildContext, channel: discord.TextChannel | None, *, command: str = commands.param(converter=CommandName)
+    ) -> None:
         """Disables a command for the server or a channel."""
 
         channel_id = channel.id if channel else None
