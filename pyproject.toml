@@ -34,13 +34,11 @@ python-dateutil = "*"
 lxml = "5.1.0"
 legofy = "*"
 mcrcon = "*"
-numpy = "*"
 tabulate = "*"
 "imagetext-py" = "*"
 orjson = "*"
 uvloop = "*"
 markdownify = "*"
-matplotlib = "*"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "*"
@@ -98,9 +96,6 @@ inline-quotes = "single"
 useLibraryCodeForTypes = true
 typeCheckingMode = "basic"
 pythonVersion = "3.12"
-ignore = [
-    "extensions/_old_lewd.py",
-] # let's keep files but ignore their diagnostics
 strictListInference = true
 strictDictionaryInference = true
 strictSetInference = true
