@@ -68,7 +68,7 @@ class RTFSView(discord.ui.View):
         if len(codeblock) >= 2000:
             content = f"Sorry, the output would be too long so I'll give you the relevant URL:\n\n{source_item['url']}"
         else:
-            content = f"[Relevant Source URL]({source_item['url']})\n{codeblock}"
+            content = f"[Relevant Source URL](<{source_item['url']}>)\n{codeblock}"
 
         await interaction.edit_original_response(content=content, view=self)
 
