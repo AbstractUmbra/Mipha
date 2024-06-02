@@ -14,6 +14,13 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "extensions/**"
+      - "configs/**"
+      - "**/*.md"
+      - "**/*.json"
+      - "**/*.sql"
+      - "**/*.ya?ml"
 
 concurrency:
   cancel-in-progress: true
