@@ -65,7 +65,7 @@ class RTFSView(discord.ui.View):
         await interaction.response.defer()
         source_item = self._payload["nodes"][item.values[0]]
         codeblock = to_codeblock(source_item["source"], escape_md=False)
-        if len(codeblock) >= 2000:
+        if len(codeblock) >= 1800:
             content = f"Sorry, the output would be too long so I'll give you the relevant URL:\n\n{source_item['url']}"
         else:
             content = f"[Relevant Source URL](<{source_item['url']}>)\n{codeblock}"
