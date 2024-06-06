@@ -51,7 +51,7 @@ class RTFSView(discord.ui.View):
         super().__init__(timeout=60)
         self.owner_id: int = owner_id
         self._payload = payload
-        options = [discord.SelectOption(label=name, value=name, description=lib) for name in payload["nodes"]]
+        options = [discord.SelectOption(label=name, value=name, description=lib) for name in payload["results"]]
         self.select_object.options = options
 
     async def interaction_check(self, interaction: Interaction) -> bool:
@@ -63,7 +63,7 @@ class RTFSView(discord.ui.View):
     @discord.ui.select(min_values=1, max_values=1)
     async def select_object(self, interaction: Interaction, item: discord.ui.Select[Self]) -> None:
         await interaction.response.defer()
-        source_item = self._payload["nodes"][item.values[0]]
+        source_item = self._payload["results"][item.values[0]]
         codeblock = to_codeblock(source_item["source"], escape_md=False)
         if len(codeblock) >= 1800:
             content = f"Sorry, the output would be too long so I'll give you the relevant URL:\n\n{source_item['url']}"
@@ -115,7 +115,7 @@ class RTFX(commands.Cog):
     ) -> None:
         """RTFM command for loading source code/searching from libraries."""
         rtfs = await self._get_rtfs(library=library, search=search)
-        if not rtfs["nodes"]:
+        if not rtfs["results"]:
             return await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
 
         view = RTFSView(rtfs, lib=library.value, owner_id=interaction.user.id)
