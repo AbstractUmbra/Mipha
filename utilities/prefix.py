@@ -15,13 +15,15 @@ if TYPE_CHECKING:
 
     from bot import Mipha
 
+DEFAULT_PREFIXES: list[str] = ["hey babe", "mipha"]
+
 
 def callable_prefix(bot: Mipha, message: Message, /) -> list[str]:
-    if message.guild is None:
-        return commands.when_mentioned_or("hey babe ")(bot, message)
+    prefixes = DEFAULT_PREFIXES
 
-    guild_prefixes: list[str] | None = bot._prefix_data.get(str(message.guild.id))
-    if guild_prefixes is None:
-        guild_prefixes = ["hey babe "]
+    if message.guild is None:
+        return commands.when_mentioned_or(*prefixes)(bot, message)
+
+    guild_prefixes: list[str] | None = bot._prefix_data.get(str(message.guild.id), prefixes)
 
     return commands.when_mentioned_or(*guild_prefixes)(bot, message)
