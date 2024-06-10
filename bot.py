@@ -283,6 +283,7 @@ class Mipha(commands.Bot):
             description="Hello, I'm a fun discord bot for Umbra#0009's personal use.",
             intents=INTENTS,
             allowed_mentions=discord.AllowedMentions.none(),
+            strip_after_prefix=True,
         )
         self.tree._mention_app_commands = {}
 
