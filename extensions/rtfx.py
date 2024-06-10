@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import pathlib
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import discord
 from discord import app_commands
@@ -108,6 +108,50 @@ class RTFX(commands.Cog):
 
         return data["success"]
 
+    def _setup_pyright(self) -> pathlib.Path:
+        pyright_dump = pathlib.Path("./_pyright/")
+        if not pyright_dump.exists():
+            pyright_dump.mkdir(mode=0o0755, parents=True, exist_ok=True)
+            conf = pyright_dump / "pyrightconfig.json"
+            conf.touch()
+            with conf.open("w") as f:
+                f.write(
+                    to_json(
+                        {
+                            "pythonVersion": "3.12",
+                            "typeCheckingMode": "strict",
+                            "useLibraryCodeForTypes": False,
+                            "reportMissingImports": True,
+                        },
+                    ),
+                )
+
+        return pyright_dump
+
+    def _parse_pyright_output(self, data: dict[str, Any]) -> str:
+        counts = {"error": 0, "warn": 0, "info": 0}
+
+        diagnostics = []
+        for diagnostic in data["generalDiagnostics"]:
+            start = diagnostic["range"]["start"]
+            start = f"{start['line']}:{start['character']}"
+
+            severity = diagnostic["severity"]
+            if severity != "error":
+                severity = severity[:4]
+            counts[severity] += 1
+
+            prefix = " " if severity == "info" else "-"
+            message = diagnostic["message"].replace("\n", f"\n{prefix} ")
+
+            diagnostics.append(f"{prefix} {start} - {severity}: {message}")
+
+        version = data["version"]
+        diagnostics = "\n".join(diagnostics)
+        totals = ", ".join(f"{count} {name}" for name, count in counts.items())
+
+        return to_codeblock(f"Pyright v{version}:\n\n{diagnostics}\n\n{totals}\n", language="diff", escape_md=False)
+
     @group.command(name="search")
     @app_commands.describe(library="Which library to search the source for.", search="Your search query.")
     async def rtfs_callback(
@@ -136,11 +180,11 @@ class RTFX(commands.Cog):
     async def refresh_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         if isinstance(error, app_commands.CommandOnCooldown):
             return await interaction.response.send_message(
-                f"Sorry, this has already been requested recently. Please wait at least {round(error.retry_after, 2)}s before trying again."
+                f"Sorry, this has already been requested recently. Please wait at least {error.retry_after:.2f}s before trying again."
             )
 
-    @commands.command(name="rtfs")
-    async def rtfs_prefix(self, ctx: Context, *args: str) -> None:
+    @commands.command(name="rtfs", ignore_extra=True)
+    async def rtfs_prefix(self, ctx: Context) -> None:
         mention = "/rtfs search"
         app_group = ctx.bot.tree.get_command("rtfs", type=discord.AppCommandType.chat_input)
         if app_group and isinstance(app_group, app_commands.Group):
@@ -161,26 +205,11 @@ class RTFX(commands.Cog):
         """
         code = codeblock.content
 
-        pyright_dump = pathlib.Path("./_pyright/")
-        if not pyright_dump.exists():
-            pyright_dump.mkdir(mode=0o0755, parents=True, exist_ok=True)
-            conf = pyright_dump / "pyrightconfig.json"
-            conf.touch()
-            with conf.open("w") as f:
-                f.write(
-                    to_json(
-                        {
-                            "pythonVersion": "3.12",
-                            "typeCheckingMode": "strict",
-                            "useLibraryCodeForTypes": False,
-                            "reportMissingImports": True,
-                        },
-                    ),
-                )
+        path = self._setup_pyright()
 
         await ctx.typing()
         rand = os.urandom(16).hex()
-        with_file = pyright_dump / f"{rand}_tmp_pyright.py"
+        with_file = path / f"{rand}_tmp_pyright.py"
         with_file.touch(mode=0o0777, exist_ok=True)
 
         with with_file.open("w") as f:
@@ -194,30 +223,10 @@ class RTFX(commands.Cog):
 
         with_file.unlink(missing_ok=True)
 
-        counts = {"error": 0, "warn": 0, "info": 0}
-
         data = from_json(output)
 
-        diagnostics = []
-        for diagnostic in data["generalDiagnostics"]:
-            start = diagnostic["range"]["start"]
-            start = f"{start['line']}:{start['character']}"
+        fmt = self._parse_pyright_output(data)
 
-            severity = diagnostic["severity"]
-            if severity != "error":
-                severity = severity[:4]
-            counts[severity] += 1
-
-            prefix = " " if severity == "info" else "-"
-            message = diagnostic["message"].replace("\n", f"\n{prefix} ")
-
-            diagnostics.append(f"{prefix} {start} - {severity}: {message}")
-
-        version = data["version"]
-        diagnostics = "\n".join(diagnostics)
-        totals = ", ".join(f"{count} {name}" for name, count in counts.items())
-
-        fmt = to_codeblock(f"Pyright v{version}:\n\n{diagnostics}\n\n{totals}\n", language="diff", escape_md=False)
         await ctx.send(fmt)
 
 
