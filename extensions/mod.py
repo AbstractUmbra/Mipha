@@ -15,11 +15,12 @@ import asyncpg
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+from discord.flags import BaseFlags, flag_value
 from discord.utils import MISSING
 from lru import LRU
 
 from utilities.context import ConfirmationView
-from utilities.shared import cache, checks, flags, time
+from utilities.shared import cache, checks, time
 from utilities.shared.converters import Snowflake  # noqa: TCH001 # dpy converters
 from utilities.shared.formats import human_join, plural
 from utilities.shared.paginator import SimplePages
@@ -52,23 +53,23 @@ class Arguments(argparse.ArgumentParser):
         raise RuntimeError(message)
 
 
-class AutoModFlags(flags.DpyFlags):
-    @flags.flag_value
+class AutoModFlags(BaseFlags):
+    @flag_value
     def joins(self) -> int:
         """Whether the server is broadcasting joins"""
         return 1
 
-    @flags.flag_value
+    @flag_value
     def raid(self) -> int:
         """Whether the server is autobanning spammers"""
         return 2
 
-    @flags.flag_value
+    @flag_value
     def alerts(self) -> int:
         """Whether the server has alerts enabled."""
         return 4
 
-    @flags.flag_value
+    @flag_value
     def gatekeeper(self) -> int:
         """Whether the server has gatekeeper enabled."""
         return 8
