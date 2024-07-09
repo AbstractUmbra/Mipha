@@ -92,10 +92,12 @@ class RTFX(commands.Cog):
         nsfw=False,
     )
 
-    async def _get_rtfs(self, *, library: Libraries, search: str) -> RTFSResponse:
+    async def _get_rtfs(self, *, library: Libraries, search: str, exact: bool) -> RTFSResponse:
         headers = {"Authorization": self.rtfs_token} if self.rtfs_token else None
         async with self.bot.session.get(
-            RTFS_URL, params={"format": "source", "library": library.value, "search": search}, headers=headers
+            RTFS_URL,
+            params={"format": "source", "library": library.value, "search": search, "direct": "true" if exact else "false"},
+            headers=headers,
         ) as resp:
             return await resp.json()
 
@@ -153,12 +155,17 @@ class RTFX(commands.Cog):
         return to_codeblock(f"Pyright v{version}:\n\n{diagnostics}\n\n{totals}\n", language="diff", escape_md=False)
 
     @group.command(name="search")
-    @app_commands.describe(library="Which library to search the source for.", search="Your search query.")
+    @app_commands.describe(
+        library="Which library to search the source for.",
+        search="Your search query.",
+        exact="If you want to access the item by the exact name you're passing.",
+        ephemeral="If you want this command execution to be private.",
+    )
     async def rtfs_callback(
-        self, interaction: Interaction, library: Libraries, search: str, ephemeral: bool = False
+        self, interaction: Interaction, library: Libraries, search: str, exact: bool = False, ephemeral: bool = False
     ) -> None:
         """RTFM command for loading source code/searching from libraries."""
-        rtfs = await self._get_rtfs(library=library, search=search)
+        rtfs = await self._get_rtfs(library=library, search=search, exact=exact)
         if not rtfs["results"]:
             return await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
 
