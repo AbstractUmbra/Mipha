@@ -174,9 +174,7 @@ class RemoveNoise(logging.Filter):
         super().__init__(name="discord.state")
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if record.levelname == "WARNING" and "referencing an unknown" in record.msg:
-            return False
-        return True
+        return not (record.levelname == "WARNING" and "referencing an unknown" in record.msg)
 
 
 class ProxyObject(discord.Object):

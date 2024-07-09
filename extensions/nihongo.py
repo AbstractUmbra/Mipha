@@ -94,9 +94,7 @@ def kanji_in_response(kanji: str, soup: bs4.BeautifulSoup) -> bool:
     raw = soup.find("h1", class_="character")
     if raw is None:
         return False
-    if segment in raw:
-        return True
-    return False
+    return segment in raw
 
 
 def parse_response(raw_html: str) -> bs4.BeautifulSoup:
