@@ -23,6 +23,7 @@ from discord.ext import commands
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import checks, formats
 from utilities.shared.converters import DatetimeTransformer
+from utilities.shared.formats import ts
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -141,8 +142,10 @@ class Meta(commands.Cog):
         self, interaction: discord.Interaction, when: app_commands.Transform[datetime.datetime, DatetimeTransformer]
     ) -> None:
         """Enter a date and/or time to get a discord formatted datetime for it. Accepts friendly input like 'tomorrow at 3:30pm'."""
-        dt = discord.utils.format_dt(when)
-        return await interaction.response.send_message(f"{dt} -> `{dt}`")
+
+        ret = ["`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("t", "T", "D", "f", "F")]
+        ret.insert(0, "\u200b\n")
+        return await interaction.response.send_message("\n".join(ret))
 
     @commands.command()
     async def ping(self, ctx: Context) -> None:
