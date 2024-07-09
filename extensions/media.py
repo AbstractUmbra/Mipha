@@ -40,15 +40,14 @@ INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(?:www\.)instagra
 SUBSTITUTIONS: dict[str, SubstitutionData] = {
     # "twitter.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
     # "x.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
-    "tiktok.com": {"repost_urls": ["vm.tiktxk.com"], "remove_query": False},
-    "vm.tiktok.com": {"repost_urls": ["vm.tiktxk.com"], "remove_query": False},
+    "tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
+    "www.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
+    "vm.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
     "instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
     "www.instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
 }
 
-GUILDS: list[discord.Object] = [
-    discord.Object(id=149998214810959872),
-]
+GUILDS: list[discord.Object] = [discord.Object(id=149998214810959872), discord.Object(id=774561547930304536)]
 
 GUILD_IDS: set[int] = {guild.id for guild in GUILDS}
 
