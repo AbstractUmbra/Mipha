@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import datetime
 import inspect
 import os
 import traceback
@@ -21,9 +22,9 @@ from discord.ext import commands
 
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import checks, formats
+from utilities.shared.converters import DatetimeTransformer
 
 if TYPE_CHECKING:
-    import datetime
     from collections.abc import AsyncGenerator
 
     from bot import Mipha
@@ -62,6 +63,7 @@ class PatchedContext(Context):
             self.first_interaction_sent = True
 
             kwargs.pop("allowed_mentions", None)
+            kwargs.pop("ephemeral", None)
 
             return await _current.get().response.send_message(content=content, ephemeral=False, **kwargs)
         else:
@@ -130,6 +132,17 @@ class Meta(commands.Cog):
 
         if not context.first_interaction_sent:
             await interaction.response.send_message(content="Command finished with no output.", ephemeral=True)
+
+    @app_commands.command()
+    @app_commands.describe(when="When to show a timestamp for, accepts 'tomorrow at 7pm' etc.")
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    async def timestamp(
+        self, interaction: discord.Interaction, when: app_commands.Transform[datetime.datetime, DatetimeTransformer]
+    ) -> None:
+        """Enter a date and/or time to get a discord formatted datetime for it. Accepts friendly input like 'tomorrow at 3:30pm'."""
+        dt = discord.utils.format_dt(when)
+        return await interaction.response.send_message(f"{dt} -> `{dt}`")
 
     @commands.command()
     async def ping(self, ctx: Context) -> None:
