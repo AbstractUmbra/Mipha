@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-import datetime
+import datetime  # noqa: TCH003 # dpy needs this at runtime
 import inspect
 import os
 import traceback
@@ -22,7 +22,7 @@ from discord.ext import commands
 
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import checks, formats
-from utilities.shared.converters import DatetimeTransformer
+from utilities.shared.converters import DatetimeTransformer  # noqa: TCH001 # dpy needs this at runtime
 from utilities.shared.formats import ts
 
 if TYPE_CHECKING:
