@@ -45,7 +45,18 @@ class BadTikTokData(Exception):
 
 class SynthCog(commands.Cog, name="Synth"):
     _tiktok_urls: ClassVar[set[str]] = {
-        "api16-normal-v6.tiktokv.com",
+        "api16-normal-c-useast1a.tiktokv.com",
+        "api16-normal-c-useast1a.tiktokv.com",
+        "api16-core-c-useast1a.tiktokv.com",
+        "api16-normal-useast5.us.tiktokv.com",
+        "api16-core.tiktokv.com",
+        "api16-core-useast5.us.tiktokv.com",
+        "api19-core-c-useast1a.tiktokv.com",
+        "api19-normal-c-useast1a.tiktokv.com",
+        "api16-core-c-alisg.tiktokv.com",
+        "api16-normal-c-alisg.tiktokv.com",
+        "api22-core-c-alisg.tiktokv.com",
+        "api16-normal-c-useast2a.tiktokv.com",
     }
 
     def __init__(self, bot: Mipha, /, *, session_id: str | None = None) -> None:
