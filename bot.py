@@ -147,8 +147,10 @@ class MiphaCommandTree(app_commands.CommandTree):
         e.add_field(name="Command", value=(interaction.command and interaction.command.name) or "No command found.")
         e.add_field(name="Author", value=interaction.user, inline=False)
         channel = interaction.channel
+        assert channel  # always there
         guild = interaction.guild
-        location_fmt = f"Channel: {channel.name} ({channel.id})"  # type: ignore
+        channel_name = "In DMs" if isinstance(channel, discord.DMChannel) else channel.name
+        location_fmt = f"Channel: {channel_name} ({channel.id})"
         if guild:
             location_fmt += f"\nGuild: {guild.name} ({guild.id})"
         e.add_field(name="Location", value=location_fmt, inline=True)
