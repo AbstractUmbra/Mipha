@@ -12,8 +12,6 @@ python = "^3.12"
     "speedup",
 ], rev = "master" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
-async-rediscache = { version = "1.0.0rc2", extras = ["fakeredis"] }
-great-asset = { git = "https://github.com/AbstractUmbra/GreatAsset.git", rev = "main" }
 rcon = { git = "https://github.com/conqp/rcon.git", rev = "master" }
 asqlite = { git = "https://github.com/Rapptz/asqlite.git", rev = "master" }
 "python-a2s" = { git = "https://github.com/Yepoleb/python-a2s.git", rev = "typing" }
@@ -38,7 +36,6 @@ tabulate = "*"
 "imagetext-py" = "*"
 orjson = "*"
 uvloop = "*"
-markdownify = "*"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "*"
