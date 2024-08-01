@@ -145,7 +145,7 @@ class Meta(commands.Cog):
 
         ret = ["`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("t", "T", "D", "f", "F")]
         ret.insert(0, "\u200b\n")
-        return await interaction.response.send_message("\n".join(ret))
+        return await interaction.response.send_message("\n".join(ret), ephemeral=True)
 
     @commands.command()
     async def ping(self, ctx: Context) -> None:
