@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
+import zlib
+from io import BytesIO
 from typing import TYPE_CHECKING, Any, Self
 
 import discord
@@ -16,14 +19,62 @@ from discord.ext import commands
 from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
 
+from utilities.shared import fuzzy
 from utilities.shared.formats import from_json, to_codeblock, to_json
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from bot import Mipha
     from utilities.context import Context, Interaction
     from utilities.shared._types.rtfs import RTFSResponse
 
-RTFS_URL = "https://rtfs.abstractumbra.dev"
+RTFS_URL: str = "https://rtfs.abstractumbra.dev"
+
+
+RTFM_PAGE_TYPES: dict[str, str] = {
+    "stable": "https://discordpy.readthedocs.io/en/stable",
+    "stable-jp": "https://discordpy.readthedocs.io/ja/stable",
+    "latest": "https://discordpy.readthedocs.io/en/latest",
+    "latest-jp": "https://discordpy.readthedocs.io/ja/latest",
+    "python": "https://docs.python.org/3",
+    "python-jp": "https://docs.python.org/ja/3",
+    "hondana": "https://hondana.readthedocs.io/en/stable",
+    "hondana-latest": "https://hondana.readthedocs.io/en/latest",
+}
+
+
+class SphinxObjectFileReader:
+    # Inspired by Sphinx's InventoryFileReader
+    BUFSIZE = 16 * 1024
+
+    def __init__(self, buffer: bytes) -> None:
+        self.stream = BytesIO(buffer)
+
+    def readline(self) -> str:
+        return self.stream.readline().decode("utf-8")
+
+    def skipline(self) -> None:
+        self.stream.readline()
+
+    def read_compressed_chunks(self) -> Generator[bytes, None, None]:
+        decompressor = zlib.decompressobj()
+        while True:
+            chunk = self.stream.read(self.BUFSIZE)
+            if len(chunk) == 0:
+                break
+            yield decompressor.decompress(chunk)
+        yield decompressor.flush()
+
+    def read_compressed_lines(self) -> Generator[str, None, None]:
+        buf = b""
+        for chunk in self.read_compressed_chunks():
+            buf += chunk
+            pos = buf.find(b"\n")
+            while pos != -1:
+                yield buf[:pos].decode("utf-8")
+                buf = buf[pos + 1 :]
+                pos = buf.find(b"\n")
 
 
 def _rtfs_cooldown(interaction: Interaction) -> app_commands.Cooldown | None:
@@ -80,6 +131,8 @@ class RTFSView(discord.ui.View):
 
 
 class RTFX(commands.Cog):
+    _rtfm_cache: dict[str, dict[str, str]]
+
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.rtfs_token: str | None = self.bot.config.get("rtfs", {}).get("token")
@@ -91,6 +144,184 @@ class RTFX(commands.Cog):
         allowed_installs=app_commands.AppInstallationType(guild=True, user=True),
         nsfw=False,
     )
+
+    def parse_object_inv(self, stream: SphinxObjectFileReader, url: str) -> dict[str, str]:
+        # key: URL
+        # n.b.: key doesn't have `discord` or `discord.ext.commands` namespaces
+        result: dict[str, str] = {}
+
+        # first line is version info
+        inv_version = stream.readline().rstrip()
+
+        if inv_version != "# Sphinx inventory version 2":
+            raise RuntimeError("Invalid objects.inv file version.")
+
+        # next line is "# Project: <name>"
+        # then after that is "# Version: <version>"
+        projname = stream.readline().rstrip()[11:]
+        stream.readline().rstrip()[11:]  # move the buffer along
+
+        # next line says if it's a zlib header
+        line = stream.readline()
+        if "zlib" not in line:
+            raise RuntimeError("Invalid objects.inv file, not z-lib compatible.")
+
+        # This code mostly comes from the Sphinx repository.
+        entry_regex = re.compile(r"(?x)(.+?)\s+(\S*:\S*)\s+(-?\d+)\s+(\S+)\s+(.*)")
+        for line in stream.read_compressed_lines():
+            match = entry_regex.match(line.rstrip())
+            if not match:
+                continue
+
+            name, directive, _, location, dispname = match.groups()
+            domain, _, subdirective = directive.partition(":")
+            if directive == "py:module" and name in result:
+                # From the Sphinx Repository:
+                # due to a bug in 1.1 and below,
+                # two inventory entries are created
+                # for Python modules, and the first
+                # one is correct
+                continue
+
+            # Most documentation pages have a label
+            if directive == "std:doc":
+                subdirective = "label"
+
+            if location.endswith("$"):
+                location = location[:-1] + name
+
+            key = name if dispname == "-" else dispname
+            prefix = f"{subdirective}:" if domain == "std" else ""
+
+            if projname == "discord.py":
+                key = key.replace("discord.ext.commands.", "").replace("discord.", "")
+
+            result[f"{prefix}{key}"] = os.path.join(url, location)  # noqa: PTH118 # we're actually using this on a url for safe appending
+
+        return result
+
+    async def build_rtfm_lookup_table(self) -> None:
+        cache: dict[str, dict[str, str]] = {}
+        for key, page in RTFM_PAGE_TYPES.items():
+            cache[key] = {}
+            async with self.bot.session.get(page + "/objects.inv") as resp:
+                if resp.status != 200:
+                    raise RuntimeError("Cannot build rtfm lookup table, try again later.")
+
+                stream = SphinxObjectFileReader(await resp.read())
+                cache[key] = self.parse_object_inv(stream, page)
+
+        self._rtfm_cache = cache
+
+    async def do_rtfm(self, ctx: Context, key: str, obj: str | None) -> None:
+        if obj is None:
+            await ctx.send(RTFM_PAGE_TYPES[key])
+            return
+
+        if not hasattr(self, "_rtfm_cache"):
+            await ctx.typing()
+            await self.build_rtfm_lookup_table()
+
+        obj = re.sub(r"^(?:discord\.(?:ext\.)?)?(?:commands\.)?(.+)", r"\1", obj)
+
+        if key.startswith("latest"):
+            # point the abc.Messageable types properly:
+            q = obj.lower()
+            for name in dir(discord.abc.Messageable):
+                if name[0] == "_":
+                    continue
+                if q == name:
+                    obj = f"abc.Messageable.{name}"
+                    break
+
+        cache = list(self._rtfm_cache[key].items())
+        matches = fuzzy.finder(obj, cache, key=lambda t: t[0])[:8]
+
+        e = discord.Embed(colour=discord.Colour.blurple())
+        if len(matches) == 0:
+            return await ctx.send("Could not find anything. Sorry.")
+
+        e.description = "\n".join(f"[`{key}`]({url})" for key, url in matches)
+        await ctx.send(embed=e, reference=ctx.replied_reference)
+
+    async def rtfm_slash_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        # Degenerate case: not having built caching yet
+        if not hasattr(self, "_rtfm_cache"):
+            await interaction.response.autocomplete([])
+            await self.build_rtfm_lookup_table()
+            return []
+
+        if not current:
+            return []
+
+        if len(current) < 3:
+            return [app_commands.Choice(name=current, value=current)]
+
+        assert interaction.command is not None
+        key = interaction.command.name
+        if key == "jp":
+            key = "latest-jp"
+
+        matches = fuzzy.finder(current, self._rtfm_cache[key])[:10]
+        return [app_commands.Choice(name=m, value=m) for m in matches]
+
+    @commands.hybrid_group(aliases=["rtfd"], fallback="stable")
+    @app_commands.describe(entity="The object to search for")
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a discord.py entity.
+
+        Events, objects, and functions are all supported through
+        a cruddy fuzzy algorithm.
+        """
+        await self.do_rtfm(ctx, "stable", entity)
+
+    @rtfm.command(name="jp")
+    @app_commands.describe(entity="The object to search for")
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm_jp(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a discord.py entity (Japanese)."""
+        await self.do_rtfm(ctx, "latest-jp", entity)
+
+    @rtfm.command(name="python", aliases=["py"])
+    @app_commands.describe(entity="The object to search for")
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm_python(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a Python entity."""
+        await self.do_rtfm(ctx, "python", entity)
+
+    @rtfm.command(name="python-jp", aliases=["py-jp", "py-ja"])
+    @app_commands.describe(entity="The object to search for")
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm_python_jp(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a Python entity (Japanese)."""
+        await self.do_rtfm(ctx, "python-jp", entity)
+
+    @rtfm.command(name="hondana")
+    @app_commands.describe(entity="The object to search for")
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm_hondana(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a Hondana entity."""
+        await self.do_rtfm(ctx, "hondana", entity)
+
+    @rtfm.command(name="hondana-latest")
+    @app_commands.describe(entity="The object to search for")
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm_hondana_latest(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a Hondana entity."""
+        await self.do_rtfm(ctx, "hondana-latest", entity)
+
+    @rtfm.command(name="refresh", with_app_command=False)
+    @commands.is_owner()
+    async def rtfm_refresh(self, ctx: Context) -> None:
+        """Refreshes the RTFM and FAQ cache"""
+
+        async with ctx.typing():
+            await self.build_rtfm_lookup_table()
+
+        await ctx.send("\N{THUMBS UP SIGN}")
 
     async def _get_rtfs(self, *, library: Libraries, search: str, exact: bool) -> RTFSResponse:
         headers = {"Authorization": self.rtfs_token} if self.rtfs_token else None
