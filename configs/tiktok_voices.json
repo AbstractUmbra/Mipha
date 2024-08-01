@@ -1,5 +1,9 @@
 [
     {
+        "name": "Default",
+        "value": "en_us_001"
+    },
+    {
         "name": "Ghost Face",
         "value": "en_us_ghostface"
     },
