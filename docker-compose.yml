@@ -30,33 +30,6 @@ services:
     networks:
       default:
 
-  db:
-    image: postgres
-    restart: unless-stopped
-    environment:
-      - POSTGRES_PASSWORD=foofuck
-      - POSTGRES_USER=penumbra
-      - POSTGRES_DB=mipha
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      # - ./schemas/:/docker-entrypoint-initdb.d/
-    profiles:
-      - db
-    networks:
-      default:
-
-  redis:
-    image: redis:latest
-    restart: unless-stopped
-    networks:
-      default:
-    volumes:
-      - ./configs/redis.conf:/config/redis.conf:ro
-    command: ["redis-server", "/config/redis.conf"]
-
-volumes:
-  pgdata:
-
 networks:
   default:
     external: false

@@ -22,8 +22,6 @@ import asyncpg
 import discord
 import jishaku
 import mystbin
-import redis
-from async_rediscache import RedisSession
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
@@ -246,7 +244,6 @@ class Mipha(commands.Bot):
 
     log_handler: LogHandler
     pool: asyncpg.Pool[asyncpg.Record]
-    redis: RedisSession | None
     user: discord.ClientUser
     session: aiohttp.ClientSession
     start_time: datetime.datetime
@@ -614,25 +611,6 @@ async def main() -> None:
     config = CONFIG_PATH.read_text("utf-8")
     raw_cfg: RootConfig = discord.utils._from_json(config)
 
-    redis_session = None
-
-    redis_key = raw_cfg.get("redis")
-    if redis_key:
-        redis_session = RedisSession(
-            host=redis_key["url"],
-            port=redis_key["port"],
-            password=redis_key["password"],
-            max_connections=20,
-            use_fakeredis=redis_key["mock"],
-            global_namespace="bot",
-            decode_responses=True,
-        )
-
-        try:
-            redis_session = await redis_session.connect()
-        except redis.exceptions.ConnectionError:
-            redis_session = None
-
     async with (
         Mipha(raw_cfg) as bot,
         aiohttp.ClientSession(json_serialize=discord.utils._to_json) as session,
@@ -646,7 +624,6 @@ async def main() -> None:
     ):
         bot.log_handler = log_handler
         bot.pool = pool
-        bot.redis = redis_session
 
         bot.session = session
 
