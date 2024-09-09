@@ -18,7 +18,7 @@ import discord
 from dateutil.zoneinfo import get_zonefile_instance
 from discord import app_commands
 from discord.ext import commands
-from lxml import etree  # type: ignore # this is broke in CI
+from lxml import etree  # pyright: ignore[reportAttributeAccessIssue] # lxml doesn't re-export anything so this breaks in CI
 
 from utilities.shared import formats, fuzzy, time
 from utilities.shared.cache import cache
