@@ -6,5 +6,5 @@ configs/**/*
 _pyright/
 buffer/
 *.ipynb
-[!__]_*.py
+**/[!__]_*.py
 *.py[cod]
