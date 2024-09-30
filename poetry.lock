@@ -721,7 +721,7 @@ resolved_reference = "8686b5d1bbc1d3c862292eb436ab630d6e9c9b53"
 
 [[package]]
 name = "discord.py"
-version = "2.5.0a5060+gff638d39"
+version = "2.5.0a5089+g59f877fc"
 description = "A Python wrapper for the Discord API"
 optional = false
 python-versions = ">=3.8"
@@ -734,7 +734,7 @@ audioop-lts = {version = "*", markers = "python_version >= \"3.13\""}
 PyNaCl = {version = ">=1.3.0,<1.6", optional = true, markers = "extra == \"voice\""}
 
 [package.extras]
-docs = ["sphinx (==4.4.0)", "sphinx-inline-tabs (==2023.4.21)", "sphinxcontrib-applehelp (==1.0.4)", "sphinxcontrib-devhelp (==1.0.2)", "sphinxcontrib-htmlhelp (==2.0.1)", "sphinxcontrib-jsmath (==1.0.1)", "sphinxcontrib-qthelp (==1.0.3)", "sphinxcontrib-serializinghtml (==1.1.5)", "sphinxcontrib-trio (==1.1.2)", "sphinxcontrib-websupport (==1.2.4)", "typing-extensions (>=4.3,<5)"]
+docs = ["sphinx (==4.4.0)", "sphinx-inline-tabs (==2023.4.21)", "sphinxcontrib-applehelp (==1.0.4)", "sphinxcontrib-devhelp (==1.0.2)", "sphinxcontrib-htmlhelp (==2.0.1)", "sphinxcontrib-jsmath (==1.0.1)", "sphinxcontrib-qthelp (==1.0.3)", "sphinxcontrib-serializinghtml (==1.1.5)", "sphinxcontrib-websupport (==1.2.4)", "sphinxcontrib_trio (==1.1.2)", "typing-extensions (>=4.3,<5)"]
 speed = ["Brotli", "aiodns (>=1.1)", "cchardet (==2.1.7)", "orjson (>=3.5.4)"]
 test = ["coverage[toml]", "pytest", "pytest-asyncio", "pytest-cov", "pytest-mock", "typing-extensions (>=4.3,<5)", "tzdata"]
 voice = ["PyNaCl (>=1.3.0,<1.6)"]
@@ -2341,13 +2341,13 @@ multidict = ">=4.0"
 
 [[package]]
 name = "yt-dlp"
-version = "2024.8.6"
+version = "2024.9.27"
 description = "A feature-rich command-line audio/video downloader"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "yt_dlp-2024.8.6-py3-none-any.whl", hash = "sha256:ab507ff600bd9269ad4d654e309646976778f0e243eaa2f6c3c3214278bb2922"},
-    {file = "yt_dlp-2024.8.6.tar.gz", hash = "sha256:e8551f26bc8bf67b99c12373cc87ed2073436c3437e53290878d0f4b4bb1f663"},
+    {file = "yt_dlp-2024.9.27-py3-none-any.whl", hash = "sha256:2717468dd697fcfcf9a89f493ba30a3830cdfb276c09750e5b561b08b9ef5f69"},
+    {file = "yt_dlp-2024.9.27.tar.gz", hash = "sha256:86605542e17e2e23ad23145b637ec308133762a15a5dedac4ae50b7973237026"},
 ]
 
 [package.dependencies]
@@ -2358,16 +2358,16 @@ mutagen = "*"
 pycryptodomex = "*"
 requests = ">=2.32.2,<3"
 urllib3 = ">=1.26.17,<3"
-websockets = ">=12.0"
+websockets = ">=13.0"
 
 [package.extras]
 build = ["build", "hatchling", "pip", "setuptools (>=71.0.2)", "wheel"]
-curl-cffi = ["curl-cffi (==0.5.10)", "curl-cffi (>=0.5.10,<0.6.dev0 || ==0.7.*)"]
-dev = ["autopep8 (>=2.0,<3.0)", "pre-commit", "pytest (>=8.1,<9.0)", "ruff (>=0.5.0,<0.6.0)"]
+curl-cffi = ["curl-cffi (==0.5.10)", "curl-cffi (>=0.5.10,!=0.6.*,<0.7.2)"]
+dev = ["autopep8 (>=2.0,<3.0)", "pre-commit", "pytest (>=8.1,<9.0)", "ruff (>=0.6.0,<0.7.0)"]
 py2exe = ["py2exe (>=0.12)"]
-pyinstaller = ["pyinstaller (>=6.7.0)"]
+pyinstaller = ["pyinstaller (>=6.10.0)"]
 secretstorage = ["cffi", "secretstorage"]
-static-analysis = ["autopep8 (>=2.0,<3.0)", "ruff (>=0.5.0,<0.6.0)"]
+static-analysis = ["autopep8 (>=2.0,<3.0)", "ruff (>=0.6.0,<0.7.0)"]
 test = ["pytest (>=8.1,<9.0)"]
 
 [metadata]
