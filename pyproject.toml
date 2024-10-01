@@ -11,6 +11,9 @@ python = "^3.12"
     "voice",
     "speedup",
 ], rev = "master" }
+hondana = { git = "https://github.com/AbstractUmbra/Hondana.git", extras = [
+    "speed",
+], rev = "main" }
 discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
 rcon = { git = "https://github.com/conqp/rcon.git", rev = "master" }
 asqlite = { git = "https://github.com/Rapptz/asqlite.git", rev = "master" }
@@ -18,7 +21,6 @@ asqlite = { git = "https://github.com/Rapptz/asqlite.git", rev = "master" }
 pykakasi = { git = "https://codeberg.org/miurahr/pykakasi.git", rev = "master" }
 "mystbin.py" = "*"
 jishaku = "*"
-hondana = "*"
 asyncpg = "*"
 psutil = "*"
 lru_dict = "*"
@@ -45,6 +47,11 @@ pre-commit = "*"
 [tool.ruff]
 target-version = "py312"
 line-length = 125
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
 
 [tool.ruff.lint]
 select = [
