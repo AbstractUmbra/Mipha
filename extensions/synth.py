@@ -45,19 +45,19 @@ class BadTikTokData(Exception):
 
 class SynthCog(commands.Cog, name="Synth"):
     _tiktok_urls: ClassVar[set[str]] = {
-        "api16-normal-c-useast1a.tiktokv.com",
-        "api16-core-c-useast1a.tiktokv.com",
-        "api16-normal-useast5.us.tiktokv.com",
-        "api16-core.tiktokv.com",
-        "api16-core-useast5.us.tiktokv.com",
-        "api19-core-c-useast1a.tiktokv.com",
         "api-core.tiktokv.com",
         "api-normal.tiktokv.com",
-        "api19-normal-c-useast1a.tiktokv.com",
         "api16-core-c-alisg.tiktokv.com",
+        "api16-core-c-useast1a.tiktokv.com",
+        "api16-core-useast5.us.tiktokv.com",
+        "api16-core.tiktokv.com",
         "api16-normal-c-alisg.tiktokv.com",
-        "api22-core-c-alisg.tiktokv.com",
+        "api16-normal-c-useast1a.tiktokv.com",
         "api16-normal-c-useast2a.tiktokv.com",
+        "api16-normal-useast5.us.tiktokv.com",
+        "api19-core-c-useast1a.tiktokv.com",
+        "api19-normal-c-useast1a.tiktokv.com",
+        "api22-core-c-alisg.tiktokv.com",
         "api22-normal-c-useast2a.tiktokv.com",
     }
 
@@ -111,7 +111,7 @@ class SynthCog(commands.Cog, name="Synth"):
         return clean
 
     def _tiktok_data_verification(self, data: TikTokSynth, /) -> None:
-        if data["message"] == "Couldn't load speech. Try again." or data["status_code"] != 0:
+        if data["message"] == "Couldn’t load speech. Try again." or data["status_code"] != 0:
             raise BadTikTokData(data)
 
     async def _get_tiktok_response(self, *, engine: str, text: str) -> TikTokSynth | None:
@@ -127,6 +127,8 @@ class SynthCog(commands.Cog, name="Synth"):
                 params=parameters,
                 headers=headers,
             ) as response:
+                if response.content_type != "application/json":
+                    continue
                 data: TikTokSynth = await response.json()
 
             try:
