@@ -251,8 +251,8 @@ class Stats(commands.Cog):
         return f"[`{short_sha2}`](https://github.com/AbstractUmbra/mipha/commit/{commit.id}) {short} ({offset})"
 
     def get_last_commits(self, count: int = 3) -> str:
-        repo = pygit2.Repository(".git")
-        commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.enums.SortMode.TOPOLOGICAL), count))
+        repo = pygit2.Repository(".git")  # pyright: ignore[reportPrivateImportUsage] # missing the `as X` export
+        commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.enums.SortMode.TOPOLOGICAL), count))  # pyright: ignore[reportAttributeAccessIssue] # missing the `as X` export
         return "\n".join(self.format_commit(c) for c in commits)
 
     @commands.command()
