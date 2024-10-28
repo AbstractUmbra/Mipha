@@ -195,7 +195,7 @@ class Admin(commands.Cog):
                 fmt = await ctx.bot.tree.sync()
 
             await ctx.send(
-                f"Synced {formats.plural(len(fmt)):command} {'globally' if spec is None else 'to the current guild.'}",
+                f"Synced {formats.plural(len(fmt)):command} {"globally" if spec is None else "to the current guild."}",
             )
             return
 
@@ -220,9 +220,9 @@ class Admin(commands.Cog):
                 return await ctx.send("Webhooks seems invalid or is gone.")
             else:
                 await ctx.send(
-                    f"Webhook details are:-\n{webhook.name} ({webhook.user.name if webhook.user else 'No User'}) ::"
+                    f"Webhook details are:-\n{webhook.name} ({webhook.user.name if webhook.user else "No User"}) ::"
                     f" {webhook.id}, bound to"
-                    f" {webhook.channel_id} ({webhook.channel.name if webhook.channel else 'Unknown'})",
+                    f" {webhook.channel_id} ({webhook.channel.name if webhook.channel else "Unknown"})",
                 )
 
             try:
@@ -240,12 +240,11 @@ class Admin(commands.Cog):
     @executor_function
     def dump_to_tar(self, user_avys: list[tuple[str, BytesIO]]) -> BytesIO:
         buf = BytesIO()
-        tar = tarfile.open(fileobj=buf, mode="x:gz")
-        for name, avy in user_avys:
-            info = tarfile.TarInfo(f"{name}.png")
-            info.size = avy.getbuffer().nbytes
-            tar.addfile(tarinfo=info, fileobj=avy)
-        tar.close()
+        with tarfile.open(fileobj=buf, mode="x:gz") as fp:
+            for name, avy in user_avys:
+                info = tarfile.TarInfo(f"{name}.png")
+                info.size = avy.getbuffer().nbytes
+                fp.addfile(tarinfo=info, fileobj=avy)
         buf.seek(0)
 
         return buf
