@@ -59,12 +59,12 @@ class Steam(commands.GroupCog):
 
         resp = await self.make_request(form)
 
-        ret = io.StringIO(
+        ret = io.BytesIO(
             ",".join(
                 mod["publishedfileid"]
                 for collection in resp["response"]["collectiondetails"]
                 for mod in collection["children"]
-            )
+            ).encode()
         )
 
         file = File(ret, filename="mod-ids.txt", description=f"The mod ids for collection: {collection_id}")
