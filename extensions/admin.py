@@ -54,7 +54,7 @@ class Admin(commands.Cog):
         """Grabs the syntax error."""
         if err.text is None:
             return f"```py\n{err.__class__.__name__}: {err}\n```"
-        return f'```py\n{err.text}{"^":>{err.offset}}\n{err.__class__.__name__}: {err}```'
+        return f"```py\n{err.text}{'^':>{err.offset}}\n{err.__class__.__name__}: {err}```"
 
     @commands.command()
     @commands.guild_only()
@@ -195,7 +195,7 @@ class Admin(commands.Cog):
                 fmt = await ctx.bot.tree.sync()
 
             await ctx.send(
-                f"Synced {formats.plural(len(fmt)):command} {"globally" if spec is None else "to the current guild."}",
+                f"Synced {formats.plural(len(fmt)):command} {'globally' if spec is None else 'to the current guild.'}",
             )
             return
 
@@ -220,9 +220,9 @@ class Admin(commands.Cog):
                 return await ctx.send("Webhooks seems invalid or is gone.")
             else:
                 await ctx.send(
-                    f"Webhook details are:-\n{webhook.name} ({webhook.user.name if webhook.user else "No User"}) ::"
+                    f"Webhook details are:-\n{webhook.name} ({webhook.user.name if webhook.user else 'No User'}) ::"
                     f" {webhook.id}, bound to"
-                    f" {webhook.channel_id} ({webhook.channel.name if webhook.channel else "Unknown"})",
+                    f" {webhook.channel_id} ({webhook.channel.name if webhook.channel else 'Unknown'})",
                 )
 
             try:
@@ -253,7 +253,7 @@ class Admin(commands.Cog):
     @commands.command()
     async def avys(self, ctx: GuildContext, *, role: discord.Role) -> None:
         urls = [
-            (member.name + "#" + member.discriminator, str(member.display_avatar.replace(static_format="png", size=256)))
+            (str(member), str(member.display_avatar.replace(static_format="png", size=256)))
             for member in ctx.guild.members
             if role in member.roles
         ]
