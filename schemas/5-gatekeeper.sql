@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS guild_gatekeeper (
     rate TEXT
 );
 
-
 DO $$ BEGIN
     CREATE TYPE gatekeeper_role_state AS ENUM ('added', 'pending_add', 'pending_remove');
 EXCEPTION

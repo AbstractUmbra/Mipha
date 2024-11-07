@@ -1,6 +1,8 @@
-CREATE ROLE IF NOT EXISTS mipha WITH LOGIN PASSWORD 'your_password';
-CREATE DATABASE IF NOT EXISTS mipha OWNER mipha;
-CREATE EXTENSION IS NOT EXISTS pg_tgrm;
+CREATE ROLE mipha WITH LOGIN PASSWORD 'your_password';
+CREATE DATABASE mipha OWNER mipha;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- After connecting to the mipha db
 CREATE TABLE IF NOT EXISTS lewd_config (
     guild_if BIGINT PRIMARY KEY,
     blacklist TEXT [],
@@ -52,7 +54,8 @@ CREATE TABLE IF NOT EXISTS starrers (
     id SERIAL PRIMARY KEY,
     author_id BIGINT NOT NULL,
     entry_id INTEGER REFERENCES starboard_entries (id) ON DELETE CASCADE ON UPDATE NO ACTION NOT NULL
-) CREATE INDEX IF NOT EXISTS starrers_entry_id_idx ON starrers (entry_id);
+);
+CREATE INDEX IF NOT EXISTS starrers_entry_id_idx ON starrers (entry_id);
 CREATE UNIQUE INDEX IF NOT EXISTS starrers_uniq_idx ON starrers (author_id, entry_id);
 CREATE TABLE IF NOT EXISTS commands (
     id SERIAL PRIMARY KEY,
@@ -64,7 +67,8 @@ CREATE TABLE IF NOT EXISTS commands (
     command TEXT,
     app_command BOOLEAN NOT NULL DEFAULT FALSE,
     failed BOOLEAN
-) CREATE INDEX IF NOT EXISTS commands_guild_id_idx ON commands (guild_id);
+);
+CREATE INDEX IF NOT EXISTS commands_guild_id_idx ON commands (guild_id);
 CREATE INDEX IF NOT EXISTS commands_author_id_idx ON commands (author_id);
 CREATE INDEX IF NOT EXISTS commands_used_idx ON commands (used);
 CREATE INDEX IF NOT EXISTS commands_command_idx ON commands (command);
@@ -72,7 +76,8 @@ CREATE INDEX IF NOT EXISTS commands_app_command_idx ON commands (app_command);
 CREATE INDEX IF NOT EXISTS commands_failed_idx ON commands (failed);
 CREATE TABLE IF NOT EXISTS tags (
     id SERIAL PRIMARY KEY,
-    name TEXT content TEXT,
+    name TEXT,
+    content TEXT,
     owner_id BIGINT,
     uses INTEGER DEFAULT 0,
     location_id BIGINT,
@@ -119,28 +124,3 @@ CREATE TABLE IF NOT EXISTS family (
     name TEXT UNIQUE,
     amount INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS starboard (
-    id BIGINT PRIMARY KEY,
-    channel_id BIGINT,
-    threshold INTEGER DEFAULT (1) NOT NULL,
-    locked BOOLEAN DEFAULT FALSE,
-    max_age INTERVAL DEFAULT ('7 days'::interval) NOT NULL
-);
-CREATE TABLE IF NOT EXISTS starboard_entries (
-    id SERIAL PRIMARY KEY,
-    bot_message_id BIGINT,
-    message_id BIGINT UNIQUE NOT NULL,
-    channel_id BIGINT,
-    author_id BIGINT,
-    guild_id BIGINT REFERENCES starboard (id) ON DELETE CASCADE ON UPDATE NO ACTION NOT NULL
-);
-CREATE INDEX IF NOT EXISTS starboard_entries_bot_message_id_idx ON starboard_entries (bot_message_id);
-CREATE INDEX IF NOT EXISTS starboard_entries_message_id_idx ON starboard_entries (message_id);
-CREATE INDEX IF NOT EXISTS starboard_entries_guild_id_idx ON starboard_entries (guild_id);
-CREATE TABLE IF NOT EXISTS starrers (
-    id SERIAL PRIMARY KEY,
-    author_id BIGINT NOT NULL,
-    entry_id INTEGER REFERENCES starboard_entries (id) ON DELETE CASCADE ON UPDATE NO ACTION NOT NULL
-);
-CREATE INDEX IF NOT EXISTS starrers_entry_id_idx ON starrers (entry_id);
-CREATE UNIQUE INDEX IF NOT EXISTS starrers_uniq_idx ON starrers (author_id, entry_id);
