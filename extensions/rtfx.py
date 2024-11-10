@@ -11,13 +11,14 @@ import pathlib
 import re
 import zlib
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, NamedTuple, Self
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 from jishaku.codeblocks import Codeblock, codeblock_converter
 from jishaku.shell import ShellReader
+from yarl import URL
 
 from utilities.shared import fuzzy
 from utilities.shared.formats import from_json, to_codeblock, to_json
@@ -28,8 +29,6 @@ if TYPE_CHECKING:
     from bot import Mipha
     from utilities.context import Context, Interaction
     from utilities.shared._types.rtfs import RTFSResponse
-
-RTFS_URL: str = "https://rtfs.abstractumbra.dev"
 
 
 RTFM_PAGE_TYPES: dict[str, str] = {
@@ -94,8 +93,8 @@ class Libraries(discord.Enum):
 
 class RTFSView(discord.ui.View):
     __slots__ = (
-        "owner_id",
         "_payload",
+        "owner_id",
     )
 
     def __init__(self, payload: RTFSResponse, /, *, lib: str, owner_id: int) -> None:
@@ -130,12 +129,22 @@ class RTFSView(discord.ui.View):
         self.stop()
 
 
+class RTFSDetails(NamedTuple):
+    raw_url: str | None
+    token: str | None
+
+    @property
+    def url(self) -> URL | None:
+        if self.raw_url:
+            return URL(self.raw_url)
+
+
 class RTFX(commands.Cog):
     _rtfm_cache: dict[str, dict[str, str]]
 
-    def __init__(self, bot: Mipha) -> None:
+    def __init__(self, bot: Mipha, *, rtfs: RTFSDetails) -> None:
         self.bot = bot
-        self.rtfs_token: str | None = self.bot.config.get("rtfs", {}).get("token")
+        self.rtfs = rtfs
 
     group = app_commands.Group(
         name="rtfs",
@@ -324,19 +333,22 @@ class RTFX(commands.Cog):
         await ctx.send("\N{THUMBS UP SIGN}")
 
     async def _get_rtfs(self, *, library: Libraries, search: str, exact: bool) -> RTFSResponse:
-        headers = {"Authorization": self.rtfs_token} if self.rtfs_token else None
+        if not self.rtfs.url:
+            raise ValueError("RTFS details not configured correctly")
+
+        headers = {"Authorization": self.rtfs.token} if self.rtfs.token else None
         async with self.bot.session.get(
-            RTFS_URL,
+            self.rtfs.url,
             params={"format": "source", "library": library.value, "search": search, "direct": "true" if exact else "false"},
             headers=headers,
         ) as resp:
             return await resp.json()
 
     async def _update_rtfs(self) -> bool:
-        if not self.rtfs_token:
+        if not self.rtfs.token or not self.rtfs.url:
             return False
 
-        async with self.bot.session.post(RTFS_URL + "/refresh", headers={"Authorization": self.rtfs_token}) as resp:
+        async with self.bot.session.post(self.rtfs.url / "refresh", headers={"Authorization": self.rtfs.token}) as resp:
             data = await resp.json()
 
         return data["success"]
@@ -469,4 +481,6 @@ class RTFX(commands.Cog):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(RTFX(bot))
+    rtfs_config = bot.config.get("rtfs", {})
+    rtfs = RTFSDetails(rtfs_config.get("url"), rtfs_config.get("token"))
+    await bot.add_cog(RTFX(bot, rtfs=rtfs))
