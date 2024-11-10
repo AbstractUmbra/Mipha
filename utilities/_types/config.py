@@ -8,24 +8,16 @@ if TYPE_CHECKING:
 __all__ = ("RootConfig",)
 
 
-class _RTFMPackage(TypedDict):
-    package: str
-    base_url: str
-    inventory_url: str
-
-
 class BotConfig(TypedDict):
     token: str
     dev_guilds: NotRequired[list[int]]
+    owner_ids: list[int]
+    intents: int
 
 
-class RTFMConfig(TypedDict):
-    packages: list[_RTFMPackage]
-
-
-class DatabaseConfig(TypedDict, total=False):
-    dsn: Required[str]
-    audio_dsn: str
+class DatabaseConfig(TypedDict):
+    dsn: NotRequired[str]
+    audio_dsn: NotRequired[str]
     host: str
     user: str
     password: str
@@ -34,6 +26,7 @@ class DatabaseConfig(TypedDict, total=False):
 
 
 class RTFSConfig(TypedDict):
+    url: str
     token: str
 
 
@@ -50,12 +43,12 @@ class WebhookConfig(TypedDict):
 
 
 class TokenConfig(TypedDict, total=False):
-    mystbin: str
     github: str
     wanikani: str
     sonarr: str
     tiktok: str
     pythonista_api: str
+    deepl: str
 
 
 class MangaDexConfig(TypedDict):
@@ -67,14 +60,6 @@ class MangaDexConfig(TypedDict):
 
 class UploaderConfig(TypedDict):
     token: str
-
-
-class CurrencyConfig(TypedDict):
-    api_key: str
-
-
-class DeeplConfig(TypedDict):
-    api_key: str
 
 
 class RCONConfig(TypedDict):
@@ -105,18 +90,12 @@ class Logging(TypedDict):
 
 class RootConfig(TypedDict, total=False):
     bot: Required[BotConfig]
-    rtfm: Required[RTFMConfig]
-    owner_ids: Required[list[int]]
-    intents: int
     postgresql: Required[DatabaseConfig]
     rtfs: RTFSConfig
-    redis: RedisConfig
     webhooks: Required[WebhookConfig]
     tokens: TokenConfig
     mangadex: MangaDexConfig
     uploader: UploaderConfig
-    deepl: DeeplConfig
-    currency: CurrencyConfig
     rcon: RCONConfig
     duckling: DucklingConfig
     lewd: LewdConfig

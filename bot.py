@@ -29,9 +29,9 @@ from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_s
 try:
     import uvloop
 except ModuleNotFoundError:
-    HAS_UVLOOP = False
+    RUNTIME = asyncio.run
 else:
-    HAS_UVLOOP = True
+    RUNTIME = uvloop.run
 
 from extensions import EXTENSIONS
 from utilities.context import Context, Interaction
@@ -257,20 +257,20 @@ class Mipha(commands.Bot):
     _stats_cog_gateway_handler: logging.Handler
 
     __slots__ = (
-        "session",
-        "start_time",
-        "pool",
-        "log_handler",
-        "command_stats",
-        "socket_stats",
         "_blacklist_data",
-        "_prefix_data",
-        "_spam_cooldown_mapping",
-        "_spammer_count",
-        "_previous_websocket_events",
         "_error_handling_cooldown",
         "_original_help_command",
+        "_prefix_data",
+        "_previous_websocket_events",
+        "_spam_cooldown_mapping",
+        "_spammer_count",
         "_stats_cog_gateway_handler",
+        "command_stats",
+        "log_handler",
+        "pool",
+        "session",
+        "socket_stats",
+        "start_time",
     )
 
     def __init__(self, config: RootConfig) -> None:
@@ -310,7 +310,7 @@ class Mipha(commands.Bot):
         self.command_stats = Counter()
         self.socket_stats = Counter()
         self.owner_id: int | None = None
-        self.owner_ids: Iterable[int] = self.config["owner_ids"]
+        self.owner_ids: Iterable[int] = self.config["bot"]["owner_ids"]
 
     def run(self) -> None:
         raise NotImplementedError("Please use `.start()` instead.")
@@ -583,7 +583,6 @@ class Mipha(commands.Bot):
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.UTC)
 
         self.bot_app_info = await self.application_info()
-        self.owner_ids = self.config["owner_ids"]
         self.mb_client = mystbin.Client(session=self.session)
 
     async def create_paste(
@@ -601,6 +600,8 @@ class Mipha(commands.Bot):
             post_files = [mystbin.File(filename="output.py", content=content)]
         elif files:
             post_files = [mystbin.File(filename=name, content=content) for name, content in files]
+        else:
+            raise ValueError("An argument for `content` or `files` must be provided.")
 
         paste = await self.mb_client.create_paste(files=post_files, password=password, expires=expires)
 
@@ -615,7 +616,11 @@ async def main() -> None:
         Mipha(raw_cfg) as bot,
         aiohttp.ClientSession(json_serialize=discord.utils._to_json) as session,
         asyncpg.create_pool(
-            dsn=bot.config["postgresql"]["dsn"],
+            host=bot.config["postgresql"]["host"],
+            user=bot.config["postgresql"]["user"],
+            password=bot.config["postgresql"]["password"],
+            database=bot.config["postgresql"]["database"],
+            port=bot.config["postgresql"]["port"],
             command_timeout=60,
             max_inactive_connection_lifetime=0,
             init=db_init,
@@ -636,5 +641,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    run = uvloop.run if HAS_UVLOOP else asyncio.run
-    run(main())
+    RUNTIME(main())
