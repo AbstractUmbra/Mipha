@@ -405,10 +405,8 @@ class Meta(commands.Cog):
             perms = discord.Permissions((everyone_perms & ~deny.value) | allow.value)
             channel_type = type(channel)
             totals[channel_type] += 1
-            if (
-                not perms.read_messages
-                or isinstance(channel, discord.VoiceChannel)
-                and (not perms.connect or not perms.speak)
+            if not perms.read_messages or (
+                isinstance(channel, discord.VoiceChannel) and (not perms.connect or not perms.speak)
             ):
                 secret[channel_type] += 1
 
@@ -486,13 +484,13 @@ class Meta(commands.Cog):
                 emoji_stats["disabled"] += not emoji.available
 
         fmt = (
-            f'Regular: {emoji_stats["regular"]}/{guild.emoji_limit}\n'
-            f'Animated: {emoji_stats["animated"]}/{guild.emoji_limit}\n'
+            f"Regular: {emoji_stats['regular']}/{guild.emoji_limit}\n"
+            f"Animated: {emoji_stats['animated']}/{guild.emoji_limit}\n"
         )
         if emoji_stats["disabled"] or emoji_stats["animated_disabled"]:
-            fmt = f'{fmt}Disabled: {emoji_stats["disabled"]} regular, {emoji_stats["animated_disabled"]} animated\n'
+            fmt = f"{fmt}Disabled: {emoji_stats['disabled']} regular, {emoji_stats['animated_disabled']} animated\n"
 
-        fmt = f"{fmt}Total Emoji: {len(guild.emojis)}/{guild.emoji_limit*2}"
+        fmt = f"{fmt}Total Emoji: {len(guild.emojis)}/{guild.emoji_limit * 2}"
         e.add_field(name="Emoji", value=fmt, inline=False)
         e.set_footer(text="Created").timestamp = guild.created_at
         await ctx.send(embed=e)

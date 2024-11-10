@@ -99,19 +99,19 @@ def has_manage_roles_overwrite(member: discord.Member, channel: discord.abc.Guil
 
 class ModConfig:
     __slots__ = (
+        "_cs_alert_webhook",
+        "_cs_broadcast_webhook",
+        "alert_channel_id",
+        "alert_webhook_url",
         "automod_flags",
-        "id",
         "bot",
         "broadcast_channel_id",
         "broadcast_webhook_url",
+        "id",
         "mention_count",
-        "safe_automod_entity_ids",
         "mute_role_id",
         "muted_members",
-        "alert_webhook_url",
-        "alert_channel_id",
-        "_cs_broadcast_webhook",
-        "_cs_alert_webhook",
+        "safe_automod_entity_ids",
     )
 
     bot: Mipha
@@ -250,17 +250,17 @@ class Gatekeeper:
 
     __slots__ = (
         "bot",
+        "bypass_action",
+        "channel_id",
         "cog",
         "id",
         "members",
-        "queue",
-        "task",
-        "started_at",
-        "role_id",
-        "channel_id",
         "message_id",
-        "bypass_action",
+        "queue",
         "rate",
+        "role_id",
+        "started_at",
+        "task",
     )
 
     def __init__(self, record: Any, members: list[Any], cog: Mod) -> None:
@@ -1540,7 +1540,7 @@ class PurgeFlags(commands.FlagConverter):
 
 
 class FlaggedMember:
-    __slots__ = ("id", "joined_at", "display_name", "messages")
+    __slots__ = ("display_name", "id", "joined_at", "messages")
 
     def __init__(self, user: discord.abc.User, joined_at: datetime.datetime) -> None:
         self.id = user.id
@@ -1761,8 +1761,7 @@ class SpamChecker:
 
             # Special case for joining and just spamming mentions at some point
             if (
-                flagged.messages <= 10
-                and message.raw_mentions
+                (flagged.messages <= 10 and message.raw_mentions)
                 or "@everyone" in message.content
                 or "@here" in message.content
             ):
@@ -2099,7 +2098,7 @@ class Mod(commands.Cog):
         else:
             to_send = f"Banned {member} (ID: {member.id}) for spamming {mention_count} mentions."
             async with self._batch_message_lock:
-                self.message_batches[(guild_id, message.channel.id)].append(to_send)
+                self.message_batches[guild_id, message.channel.id].append(to_send)
 
             log.info("[Mention Spam] Member %s (ID: %s) has been banned from guild ID %s", member, member.id, guild_id)
 
@@ -2870,7 +2869,7 @@ class Mod(commands.Cog):
         await ctx.db.execute(query, ctx.guild.id, ids)
         self.get_guild_config.invalidate(self, ctx.guild.id)
         await ctx.send(
-            f'Updated ignore list to ignore {", ".join(c.mention for c in entities)}',
+            f"Updated ignore list to ignore {', '.join(c.mention for c in entities)}",
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
@@ -2899,7 +2898,7 @@ class Mod(commands.Cog):
         await ctx.db.execute(query, ctx.guild.id, [c.id for c in entities])
         self.get_guild_config.invalidate(self, ctx.guild.id)
         await ctx.send(
-            f'Updated ignore list to no longer ignore {", ".join(c.mention for c in entities)}',
+            f"Updated ignore list to no longer ignore {', '.join(c.mention for c in entities)}",
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
@@ -2975,7 +2974,7 @@ class Mod(commands.Cog):
 
         spammers = await strategy(ctx, search)
         deleted = sum(spammers.values())
-        messages = [f'{deleted} message{" was" if deleted == 1 else "s were"} removed.']
+        messages = [f"{deleted} message{' was' if deleted == 1 else 's were'} removed."]
         if deleted:
             messages.append("")
             spammers = sorted(spammers.items(), key=lambda t: t[1], reverse=True)
@@ -3342,7 +3341,7 @@ class Mod(commands.Cog):
         if reminder is None:
             return await ctx.send("Sorry, this functionality is currently unavailable. Try again later?")
 
-        until = f'until {discord.utils.format_dt(duration.dt, "F")}'
+        until = f"until {discord.utils.format_dt(duration.dt, 'F')}"
         heads_up_message = f"You have been banned from {ctx.guild.name} {until}. Reason: {reason}"
 
         try:
@@ -3426,6 +3425,7 @@ class Mod(commands.Cog):
         When the command is done doing its work, you will get a message
         detailing which users got removed and how many messages got removed.
         """
+        await ctx.defer()
 
         predicates: list[Callable[[discord.Message], Any]] = []
         if flags.bot:
@@ -3467,6 +3467,9 @@ class Mod(commands.Cog):
             require_prompt = True
             predicates.append(lambda m: True)
 
+        threshold = discord.utils.utcnow() - datetime.timedelta(days=14)
+        predicates.append(lambda m: m.created_at >= threshold)
+
         op = all if flags.require == "all" else any
 
         def predicate(m: discord.Message) -> bool:
@@ -3479,14 +3482,8 @@ class Mod(commands.Cog):
         if search is None:
             search = 100
 
-        if require_prompt:
-            confirm = await ctx.prompt(f"Are you sure you want to delete {plural(search):message}?", timeout=30)
-            if not confirm:
-                return await ctx.send("Aborting.")
-
         before = discord.Object(id=flags.before) if flags.before else None
         after = discord.Object(id=flags.after) if flags.after else None
-        await ctx.defer()
 
         if before is None and ctx.interaction is not None:
             # If no before: is passed and we're in a slash command,
@@ -3494,16 +3491,34 @@ class Mod(commands.Cog):
             # To work around this, we need to get the deferred message's ID and avoid deleting it.
             before = await ctx.interaction.original_response()
 
-        try:
-            deleted = await ctx.channel.purge(limit=search, before=before, after=after, check=predicate)
-        except discord.Forbidden:
+        if not ctx.bot_permissions.manage_messages:
             return await ctx.send("I do not have permissions to delete messages.")
+
+        try:
+            deleted = [msg async for msg in ctx.channel.history(limit=search, before=before, after=after) if predicate(msg)]
+        except discord.Forbidden:
+            return await ctx.send("I do not have permissions to search for messages.")
         except discord.HTTPException as e:
             return await ctx.send(f"Error: {e} (try a smaller search?)")
 
+        if require_prompt:
+            confirm = await ctx.prompt(f"Are you sure you want to delete up to {plural(len(deleted)):message}?", timeout=30)
+            if not confirm:
+                return await ctx.send("Aborting.")
+
+            for chunk in discord.utils.as_chunks(deleted, 100):
+                try:
+                    await ctx.channel.delete_messages(
+                        chunk, reason=f"Action done by {ctx.author} (ID: {ctx.author.id}): Purge"
+                    )
+                except discord.Forbidden:
+                    return await ctx.send("I do not have permissions to delete messages.")
+                except discord.HTTPException as err:
+                    return await ctx.send(f"Something went wrong whilst purging: {err}")
+
         spammers = Counter(m.author.display_name for m in deleted)
         deleted = len(deleted)
-        messages = [f'{deleted} message{" was" if deleted == 1 else "s were"} removed.']
+        messages = [f"{deleted} message{' was' if deleted == 1 else 's were'} removed."]
         if deleted:
             messages.append("")
             spammers = sorted(spammers.items(), key=lambda t: t[1], reverse=True)
@@ -3912,7 +3927,7 @@ class Mod(commands.Cog):
         async with ctx.typing():
             success, failure, skipped = await self.update_role_permissions(role, ctx.guild, ctx.author)
             await ctx.send(
-                "Mute role successfully created. Overwrites: " f"[Updated: {success}, Failed: {failure}, Skipped: {skipped}]"
+                f"Mute role successfully created. Overwrites: [Updated: {success}, Failed: {failure}, Skipped: {skipped}]"
             )
 
     @_mute_role.command(name="unbind")
@@ -4173,9 +4188,9 @@ class Mod(commands.Cog):
         success, failures = await self.start_lockdown(ctx, channels)
         if failures:
             await ctx.send(
-                f'Successfully locked down {len(success)}/{len(failures)} channels.\n'
-                f'Failed channels: {", ".join(c.mention for c in failures)}\n\n'
-                f'Give the bot Manage Roles permissions in those channels and try again.'
+                f"Successfully locked down {len(success)}/{len(failures)} channels.\n"
+                f"Failed channels: {', '.join(c.mention for c in failures)}\n\n"
+                f"Give the bot Manage Roles permissions in those channels and try again."
             )
         else:
             await ctx.send(f"Successfully locked down {plural(len(success)):channel}")
@@ -4257,10 +4272,10 @@ class Mod(commands.Cog):
         formatted_time = discord.utils.format_dt(timer.expires, "f" if long else "T")
         if failures:
             await ctx.send(
-                f'Successfully locked down {len(success)}/{len(channels)} channels until {formatted_time}.\n'
-                f'Failed channels: {", ".join(c.mention for c in failures)}\n'
-                f'Give the bot Manage Roles permissions in {plural(len(failures)):the channel|those channels} and try '
-                f'the lockdown command on the failed {plural(len(failures)):channel} again.'
+                f"Successfully locked down {len(success)}/{len(channels)} channels until {formatted_time}.\n"
+                f"Failed channels: {', '.join(c.mention for c in failures)}\n"
+                f"Give the bot Manage Roles permissions in {plural(len(failures)):the channel|those channels} and try "
+                f"the lockdown command on the failed {plural(len(failures)):channel} again."
             )
         else:
             await ctx.send(f"Successfully locked down {plural(len(success)):channel} until {formatted_time}")
@@ -4285,7 +4300,7 @@ class Mod(commands.Cog):
         await ctx.db.execute(query, ctx.guild.id)
         if failures:
             formatted = [c.mention for c in failures]
-            await ctx.send(f'Lockdown ended. Failed to edit {human_join(formatted, final="and")}')
+            await ctx.send(f"Lockdown ended. Failed to edit {human_join(formatted, final='and')}")
         else:
             await ctx.send("Lockdown successfully ended")
 
@@ -4312,11 +4327,11 @@ class Mod(commands.Cog):
             if failures:
                 formatted = [c.mention for c in failures]
                 await channel.send(
-                    f'Lockdown ended. However, I failed to properly edit {human_join(formatted, final="and")}'
+                    f"Lockdown ended. However, I failed to properly edit {human_join(formatted, final='and')}"
                 )
             else:
                 valid = [f"<#{c}>" for c in channel_ids]
-                await channel.send(f'Lockdown successfully ended for {human_join(valid, final="and")}')
+                await channel.send(f"Lockdown successfully ended for {human_join(valid, final='and')}")
 
 
 async def setup(bot: Mipha) -> None:
