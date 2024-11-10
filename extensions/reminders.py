@@ -151,11 +151,11 @@ class ReminderView(BaseView):
 class Timer:
     __slots__ = (
         "args",
-        "kwargs",
-        "event",
-        "id",
         "created_at",
+        "event",
         "expires",
+        "id",
+        "kwargs",
     )
 
     def __init__(self, *, record: asyncpg.Record) -> None:

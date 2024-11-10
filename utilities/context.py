@@ -10,18 +10,10 @@ from __future__ import annotations
 
 import datetime
 import secrets
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    Protocol,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, TypeVar, overload
 
 import discord
 from discord.ext import commands
-from typing_extensions import TypeVar
 
 from .shared.ui import BaseView, ConfirmationView
 
@@ -31,6 +23,7 @@ if TYPE_CHECKING:
 
     from aiohttp import ClientSession
     from asyncpg import Connection
+    from typing_extensions import TypeVar  # noqa: TCH004
 
     from bot import Mipha
 
@@ -131,7 +124,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
 
     __slots__ = ("pool",)
 
-    def __init__(self, **kwargs) -> None:  # noqa: ANN003
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.pool = self.bot.pool
         self.ray_id: str = secrets.token_urlsafe()
