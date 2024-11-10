@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     networks:
       default:
-      main:
+      access_pg:
     volumes:
       - ./configs/:/app/configs/:rw
       - ./logs/:/app/logs/:rw
@@ -33,5 +33,5 @@ services:
 networks:
   default:
     external: false
-  main:
+  access_pg:
     external: true
