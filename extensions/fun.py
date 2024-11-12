@@ -10,6 +10,7 @@ import asyncio
 import inspect
 import io
 import itertools
+import math
 import pathlib
 import random
 import re
@@ -315,7 +316,8 @@ class Fun(commands.Cog):
         return None
 
     @commands.command(hidden=True, name="scatter", aliases=["scattertheweak"])
-    @checks.has_guild_permissions(administrator=True)
+    @checks.has_guild_permissions(move_members=True)
+    @commands.bot_has_guild_permissions(move_members=True)
     async def scatter(self, ctx: GuildContext, voice_channel: discord.VoiceChannel | None = None) -> None:
         assert isinstance(ctx.author, discord.Member)
         channel = voice_channel if voice_channel else ctx.author.voice.channel if ctx.author.voice else None
@@ -332,11 +334,12 @@ class Fun(commands.Cog):
             await member.move_to(target)
 
     @commands.command(hidden=True, name="snap")
-    @checks.has_guild_permissions(administrator=True)
+    @checks.has_guild_permissions(move_members=True)
+    @commands.bot_has_guild_permissions(move_members=True)
     async def snap(self, ctx: GuildContext) -> None:
         members = list(itertools.chain.from_iterable([c.members for c in ctx.guild.voice_channels]))
 
-        upper = len(members) // 2
+        upper = math.ceil(len(members) / 2)
         choices = random.choices(members, k=upper)
 
         await asyncio.gather(*[m.move_to(None) for m in choices])
