@@ -7,27 +7,26 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import annotations
 
 import os
-import pathlib
 import re
 import zlib
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple, Self
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 from jishaku.codeblocks import Codeblock, codeblock_converter
-from jishaku.shell import ShellReader
 from yarl import URL
 
 from utilities.shared import fuzzy
-from utilities.shared.formats import from_json, to_codeblock, to_json
+from utilities.shared.formats import to_codeblock
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
     from bot import Mipha
     from utilities.context import Context, Interaction
+    from utilities.shared._types.pyright import PyrightResponse
     from utilities.shared._types.rtfs import RTFSResponse
 
 
@@ -76,7 +75,7 @@ class SphinxObjectFileReader:
                 pos = buf.find(b"\n")
 
 
-def _rtfs_cooldown(interaction: Interaction) -> app_commands.Cooldown | None:
+def _rtfs_refresh_cooldown(interaction: Interaction) -> app_commands.Cooldown | None:
     if interaction.user.id == interaction.client.owner.id:
         return None
     return app_commands.Cooldown(1, 60)
@@ -129,7 +128,7 @@ class RTFSView(discord.ui.View):
         self.stop()
 
 
-class RTFSDetails(NamedTuple):
+class RTFXDetails(NamedTuple):
     raw_url: str | None
     token: str | None
 
@@ -142,9 +141,10 @@ class RTFSDetails(NamedTuple):
 class RTFX(commands.Cog):
     _rtfm_cache: dict[str, dict[str, str]]
 
-    def __init__(self, bot: Mipha, *, rtfs: RTFSDetails) -> None:
+    def __init__(self, bot: Mipha, *, rtfs: RTFXDetails, pyright: RTFXDetails) -> None:
         self.bot = bot
         self.rtfs = rtfs
+        self.pyright = pyright
 
     group = app_commands.Group(
         name="rtfs",
@@ -353,31 +353,11 @@ class RTFX(commands.Cog):
 
         return data["success"]
 
-    def _setup_pyright(self) -> pathlib.Path:
-        pyright_dump = pathlib.Path("./_pyright/")
-        if not pyright_dump.exists():
-            pyright_dump.mkdir(mode=0o0755, parents=True, exist_ok=True)
-            conf = pyright_dump / "pyrightconfig.json"
-            conf.touch()
-            with conf.open("w") as f:
-                f.write(
-                    to_json(
-                        {
-                            "pythonVersion": "3.12",
-                            "typeCheckingMode": "strict",
-                            "useLibraryCodeForTypes": False,
-                            "reportMissingImports": True,
-                        },
-                    ),
-                )
-
-        return pyright_dump
-
-    def _parse_pyright_output(self, data: dict[str, Any]) -> str:
+    def _parse_pyright_output(self, data: PyrightResponse) -> str:
         counts = {"error": 0, "warn": 0, "info": 0}
 
         diagnostics = []
-        for diagnostic in data["generalDiagnostics"]:
+        for diagnostic in data["result"]["generalDiagnostics"]:
             start = diagnostic["range"]["start"]
             start = f"{start['line']}:{start['character']}"
 
@@ -391,11 +371,17 @@ class RTFX(commands.Cog):
 
             diagnostics.append(f"{prefix} {start} - {severity}: {message}")
 
-        version = data["version"]
+        pyr_version = data["pyright_version"]
+        py_version = data["python_version"]
+        node_version = data["node_version"]
         diagnostics = "\n".join(diagnostics)
         totals = ", ".join(f"{count} {name}" for name, count in counts.items())
 
-        return to_codeblock(f"Pyright v{version}:\n\n{diagnostics}\n\n{totals}\n", language="diff", escape_md=False)
+        return to_codeblock(
+            f"Pyright v{pyr_version} | Python v{py_version} | Node {node_version}:\n\n{diagnostics}\n\n{totals}\n",
+            language="diff",
+            escape_md=False,
+        )
 
     @group.command(name="search")
     @app_commands.describe(
@@ -416,7 +402,7 @@ class RTFX(commands.Cog):
         await interaction.response.send_message(view=view, ephemeral=ephemeral)
 
     @group.command(name="refresh")
-    @app_commands.checks.dynamic_cooldown(_rtfs_cooldown)
+    @app_commands.checks.dynamic_cooldown(_rtfs_refresh_cooldown)
     async def rtfs_refresh(self, interaction: Interaction) -> None:
         """Schedules an update of the RTFS library code in the API."""
         await interaction.response.defer(ephemeral=True)
@@ -443,6 +429,17 @@ class RTFX(commands.Cog):
                 mention = await ctx.bot.tree.find_mention_for(app_command)
         return await ctx.send(f"Migrated to a slash command, sorry. Use {mention}")
 
+    async def _perform_pyright(self, code: str, /) -> PyrightResponse:
+        if not self.pyright.url:
+            raise ValueError("Sorry, this feature has not been configured.")
+
+        async with self.bot.session.post(
+            self.pyright.url,
+            headers={"Authorization": self.pyright.token} if self.pyright.token else None,
+            json={"content": code},
+        ) as resp:
+            return await resp.json()
+
     @commands.command(name="pyright", aliases=["pr"])
     async def _pyright(
         self,
@@ -455,32 +452,19 @@ class RTFX(commands.Cog):
         """
         code = codeblock.content
 
-        path = self._setup_pyright()
+        try:
+            output: PyrightResponse = await self._perform_pyright(code)
+        except ValueError:
+            return await ctx.send("Sorry, this functionality is currently disabled.")
 
-        await ctx.typing()
-        rand = os.urandom(16).hex()
-        with_file = path / f"{rand}_tmp_pyright.py"
-        with_file.touch(mode=0o0777, exist_ok=True)
-
-        with with_file.open("w") as f:
-            f.write(code)
-
-        output: str = ""
-        with ShellReader(f"cd _pyright && pyright --outputjson {with_file.name}") as reader:
-            async for line in reader:
-                if not line.startswith("[stderr] "):
-                    output += line
-
-        with_file.unlink(missing_ok=True)
-
-        data = from_json(output)
-
-        fmt = self._parse_pyright_output(data)
+        fmt = self._parse_pyright_output(output)
 
         await ctx.send(fmt)
 
 
 async def setup(bot: Mipha) -> None:
     rtfs_config = bot.config.get("rtfs", {})
-    rtfs = RTFSDetails(rtfs_config.get("url"), rtfs_config.get("token"))
-    await bot.add_cog(RTFX(bot, rtfs=rtfs))
+    pyright_config = bot.config.get("pyright", {})
+    rtfs = RTFXDetails(rtfs_config.get("url"), rtfs_config.get("token"))
+    pyright = RTFXDetails(pyright_config.get("url"), pyright_config.get("token"))
+    await bot.add_cog(RTFX(bot, rtfs=rtfs, pyright=pyright))

@@ -30,6 +30,11 @@ class RTFSConfig(TypedDict):
     token: str
 
 
+class PyrightConfig(TypedDict):
+    url: str
+    token: str
+
+
 class RedisConfig(TypedDict):
     url: str
     port: int
@@ -92,6 +97,7 @@ class RootConfig(TypedDict, total=False):
     bot: Required[BotConfig]
     postgresql: Required[DatabaseConfig]
     rtfs: RTFSConfig
+    pyright: PyrightConfig
     webhooks: Required[WebhookConfig]
     tokens: TokenConfig
     mangadex: MangaDexConfig

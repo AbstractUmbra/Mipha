@@ -17,18 +17,27 @@ services:
       - ./.safe-gitconfig:/root/.gitconfig:ro
 
   duckling:
-    container_name: "duckling"
+    container_name: mipha-duckling
     image: ghcr.io/abstractumbra/duckling:latest
     restart: unless-stopped
     networks:
       default:
 
   synth:
-    container_name: synth-engine
+    container_name: mipha-synth
     image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
     restart: unless-stopped
     networks:
       default:
+
+  pyright:
+    container_name: mipha-pyright
+    image: ghcr.io/abstractumbra/pyright-api
+    restart: unless-stopped
+    networks:
+      default:
+    env_file:
+      - .env
 
 networks:
   default:

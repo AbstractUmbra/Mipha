@@ -36,10 +36,6 @@ RUN mkdir -p /etc/apt/keyrings \
     curl \
     ca-certificates \
     gnupg \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
-    && apt update -y \
-    && apt-get install --no-install-recommends -y \
     git \
     # deps for building python deps
     build-essential \
@@ -47,11 +43,9 @@ RUN mkdir -p /etc/apt/keyrings \
     gnutls-dev \
     libmagic-dev \
     ffmpeg \
-    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -sSL https://install.python-poetry.org | python -
-RUN npm install -g pyright@latest
 
 # copy project requirement files here to ensure they will be cached.
 WORKDIR /app
