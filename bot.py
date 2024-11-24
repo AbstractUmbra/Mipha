@@ -11,7 +11,6 @@ import datetime
 import logging
 import pathlib
 import secrets
-import sys
 import traceback
 from collections import Counter, deque
 from logging.handlers import RotatingFileHandler
@@ -24,7 +23,10 @@ import jishaku
 import mystbin
 from discord import app_commands
 from discord.ext import commands
-from discord.utils import MISSING, _ColourFormatter as ColourFormatter, stream_supports_colour
+from discord.utils import (
+    _ColourFormatter as ColourFormatter,  # we do a little cheating
+    stream_supports_colour,
+)
 
 try:
     import uvloop
@@ -229,10 +231,10 @@ class LogHandler:
 
         return self
 
-    async def __aexit__(self, *args: Any) -> None:
+    async def __aexit__(self, *args: object) -> None:
         return self.__exit__(*args)
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         handlers = self.log.handlers[:]
         for hdlr in handlers:
             hdlr.close()
@@ -321,11 +323,11 @@ class Mipha(commands.Bot):
 
     @property
     def reminder(self) -> Reminder | None:
-        return self.get_cog("Reminder")  # type: ignore # valid
+        return self.get_cog("Reminder")  # pyright: ignore[reportReturnType] # type downcasting
 
     @property
     def config_cog(self) -> ConfigCog | None:
-        return self.get_cog("Config")  # type: ignore
+        return self.get_cog("Config")  # pyright: ignore[reportReturnType] # type downcasting
 
     @discord.utils.cached_property
     def logging_webhook(self) -> discord.Webhook:
@@ -342,10 +344,10 @@ class Mipha(commands.Bot):
         self._previous_websocket_events.append(message)
 
     async def on_ready(self) -> None:
-        self.log_handler.log.info("%s got a ready event at %s", self.user.name, datetime.datetime.now())
+        self.log_handler.log.info("%s got a ready event at %s", self.user.name, datetime.datetime.now(datetime.UTC))
 
     async def on_resume(self) -> None:
-        self.log_handler.log.info("%s got a resume event at %s", self.user.name, datetime.datetime.now())
+        self.log_handler.log.info("%s got a resume event at %s", self.user.name, datetime.datetime.now(datetime.UTC))
 
     async def on_command_error(self, ctx: Context, error: commands.CommandError) -> None:
         assert ctx.command is not None  # type checking - disable assertions
@@ -356,19 +358,17 @@ class Mipha(commands.Bot):
             await ctx.send("Sorry, this command is not available in DMs.")
             return
 
-        elif isinstance(error, commands.DisabledCommand):
+        if isinstance(error, commands.DisabledCommand):
             retry_period = self._error_handling_cooldown.update_rate_limit(ctx.message)
             if retry_period is None:
                 return
             await ctx.send("Sorry, this command has been disabled.")
             return
 
-        elif isinstance(error, commands.CommandInvokeError):
+        if isinstance(error, commands.CommandInvokeError):
             origin_ = error.original
             if not isinstance(origin_, discord.HTTPException):
-                print(f"In {ctx.command.qualified_name}:", file=sys.stderr)
-                traceback.print_tb(origin_.__traceback__)
-                print(f"{origin_.__class__.__name__}: {origin_}", file=sys.stderr)
+                self.log_handler.error("In %s:", ctx.command.qualified_name, exc_info=origin_)
 
     def _get_guild_prefixes(
         self,
@@ -381,7 +381,7 @@ class Mipha(commands.Bot):
             return self._prefix_data.get(guild.id, ["hey babe "])
 
         snowflake_proxy = ProxyObject(guild)
-        return local_(self, snowflake_proxy)  # type: ignore # lying here
+        return local_(self, snowflake_proxy)  # pyright: ignore[reportArgumentType] # lying here
 
     async def _set_guild_prefixes(self, guild: discord.abc.Snowflake, prefixes: list[str] | None) -> None:
         if not prefixes:
@@ -392,7 +392,7 @@ class Mipha(commands.Bot):
             await self._prefix_data.put(guild.id, prefixes)
 
     async def _blacklist_add(self, object_id: int) -> None:
-        await self._blacklist_data.put(object_id, True)
+        await self._blacklist_data.put(object_id, True)  # noqa: FBT003 # shortcut
 
     async def _blacklist_remove(self, object_id: int) -> None:
         try:
@@ -469,18 +469,9 @@ class Mipha(commands.Bot):
 
         total_need_resolution = len(needs_resolution)
         if total_need_resolution == 1:
-            shard: discord.ShardInfo = self.get_shard(guild.shard_id)  # type: ignore  # will never be None
-            if shard.is_ws_ratelimited():
-                try:
-                    member = await guild.fetch_member(needs_resolution[0])
-                except discord.HTTPException:
-                    pass
-                else:
-                    yield member
-            else:
-                members = await guild.query_members(limit=1, user_ids=needs_resolution, cache=True)
-                if members:
-                    yield members[0]
+            members = await guild.query_members(limit=1, user_ids=needs_resolution, cache=True)
+            if members:
+                yield members[0]
         elif total_need_resolution <= 100:
             # Only a single resolution call needed here
             resolved = await guild.query_members(limit=100, user_ids=needs_resolution, cache=True)
@@ -500,9 +491,7 @@ class Mipha(commands.Bot):
     @overload
     async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT]) -> ContextT: ...
 
-    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT] = MISSING) -> ContextT:
-        if cls is MISSING:
-            cls = Context  # type: ignore
+    async def get_context(self, origin: Interaction | discord.Message, /, *, cls: type[ContextT] = Context) -> ContextT:
         return await super().get_context(origin, cls=cls)
 
     async def process_commands(self, message: discord.Message, /) -> None:
@@ -531,8 +520,7 @@ class Mipha(commands.Bot):
             else:
                 self._log_spammer(ctx, message, retry_after)
             return
-        else:
-            self._spammer_count.pop(message.author.id, None)
+        self._spammer_count.pop(message.author.id, None)
 
         await self.invoke(ctx)
 
@@ -570,11 +558,11 @@ class Mipha(commands.Bot):
             await super().start(token=self.config["bot"]["token"], reconnect=True)
         finally:
             path = pathlib.Path("logs/prev_events.log")
-            with path.open("w+", encoding="utf-8") as f:
+            with path.open("w+", encoding="utf-8") as f:  # noqa: ASYNC230 # this is as the loop exists
                 for event in self._previous_websocket_events:
                     try:
                         last_log = to_json(event)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 # orjson or jsondecodeerror
                         f.write(f"{event}\n")
                     else:
                         f.write(f"{last_log}\n")
