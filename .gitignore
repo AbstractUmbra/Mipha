@@ -1,10 +1,11 @@
-_bot_config.py
-extensions/private/*
 static/
 configs/**/*
 *.log*
-_pyright/
 buffer/
 *.ipynb
 **/[!__]_*.py
 *.py[cod]
+.ruff_cache/
+.venv/
+__pycache__/
+compose.override.yaml

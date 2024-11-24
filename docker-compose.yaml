@@ -7,7 +7,6 @@ services:
     restart: unless-stopped
     networks:
       default:
-      access_pg:
     volumes:
       - ./configs/:/app/configs/:rw
       - ./logs/:/app/logs/:rw
@@ -30,17 +29,6 @@ services:
     networks:
       default:
 
-  pyright:
-    container_name: mipha-pyright
-    image: ghcr.io/abstractumbra/pyright-api
-    restart: unless-stopped
-    networks:
-      default:
-    env_file:
-      - .env
-
 networks:
   default:
-    external: false
-  access_pg:
-    external: true
+    internal: true
