@@ -145,7 +145,10 @@ class Hyrule(commands.Cog):
     @restricted_guild(HYRULE_GUILD_ID)
     @commands.command()
     async def setup_role_assignments(self, ctx: GuildContext) -> None:
-        """This command will quickly update the role assignment message with the in-memory View created in this same extension."""
+        """
+        This command will quickly update the role assignment message with the
+        in-memory View created in this same extension.
+        """
         channel = ctx.guild.get_channel(ROLE_ASSIGNMENT_CHANNEL_ID)
         assert isinstance(channel, discord.TextChannel)
 
@@ -172,9 +175,12 @@ class Hyrule(commands.Cog):
             return await ctx.send(f"Sorry, but we don't have a rule #{rule_num}", delete_after=5)
 
         embed = discord.Embed(
-            title=f"Rule {rule_num}", colour=random_pastel_colour(), description=rule, timestamp=ctx.message.created_at
+            title=f"Rule {rule_num}",
+            colour=random_pastel_colour(),
+            description=rule,
+            timestamp=ctx.message.created_at,
         )
-        await ctx.send(embed=embed)
+        return await ctx.send(embed=embed)
 
 
 async def setup(bot: Mipha) -> None:

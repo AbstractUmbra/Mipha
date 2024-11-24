@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
     from bot import Mipha
 
+__all__ = ("callable_prefix",)
+
 DEFAULT_PREFIXES: list[str] = ["hey babe", "mipha"]
 
 
@@ -24,6 +26,9 @@ def callable_prefix(bot: Mipha, message: Message, /) -> list[str]:
     if message.guild is None:
         return commands.when_mentioned_or(*prefixes)(bot, message)
 
-    guild_prefixes: list[str] | None = bot._prefix_data.get(str(message.guild.id), prefixes)
+    guild_prefixes: list[str] | None = bot._prefix_data.get(
+        str(message.guild.id),
+        prefixes,
+    )
 
     return commands.when_mentioned_or(*guild_prefixes)(bot, message)

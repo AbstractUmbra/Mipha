@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, TypeVar, over
 
 import discord
 from discord.ext import commands
+from discord.utils import MISSING
 
 from .shared.ui import BaseView, ConfirmationView
 
@@ -23,13 +24,13 @@ if TYPE_CHECKING:
 
     from aiohttp import ClientSession
     from asyncpg import Connection
-    from typing_extensions import TypeVar  # noqa: TCH004
+    from typing_extensions import TypeVar  # noqa: TC004
 
     from bot import Mipha
 
-    CogT = TypeVar("CogT", bound=commands.Cog, covariant=True, default=commands.Cog)
+    CogT_co = TypeVar("CogT_co", bound=commands.Cog, covariant=True, default=commands.Cog)
 else:
-    CogT = TypeVar("CogT", bound=commands.Cog, covariant=True)
+    CogT_co = TypeVar("CogT_co", bound=commands.Cog, covariant=True)
 
 
 __all__ = (
@@ -60,15 +61,41 @@ class ConnectionContextManager(Protocol):
 
 
 class DatabaseProtocol(Protocol):
-    async def execute(self, query: str, *args: Any, timeout: float | None = None) -> str: ...
+    async def execute(
+        self,
+        query: str,
+        *args: Any,
+        timeout: float | None = None,
+    ) -> str: ...
 
-    async def fetch(self, query: str, *args: Any, timeout: float | None = None) -> list[Any]: ...
+    async def fetch(
+        self,
+        query: str,
+        *args: Any,
+        timeout: float | None = None,
+    ) -> list[Any]: ...
 
-    async def fetchrow(self, query: str, *args: Any, timeout: float | None = None) -> Any | None: ...
+    async def fetchrow(
+        self,
+        query: str,
+        *args: Any,
+        timeout: float | None = None,
+    ) -> Any | None: ...
 
-    async def fetchval(self, query: str, *args: Any, timeout: float | None = None) -> Any | None: ...
+    async def fetchval(
+        self,
+        query: str,
+        *args: Any,
+        timeout: float | None = None,
+    ) -> Any | None: ...
 
-    async def executemany(self, query: str, args: Iterable[Sequence[Any]], *, timeout: float | None = None) -> None: ...
+    async def executemany(
+        self,
+        query: str,
+        args: Iterable[Sequence[Any]],
+        *,
+        timeout: float | None = None,
+    ) -> None: ...
 
     async def close(self) -> None: ...
 
@@ -102,7 +129,10 @@ class DisambiguatorView(BaseView, Generic[T]):
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.ctx.author.id:
-            await interaction.response.send_message("This select menu is not meant for you, sorry.", ephemeral=True)
+            await interaction.response.send_message(
+                "This select menu is not meant for you, sorry.",
+                ephemeral=True,
+            )
             return False
         return True
 
@@ -116,11 +146,11 @@ class DisambiguatorView(BaseView, Generic[T]):
         self.stop()
 
 
-class Context(commands.Context["Mipha"], Generic[CogT]):
+class Context(commands.Context["Mipha"], Generic[CogT_co]):
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
     bot: Mipha
     command: commands.Command[Any, ..., Any]
-    cog: CogT
+    cog: CogT_co
 
     __slots__ = ("pool",)
 
@@ -138,7 +168,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
 
     @property
     def db(self) -> DatabaseProtocol:
-        return self.pool  # type: ignore # override for protocol
+        return self.pool  # pyright: ignore[reportReturnType] # override for protocol
 
     @discord.utils.cached_property
     def replied_reference(self) -> discord.MessageReference | None:
@@ -146,13 +176,23 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         if ref and isinstance(ref.resolved, discord.Message):
             return ref.resolved.to_reference()
 
+        return None
+
     @discord.utils.cached_property
     def replied_message(self) -> discord.Message | None:
         ref = self.message.reference
         if ref and isinstance(ref.resolved, discord.Message):
             return ref.resolved
 
-    async def disambiguate(self, matches: list[T], entry: Callable[[T], Any], *, ephemeral: bool = False) -> T:
+        return None
+
+    async def disambiguate(
+        self,
+        matches: list[T],
+        entry: Callable[[T], Any],
+        *,
+        ephemeral: bool = False,
+    ) -> T:
         if len(matches) == 0:
             raise ValueError("No results found.")
 
@@ -210,7 +250,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         await view.wait()
         return view.value
 
-    def tick(self, opt: bool | None, label: str | None = None) -> str:
+    def tick(self, opt: bool | None, label: str | None = None) -> str:  # shortcut
         lookup = {
             True: "<:TickYes:735498312861351937>",
             False: "<:CrossNo:735498453181923377>",
@@ -241,6 +281,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = ...,
         ephemeral: bool = ...,
         silent: bool = ...,
+        poll: discord.Poll = ...,
         paste: bool = ...,
         wait: Literal[True],
     ) -> discord.Message: ...
@@ -265,6 +306,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = ...,
         ephemeral: bool = ...,
         silent: bool = ...,
+        poll: discord.Poll = ...,
         paste: bool = ...,
         wait: Literal[False],
     ) -> None: ...
@@ -289,6 +331,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = ...,
         ephemeral: bool = ...,
         silent: bool = ...,
+        poll: discord.Poll = ...,
         paste: bool = ...,
         wait: bool = ...,
     ) -> None: ...
@@ -312,6 +355,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
         suppress_embeds: bool = False,
         ephemeral: bool = False,
         silent: bool = False,
+        poll: discord.Poll = MISSING,
         paste: bool = False,
         wait: bool = False,
     ) -> discord.Message | None:
@@ -326,7 +370,7 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
 
             content = f"Sorry, the output was too large but I posted it to a paste for you here: {paste_url}"
 
-        sent = await super().send(  # type: ignore
+        sent = await super().send(  # pyright: ignore[reportCallIssue] # following the upstream *args and **kwargs sucks
             content=content,
             tts=tts,
             embed=embed,
@@ -343,10 +387,13 @@ class Context(commands.Context["Mipha"], Generic[CogT]):
             suppress_embeds=suppress_embeds,
             ephemeral=ephemeral,
             silent=silent,
+            poll=poll,
         )
 
         if wait is True:
             return sent
+
+        return None
 
 
 class GuildContext(Context):

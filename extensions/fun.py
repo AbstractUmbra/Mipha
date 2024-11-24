@@ -163,7 +163,7 @@ class Fun(commands.Cog):
                 return AL_BHED_CHARACTER_MAP[get.lower()].upper()
             return AL_BHED_CHARACTER_MAP[get]
 
-        repl = re.sub("[a-zA-Z]", trans, content)
+        repl = re.sub(r"[a-zA-Z]", trans, content)
         fin = re.sub(ABT_REG, lambda _: keep.pop(0), repl)
         await ctx.send(fin)
 
@@ -203,7 +203,7 @@ class Fun(commands.Cog):
 
         url = "https://api-free.deepl.com/v2/translate"
         form = aiohttp.FormData()
-        form.add_field("auth_key", value=self.bot.config["deepl"]["api_key"])  # type: ignore # guarded by check
+        form.add_field("auth_key", value=self.bot.config["deepl"]["api_key"])  # pyright: ignore[reportGeneralTypeIssues] # guarded by check
         form.add_field("text", value=new_content)
         form.add_field("target_lang", value="EN")
 
@@ -225,11 +225,11 @@ class Fun(commands.Cog):
         padding = 50
 
         images = [Image.new("RGBA", (1, 1), color=0) for _ in range(2)]
-        for index, (image, colour) in enumerate(zip(images, ((47, 49, 54), "white"))):
+        for index, (image, colour) in enumerate(zip(images, ((47, 49, 54), "white"), strict=False)):
             draw = ImageDraw.Draw(image)
             left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
             w, h = right - left, bottom - top
-            images[index] = image = image.resize((w + padding, h + padding))
+            images[index] = image = image.resize((w + padding, h + padding))  # noqa: PLW2901 # correct usage
             draw = ImageDraw.Draw(image)
             draw.multiline_text((padding / 2, padding / 2), text=text, fill=colour, font=font)
         background, foreground = images
@@ -242,7 +242,7 @@ class Fun(commands.Cog):
         return buf
 
     def random_words(self, amount: int) -> list[str]:
-        with open("static/words.txt") as fp:  # noqa: PTH123
+        with open("static/words.txt", encoding="utf8") as fp:  # noqa: PTH123
             words = fp.readlines()
 
         return random.sample(words, amount)
@@ -285,7 +285,7 @@ class Fun(commands.Cog):
             ):
                 winners[message.author] = time.time() - start
                 is_ended.set()
-                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))
+                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))  # noqa: FBT003 # shortcut
             return False
 
         task = ctx.bot.loop.create_task(ctx.bot.wait_for("message", check=check))
@@ -320,7 +320,7 @@ class Fun(commands.Cog):
     @commands.bot_has_guild_permissions(move_members=True)
     async def scatter(self, ctx: GuildContext, voice_channel: discord.VoiceChannel | None = None) -> None:
         assert isinstance(ctx.author, discord.Member)
-        channel = voice_channel if voice_channel else ctx.author.voice.channel if ctx.author.voice else None
+        channel = voice_channel or (ctx.author.voice.channel if ctx.author.voice else None)
 
         if channel is None:
             await ctx.send("No voice channel.")
@@ -340,7 +340,7 @@ class Fun(commands.Cog):
         members = list(itertools.chain.from_iterable([c.members for c in ctx.guild.voice_channels]))
 
         upper = math.ceil(len(members) / 2)
-        choices = random.choices(members, k=upper)
+        choices = random.choices(members, k=upper)  # noqa: S311 # not crypto
 
         await asyncio.gather(*[m.move_to(None) for m in choices])
 
@@ -364,7 +364,7 @@ class Fun(commands.Cog):
         output_buffer = io.BytesIO()
         with Image.open(buffer) as image, Image.open(resolved_path) as bricks:
             new_size = legofy.get_new_size(image, bricks, None)
-            image = image.resize(new_size, Image.Resampling.LANCZOS)
+            image = image.resize(new_size, Image.Resampling.LANCZOS)  # noqa: PLW2901 # correct usage
 
             pil_image = legofy.make_lego_image(image, bricks)
             pil_image.save(output_buffer, "png")
@@ -409,10 +409,10 @@ class Fun(commands.Cog):
                     bytes_ = await resp.read()
                     try:
                         discord.utils._get_mime_type_for_image(bytes_)
-                    except:
-                        raise commands.BadArgument("Sorry but I'm not sure what this file type is.")
-            except aiohttp.ClientError:
-                raise commands.BadArgument("Sorry, this url doesn't appear to be valid.")
+                    except ValueError as err:
+                        raise commands.BadArgument("Sorry but I'm not sure what this file type is.") from err
+            except aiohttp.ClientError as err:
+                raise commands.BadArgument("Sorry, this url doesn't appear to be valid.") from err
 
         else:
             bytes_ = await ctx.author.display_avatar.read()

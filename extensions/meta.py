@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-import datetime  # noqa: TCH003 # dpy needs this at runtime
+import datetime  # noqa: TC003 # dpy needs this at runtime
 import inspect
 import os
 import traceback
@@ -22,7 +22,7 @@ from discord.ext import commands
 
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import checks, formats
-from utilities.shared.converters import DatetimeTransformer  # noqa: TCH001 # dpy needs this at runtime
+from utilities.shared.converters import DatetimeTransformer  # noqa: TC001 # dpy needs this at runtime
 from utilities.shared.formats import ts
 
 if TYPE_CHECKING:
@@ -67,8 +67,7 @@ class PatchedContext(Context):
             kwargs.pop("ephemeral", None)
 
             return await _current.get().response.send_message(content=content, ephemeral=False, **kwargs)
-        else:
-            return await super().send(content=content, **kwargs)
+        return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
     async def typing(self, *args, **kwargs) -> AsyncGenerator[None, None]:  # noqa: ANN003, ANN002
@@ -134,14 +133,21 @@ class Meta(commands.Cog):
         if not context.first_interaction_sent:
             await interaction.response.send_message(content="Command finished with no output.", ephemeral=True)
 
+        return None
+
     @app_commands.command()
     @app_commands.describe(when="When to show a timestamp for, accepts 'tomorrow at 7pm' etc.")
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
     async def timestamp(
-        self, interaction: discord.Interaction, when: app_commands.Transform[datetime.datetime, DatetimeTransformer]
+        self,
+        interaction: discord.Interaction,
+        when: app_commands.Transform[datetime.datetime, DatetimeTransformer],
     ) -> None:
-        """Enter a date and/or time to get a discord formatted datetime for it. Accepts friendly input like 'tomorrow at 3:30pm'."""
+        """
+        Enter a date and/or time to get a discord formatted datetime for it.
+        Accepts friendly input like 'tomorrow at 3:30pm'.
+        """
 
         ret = ["`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("t", "T", "D", "f", "F")]
         ret.insert(0, "\u200b\n")
@@ -214,10 +220,10 @@ class Meta(commands.Cog):
         current_prefixes.append(prefix)
         try:
             await self.bot._set_guild_prefixes(ctx.guild, current_prefixes)
-        except Exception as e:
-            await ctx.send(f"{ctx.tick(False)} {e}")
+        except commands.TooManyArguments as e:
+            await ctx.send(f"{ctx.tick(False)} {e}")  # noqa: FBT003 # shortcut
         else:
-            await ctx.send(ctx.tick(True))
+            await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
 
     @prefix_add.error
     async def prefix_add_error(self, ctx: Context, error: commands.CommandError) -> None:
@@ -250,10 +256,10 @@ class Meta(commands.Cog):
 
         try:
             await self.bot._set_guild_prefixes(ctx.guild, current_prefixes)
-        except Exception as e:
-            await ctx.send(f"{ctx.tick(False)} {e}")
+        except commands.TooManyArguments as e:
+            await ctx.send(f"{ctx.tick(False)} {e}")  # noqa: FBT003 # shortcut
         else:
-            await ctx.send(ctx.tick(True))
+            await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
 
     @prefix.command(name="clear")
     @checks.is_mod()
@@ -267,7 +273,7 @@ class Meta(commands.Cog):
         assert ctx.guild is not None
 
         await self.bot._set_guild_prefixes(ctx.guild, [])
-        await ctx.send(ctx.tick(True))
+        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
 
     @commands.command()
     async def source(self, ctx: Context, *, command: str | None = None) -> None:
@@ -454,7 +460,7 @@ class Meta(commands.Cog):
 
         for feature, label in all_features.items():
             if feature in features:
-                info.append(f"{ctx.tick(True)}: {label}")
+                info.append(f"{ctx.tick(True)}: {label}")  # noqa: FBT003 # shortcut
 
         if info:
             e.add_field(name="Features", value="\n".join(info))
@@ -503,7 +509,7 @@ class Meta(commands.Cog):
         allowed, denied = [], []
 
         for name, value in permissions:
-            name = name.replace("_", " ").replace("guild", "server").title()
+            name = name.replace("_", " ").replace("guild", "server").title()  # noqa: PLW2901 # correct usage
             if value:
                 allowed.append(name)
             else:
@@ -563,7 +569,7 @@ class Meta(commands.Cog):
     async def debugpermissions(
         self,
         ctx: Context,
-        channel: MessageableGuildChannel = commands.param(converter=GuildChannel),
+        channel: MessageableGuildChannel = commands.param(converter=GuildChannel),  # noqa: B008 # this is how commands.param works
         author: discord.Member | None = None,
     ) -> None:
         """Shows permission resolution for a channel and an optional author."""
@@ -589,11 +595,10 @@ class Meta(commands.Cog):
         try:
             msg = await ctx.bot.http.get_message(message.channel.id, message.id)
         except discord.NotFound as err:
-            raise commands.BadArgument(
-                f"Message with the ID of {message.id} cannot be found in <#{message.channel.id}>.",
-            ) from err
+            msg = f"Message with the ID of {message.id} cannot be found in <#{message.channel.id}>."
+            raise commands.BadArgument(msg) from err
 
-        # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")
+        # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")  # noqa: E501, ERA001
         # thanks daggy
 
         await ctx.send(
@@ -606,7 +611,7 @@ class Meta(commands.Cog):
         """Disconnects the bot from the voice channel."""
         assert ctx.guild.voice_client is not None  # guarded by check
 
-        v_client: discord.VoiceClient = ctx.guild.voice_client  # type: ignore # python types are gae
+        v_client: discord.VoiceClient = ctx.guild.voice_client  # pyright: ignore[reportAssignmentType] # type downcasting
         v_client.stop()
         await v_client.disconnect(force=True)
 

@@ -95,7 +95,7 @@ class RepostView(BaseView):
 
         if self.urls:
             for url in self.urls:
-                await interaction.channel.send(str(url))  # type: ignore # it's definitely not a stagechannel thanks
+                await interaction.channel.send(str(url))  # pyright: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess] # we only use messageable channels
 
     @ui.button(label="Upload video?", emoji="\U0001f4fa")
     async def download_video(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
@@ -114,7 +114,7 @@ class RepostView(BaseView):
                 "Sorry downloading this video broke somehow. Umbra knows don't worry.",
                 ephemeral=True,
             )
-            await interaction.client.tree.on_error(interaction, error)  # type: ignore
+            await interaction.client.tree.on_error(interaction, error)  # pyright: ignore[reportArgumentType]
             return
 
         if not _info:
@@ -134,11 +134,11 @@ class RepostView(BaseView):
                 ephemeral=True,
             )
         await self.message.delete()
-        self.stop()
+        return self.stop()
 
 
 class FilesizeLimitExceeded(Exception):
-    def __init__(self, post: bool) -> None:
+    def __init__(self, *, post: bool) -> None:
         self.post: bool = post
         super().__init__("The filesize limit was exceeded for this guild.")
 
@@ -183,7 +183,7 @@ class MediaReposter(commands.Cog):
             url = match[0]
         else:
             await interaction.followup.send(content="I couldn't find a valid tiktok link in this message.", ephemeral=True)
-            return
+            return None
 
         loop = asyncio.get_running_loop()
 
@@ -196,16 +196,16 @@ class MediaReposter(commands.Cog):
                 "This message could not be parsed. Are you sure it's a valid link?",
                 ephemeral=True,
             )
-            return
+            return None
 
         filesize_limit = (interaction.guild and interaction.guild.filesize_limit) or 8388608
         try:
             file, content = await self._manipulate_video(info, filesize_limit=filesize_limit, loop=loop)
         except FilesizeLimitExceeded as error:
             await interaction.followup.send(content=str(error))
-            return
+            return None
 
-        await interaction.followup.send(content=content, file=file)
+        return await interaction.followup.send(content=content, file=file)
 
     async def _cleanup_paths(self, *args: pathlib.Path) -> None:
         await asyncio.sleep(60)
@@ -322,7 +322,7 @@ class MediaReposter(commands.Cog):
             if not _url.host or not (_sub := SUBSTITUTIONS.get(_url.host, None)):
                 return
 
-            new_url = _url.with_host(random.choice(_sub["repost_urls"]))
+            new_url = _url.with_host(random.choice(_sub["repost_urls"]))  # noqa: S311 # not crypto
             if _sub["remove_query"] is True:
                 new_url = new_url.with_query(None)
 

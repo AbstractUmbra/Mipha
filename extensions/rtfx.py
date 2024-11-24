@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from __future__ import annotations
 
+import operator
 import os
 import re
 import zlib
@@ -137,6 +138,8 @@ class RTFXDetails(NamedTuple):
         if self.raw_url:
             return URL(self.raw_url)
 
+        return None
+
 
 class RTFX(commands.Cog):
     _rtfm_cache: dict[str, dict[str, str]]
@@ -155,7 +158,7 @@ class RTFX(commands.Cog):
     )
 
     def parse_object_inv(self, stream: SphinxObjectFileReader, url: str) -> dict[str, str]:
-        # key: URL
+        # key: URL  # noqa: ERA001
         # n.b.: key doesn't have `discord` or `discord.ext.commands` namespaces
         result: dict[str, str] = {}
 
@@ -225,7 +228,7 @@ class RTFX(commands.Cog):
     async def do_rtfm(self, ctx: Context, key: str, obj: str | None) -> None:
         if obj is None:
             await ctx.send(RTFM_PAGE_TYPES[key])
-            return
+            return None
 
         if not hasattr(self, "_rtfm_cache"):
             await ctx.typing()
@@ -244,17 +247,19 @@ class RTFX(commands.Cog):
                     break
 
         cache = list(self._rtfm_cache[key].items())
-        matches = fuzzy.finder(obj, cache, key=lambda t: t[0])[:8]
+        matches = fuzzy.finder(obj, cache, key=operator.itemgetter(0))[:8]
 
         e = discord.Embed(colour=discord.Colour.blurple())
         if len(matches) == 0:
             return await ctx.send("Could not find anything. Sorry.")
 
         e.description = "\n".join(f"[`{key}`]({url})" for key, url in matches)
-        await ctx.send(embed=e, reference=ctx.replied_reference)
+        return await ctx.send(embed=e, reference=ctx.replied_reference)
 
     async def rtfm_slash_autocomplete(
-        self, interaction: discord.Interaction, current: str
+        self,
+        interaction: discord.Interaction,
+        current: str,
     ) -> list[app_commands.Choice[str]]:
         # Degenerate case: not having built caching yet
         if not hasattr(self, "_rtfm_cache"):
@@ -391,7 +396,12 @@ class RTFX(commands.Cog):
         ephemeral="If you want this command execution to be private.",
     )
     async def rtfs_callback(
-        self, interaction: Interaction, library: Libraries, search: str, exact: bool = False, ephemeral: bool = False
+        self,
+        interaction: Interaction,
+        library: Libraries,
+        search: str,
+        exact: bool = False,  # noqa: FBT001, FBT002 # required for slash parameters
+        ephemeral: bool = False,  # noqa: FBT001, FBT002 # required for slash parameters
     ) -> None:
         """RTFM command for loading source code/searching from libraries."""
         rtfs = await self._get_rtfs(library=library, search=search, exact=exact)
@@ -399,7 +409,7 @@ class RTFX(commands.Cog):
             return await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
 
         view = RTFSView(rtfs, lib=library.value, owner_id=interaction.user.id)
-        await interaction.response.send_message(view=view, ephemeral=ephemeral)
+        return await interaction.response.send_message(view=view, ephemeral=ephemeral)
 
     @group.command(name="refresh")
     @app_commands.checks.dynamic_cooldown(_rtfs_refresh_cooldown)
@@ -416,8 +426,11 @@ class RTFX(commands.Cog):
     async def refresh_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         if isinstance(error, app_commands.CommandOnCooldown):
             return await interaction.response.send_message(
-                f"Sorry, this has already been requested recently. Please wait at least {error.retry_after:.2f}s before trying again."
+                "Sorry, this has already been requested recently. "
+                f"Please wait at least {error.retry_after:.2f}s before trying again.",
             )
+
+        return None
 
     @commands.command(name="rtfs", ignore_extra=True)
     async def rtfs_prefix(self, ctx: Context) -> None:
@@ -445,7 +458,7 @@ class RTFX(commands.Cog):
         self,
         ctx: Context,
         *,
-        codeblock: Codeblock = commands.param(converter=codeblock_converter),
+        codeblock: Codeblock = commands.param(converter=codeblock_converter),  # noqa: B008 # this is how commands.param works
     ) -> None:
         """
         Evaluates Python code through the latest (installed) version of Pyright on my system.
@@ -459,7 +472,7 @@ class RTFX(commands.Cog):
 
         fmt = self._parse_pyright_output(output)
 
-        await ctx.send(fmt)
+        return await ctx.send(fmt)
 
 
 async def setup(bot: Mipha) -> None:

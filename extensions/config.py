@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from itertools import accumulate
 from typing import TYPE_CHECKING
 
 import asyncpg
@@ -57,7 +58,8 @@ class CommandName(commands.Converter):
         command = ctx.bot.get_command(lowered)
 
         if command is None or command.cog_name in ("Config", "Admin"):
-            raise commands.BadArgument(f"Command {lowered!r} is not valid.")
+            msg = f"Command {lowered!r} is not valid."
+            raise commands.BadArgument(msg)
 
         return command.qualified_name
 
@@ -75,8 +77,6 @@ class ResolvedCommandPermissions:
 
         self._lookup: defaultdict[int | None, ResolvedCommandPermissions._Entry] = defaultdict(self._Entry)
 
-        # channel_id: { allow: [commands], deny: [commands] }
-
         for name, channel_id, whitelist in records:
             entry = self._lookup[channel_id]
             if whitelist:
@@ -86,8 +86,6 @@ class ResolvedCommandPermissions:
 
     def _split(self, obj: str) -> list[str]:
         # "hello there world" -> ["hello", "hello there", "hello there world"]
-        from itertools import accumulate
-
         return list(accumulate(obj.split(), lambda x, y: f"{x} {y}"))
 
     def get_blocked_commands(self, channel_id: int) -> set[str]:
@@ -119,7 +117,7 @@ class ResolvedCommandPermissions:
         # use ?foo bar
         # ?foo bar <- guild allow
         # ?foo <- channel block
-        # result: blocked
+        # result: blocked  # noqa: ERA001
         # this is why the two for loops are separate
 
         for command in command_names:
@@ -300,7 +298,7 @@ class Config(commands.Cog):
         else:
             await self._bulk_ignore_entries(ctx, entities)
 
-        await ctx.send(ctx.tick(True))
+        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
 
     @ignore.command(name="list")
     @checks.is_mod()
@@ -374,7 +372,7 @@ class Config(commands.Cog):
             await ctx.db.execute(query, ctx.guild.id, entity_ids)
 
         self.is_plonked.invalidate_containing(f"{ctx.guild.id!r}:")
-        await ctx.send(ctx.tick(True))
+        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
 
     @unignore.command(name="all")
     @checks.is_mod()
@@ -413,7 +411,7 @@ class Config(commands.Cog):
 
         async with pool.acquire() as connection, connection.transaction():
             # delete the previous entry regardless of what it was
-            query = f"DELETE FROM command_config WHERE guild_id=$1 AND name=$2 AND {subcheck};"
+            query = f"DELETE FROM command_config WHERE guild_id=$1 AND name=$2 AND {subcheck};"  # noqa: S608 # our data only
 
             # DELETE <num>
             await connection.execute(query, *args)
@@ -422,9 +420,9 @@ class Config(commands.Cog):
 
             try:
                 await connection.execute(query, guild_id, channel_id, name, whitelist)
-            except asyncpg.UniqueViolationError:
+            except asyncpg.UniqueViolationError as err:
                 msg = "This command is already disabled." if not whitelist else "This command is already explicitly enabled."
-                raise RuntimeError(msg)
+                raise RuntimeError(msg) from err
 
     @channel.command(name="disable")
     async def channel_disable(self, ctx: GuildContext, *, command: str = commands.param(converter=CommandName)) -> None:
@@ -473,7 +471,11 @@ class Config(commands.Cog):
     @config.command(name="enable")
     @checks.is_mod()
     async def config_enable(
-        self, ctx: GuildContext, channel: discord.TextChannel | None, *, command: str = commands.param(converter=CommandName)
+        self,
+        ctx: GuildContext,
+        channel: discord.TextChannel | None,
+        *,
+        command: str = commands.param(converter=CommandName),
     ) -> None:
         """Enables a command the server or a channel."""
 
@@ -489,7 +491,11 @@ class Config(commands.Cog):
     @config.command(name="disable")
     @checks.is_mod()
     async def config_disable(
-        self, ctx: GuildContext, channel: discord.TextChannel | None, *, command: str = commands.param(converter=CommandName)
+        self,
+        ctx: GuildContext,
+        channel: discord.TextChannel | None,
+        *,
+        command: str = commands.param(converter=CommandName),
     ) -> None:
         """Disables a command for the server or a channel."""
 
@@ -532,13 +538,13 @@ class Config(commands.Cog):
     async def global_block(self, ctx: GuildContext, object_id: int) -> None:
         """Blocks a user or guild globally."""
         await self.bot._blacklist_add(object_id)
-        await ctx.send(ctx.tick(True))
+        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
 
     @_global.command(name="unblock")
     async def global_unblock(self, ctx: GuildContext, object_id: int) -> None:
         """Unblocks a user or guild globally."""
         await self.bot._blacklist_remove(object_id)
-        await ctx.send(ctx.tick(True))
+        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
 
 
 async def setup(bot: Mipha) -> None:

@@ -6,6 +6,7 @@ import gc
 import io
 import itertools
 import logging
+import operator
 import os
 import re
 import sys
@@ -158,7 +159,7 @@ class Stats(commands.Cog):
                     "channel": ctx.channel.id,
                     "author": ctx.author.id,
                     "used": message.created_at.isoformat(),
-                    "prefix": ctx.prefix,  # type: ignore
+                    "prefix": ctx.prefix,  # pyright: ignore[reportArgumentType] # won't be none here
                     "command": command,
                     "failed": ctx.command_failed,
                     "app_command": is_app_command,
@@ -191,8 +192,7 @@ class Stats(commands.Cog):
 
     @discord.utils.cached_property
     def webhook(self) -> discord.Webhook:
-        hook = discord.Webhook.from_url(self.bot.config["webhooks"]["logging"], session=self.bot.session)
-        return hook
+        return discord.Webhook.from_url(self.bot.config["webhooks"]["logging"], session=self.bot.session)
 
     @commands.command(hidden=True)
     @commands.is_owner()
@@ -321,7 +321,7 @@ class Stats(commands.Cog):
 
         # total command uses
         query = "SELECT COUNT(*), MIN(used) FROM commands WHERE guild_id=$1;"
-        count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id)  # type: ignore
+        count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id)  # pyright: ignore[reportAssignmentType] # stub shenanigans
 
         embed.description = f"{count[0]} commands used."
         timestamp = count[1].replace(tzinfo=datetime.UTC) if count[1] else discord.utils.utcnow()
@@ -423,7 +423,7 @@ class Stats(commands.Cog):
 
         # total command uses
         query = "SELECT COUNT(*), MIN(used) FROM commands WHERE guild_id=$1 AND author_id=$2;"
-        count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)  # type: ignore
+        count: tuple[int, datetime.datetime] = await ctx.db.fetchrow(query, ctx.guild.id, member.id)  # pyright: ignore[reportAssignmentType] # stub nonsense
 
         embed.description = f"{count[0]} commands used."
         timestamp = count[1].replace(tzinfo=datetime.UTC) if count[1] else discord.utils.utcnow()
@@ -486,7 +486,7 @@ class Stats(commands.Cog):
         """Global all time command statistics."""
 
         query = "SELECT COUNT(*) FROM commands;"
-        total: tuple[int] = await ctx.db.fetchrow(query)  # type: ignore
+        total: tuple[int] = await ctx.db.fetchrow(query)  # pyright: ignore[reportAssignmentType] # stub nonsense
 
         e = discord.Embed(title="Command Stats", colour=discord.Colour.blurple())
         e.description = f"{total[0]} commands used."
@@ -637,7 +637,7 @@ class Stats(commands.Cog):
         bots = sum(m.bot for m in guild.members)
         total = guild.member_count or 1
         e.add_field(name="Members", value=str(total))
-        e.add_field(name="Bots", value=f"{bots} ({bots/total:.2%})")
+        e.add_field(name="Bots", value=f"{bots} ({bots / total:.2%})")
 
         if guild.icon:
             e.set_thumbnail(url=guild.icon.url)
@@ -691,15 +691,13 @@ class Stats(commands.Cog):
         await self.bot.owner.send(embed=e)
 
     def add_record(self, record: logging.LogRecord) -> None:
-        # if self.bot.config.debug:
-        #     return
         self._logging_queue.put_nowait(record)
 
     async def send_log_record(self, record: logging.LogRecord) -> None:
         attributes = {"INFO": "\U00002139\U0000fe0f", "WARNING": "\U000026a0\U0000fe0f"}
 
         emoji = attributes.get(record.levelname, "\N{CROSS MARK}")
-        dt = datetime.datetime.utcfromtimestamp(record.created)
+        dt = datetime.datetime.fromtimestamp(record.created, datetime.UTC)
 
         if "heartbeat blocked" in record.message:
             message = formats.to_codeblock(record.message, language="py", escape_md=False)
@@ -758,8 +756,12 @@ class Stats(commands.Cog):
         spam_control = self.bot._spam_cooldown_mapping
         being_spammed = [str(key) for key, value in spam_control._cache.items() if value._tokens == 0]
 
-        description.append(f'Current Spammers: {", ".join(being_spammed) if being_spammed else "None"}')
-        description.append(f"Questionable Connections: {questionable_connections}")
+        description.extend(
+            (
+                f"Current Spammers: {', '.join(being_spammed) if being_spammed else 'None'}",
+                f"Questionable Connections: {questionable_connections}",
+            )
+        )
 
         total_warnings += questionable_connections
         if being_spammed:
@@ -775,7 +777,7 @@ class Stats(commands.Cog):
 
         bad_inner_tasks = ", ".join(hex(id(t)) for t in inner_tasks if t.done() and t._exception is not None)
         total_warnings += bool(bad_inner_tasks)
-        embed.add_field(name="Inner Tasks", value=f'Total: {len(inner_tasks)}\nFailed: {bad_inner_tasks or "None"}')
+        embed.add_field(name="Inner Tasks", value=f"Total: {len(inner_tasks)}\nFailed: {bad_inner_tasks or 'None'}")
         embed.add_field(name="Events Waiting", value=f"Total: {len(event_tasks)}", inline=False)
 
         command_waiters = len(self._data_batch)
@@ -943,7 +945,7 @@ class Stats(commands.Cog):
             if name in all_commands:
                 all_commands[name] = uses
 
-        as_data = sorted(all_commands.items(), key=lambda t: t[1], reverse=True)
+        as_data = sorted(all_commands.items(), key=operator.itemgetter(1), reverse=True)
         table = formats.TabularData()
         table.set_columns(["Command", "Uses"])
         table.add_rows(tup for tup in as_data)
@@ -1005,7 +1007,7 @@ class Stats(commands.Cog):
                 """
 
         class Count:
-            __slots__ = ("success", "failed", "total")
+            __slots__ = ("failed", "success", "total")
 
             def __init__(self) -> None:
                 self.success = 0
@@ -1028,11 +1030,15 @@ class Stats(commands.Cog):
 
         table = formats.TabularData()
         table.set_columns(["Cog", "Success", "Failed", "Total"])
-        data = sorted([(cog, e.success, e.failed, e.total) for cog, e in data.items()], key=lambda t: t[-1], reverse=True)
+        data = sorted(
+            [(cog, e.success, e.failed, e.total) for cog, e in data.items()],
+            key=operator.itemgetter(-1),
+            reverse=True,
+        )
 
         table.add_rows(data)
         render = table.render()
-        await ctx.send(f"```\n{render}\n```")
+        return await ctx.send(f"```\n{render}\n```")
 
 
 old_on_error = commands.Bot.on_error
@@ -1055,7 +1061,7 @@ async def on_error(self: commands.Bot, event: str, *args: Any, **kwargs: Any) ->
         args_str.append(f"[{index}]: {arg!r}")
     args_str.append("```")
     e.add_field(name="Args", value="\n".join(args_str), inline=False)
-    cog: Stats | None = self.get_cog("Stats")  # type: ignore # no upcasting
+    cog: Stats | None = self.get_cog("Stats")  # pyright: ignore[reportAssignmentType] # no upcasting
     if cog:
         await cog.webhook.send(embed=e)
 
@@ -1077,7 +1083,7 @@ async def setup(bot: Mipha) -> None:
     commands.Bot.on_error = on_error
 
 
-async def teardown(bot: Mipha) -> None:
+async def teardown(bot: Mipha) -> None:  # required for extension loading
     commands.Bot.on_error = old_on_error
     logging.getLogger().removeHandler(bot._stats_cog_gateway_handler)
     del bot._stats_cog_gateway_handler

@@ -36,7 +36,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         yield ("" if indent == 1 else "├" if subc != 0 else "└") + f"`{command.qualified_name}`: {command.short_doc}"
         if isinstance(command, commands.Group):
             last = len(command.commands) - 1
-            for _, command in enumerate(await self.filter_commands(command.commands, sort=True)):
+            for _, command in enumerate(await self.filter_commands(command.commands, sort=True)):  # noqa: B020 # correct usage
                 async for result in self.recursive_command_format(command, indent=indent + 1, subc=last):
                     yield result
                 last -= 1
@@ -78,7 +78,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         pages = []
 
         for cog, cmds in mapping.items():
-            cmds = await self.filter_commands(cmds, sort=True)
+            cmds = await self.filter_commands(cmds, sort=True)  # noqa: PLW2901 # correct usage
             await self.format_commands(cog, cmds, pages=pages)
 
         total = len(pages)
@@ -117,7 +117,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         embed.title = f"{self.context.clean_prefix}{group.qualified_name} {group.signature}"
         embed.description = f"{group.help or ''}\n\n**Subcommands**\n\n{subs}"
         embed.set_footer(text=f'Use "{self.context.clean_prefix}help <command>" for more information.')
-        await self.context.send(embed=embed)
+        return await self.context.send(embed=embed)
 
     async def send_command_help(self, command: commands.Command) -> None:
         try:

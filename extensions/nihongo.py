@@ -44,8 +44,14 @@ if TYPE_CHECKING:
     )
 
 BASE_URL = "https://kanjiapi.dev/v1"
-HIRAGANA = "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよらりるれろわを"
-KATAKANA = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ"
+HIRAGANA = (
+    "あいうえおかきくけこがぎぐげごさしすせそざじずぜぞたちつてとだぢづでどなにぬ"
+    "ねのはひふへほばびぶべぼぱぴぷぺぽまみむめもやゆよらりるれろわを"
+)
+KATAKANA = (
+    "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメ"
+    "モヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ"
+)
 JISHO_WORDS_URL = "https://jisho.org/api/v1/search/words"
 JISHO_KANJI_URL = "https://jisho.org/api/v1/search/{}%23kanji"
 JISHO_REPLACEMENTS = {
@@ -98,8 +104,7 @@ def kanji_in_response(kanji: str, soup: bs4.BeautifulSoup) -> bool:
 
 
 def parse_response(raw_html: str) -> bs4.BeautifulSoup:
-    soup = bs4.BeautifulSoup(raw_html, "html.parser")
-    return soup
+    return bs4.BeautifulSoup(raw_html, "html.parser")
 
 
 class JishoKanji:
@@ -112,7 +117,7 @@ class JishoKanji:
     def taught_in(self) -> str | None:
         raw = self.data.find("div", class_="grade")
         if raw:
-            return raw.select("strong")[0].text.title()  # type: ignore # bs4 types are bad
+            return raw.select("strong")[0].text.title()  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
         return None
 
     @property
@@ -121,7 +126,7 @@ class JishoKanji:
         if raw is None:
             return None
 
-        level = raw.select("strong")[0].text  # type: ignore # bs4 types are bad
+        level = raw.select("strong")[0].text  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
         return level.title()
 
     @property
@@ -130,7 +135,7 @@ class JishoKanji:
         if raw is None:
             return None
 
-        count = raw.select("strong")[0].text  # type: ignore # bs4 types are bad
+        count = raw.select("strong")[0].text  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
 
         return f"{plural(int(count)):Stroke}"
 
@@ -152,7 +157,7 @@ class JishoKanji:
         if raw is None:
             return None
 
-        raw = raw.select("strong")[0].text  # type: ignore # bs4 types are bad
+        raw = raw.select("strong")[0].text  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
         return f"{raw} of 2500 most used Kanji in newspapers."
 
     def reading_compounds(self) -> defaultdict[str, list[str]]:
@@ -162,7 +167,7 @@ class JishoKanji:
 
         fmt = defaultdict(list)
 
-        for x in raw:  # type: ignore # typeshed sucks here
+        for x in raw:  # pyright: ignore[reportAssignmentType] # typeshed sucks here
             x: bs4.Tag
             if isinstance(x, (bs4.NavigableString, str)):
                 continue
@@ -180,11 +185,11 @@ class JishoKanji:
         if raw is None:
             return None
 
-        raw = raw.find("dl", class_=f"dictionary_entry {key}_yomi")  # type: ignore # bs4 types are bad
+        raw = raw.find("dl", class_=f"dictionary_entry {key}_yomi")  # pyright: ignore[reportCallIssue] # bs4 types are bad
         if not raw:
             return None
 
-        raw = raw.select("dd", class_="kanji-details__main-readings")[0]  # type: ignore # bs4 types are bad
+        raw = raw.select("dd", class_="kanji-details__main-readings")[0]  # pyright: ignore[reportAttributeAccessIssue,reportCallIssue] # bs4 types are bad
 
         fmt = []
 
@@ -194,7 +199,7 @@ class JishoKanji:
                 href = item.get("href")
                 if href is None:
                     raise ValueError("Somethign was None that should not be None.")
-                link = f"https://{href.lstrip('//')}"  # type: ignore # bs4 types are bad
+                link = f"https://{href.lstrip('//')}"  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad  # noqa: B005 # correct usage
                 fmt.append((text, link))
 
         return fmt
@@ -220,6 +225,8 @@ class JishoKanji:
         if kun_readings := readings.get("Kun"):
             return kun_readings
 
+        return None
+
     @property
     def kun_symbols(self) -> list[tuple[str, str]] | None:
         return self.symbols("kun")
@@ -228,7 +235,7 @@ class JishoKanji:
     def radical(self) -> list[str] | None:
         raw = self.data.find("div", class_="radicals")
         if raw and raw.find("span"):
-            return raw.find("span").text.strip().rsplit()[:2]  # type: ignore #protected
+            return raw.find("span").text.strip().rsplit()[:2]  # pyright: ignore[reportOptionalMemberAccess,reportAttributeAccessIssue] # guarded in earlier call
         return None
 
     def to_dict(self) -> dict[str, str | list[str]]:
@@ -345,20 +352,18 @@ class KanjiEmbed(discord.Embed):
         embed.description = ""
         for key, value in sense.items():
             if key == "links":
-                # list[dict[str, str]]
                 if value:
-                    subdict = value[0]  # type: ignore  # bleh
+                    subdict = value[0]  # pyright: ignore[reportIndexIssue]  # typeddict.items funny
                     links += f"[{subdict.get('text')}]({subdict.get('url')})\n"
                 else:
                     continue
             elif key == "source":
-                # list[dict[str, str]]
                 if value:
-                    subdict = value[0]  # type: ignore  # bleh
+                    subdict = value[0]  # pyright: ignore[reportIndexIssue]  # typeddict.items funny
                     sources += f"Language: {subdict['language']}\nWord: {subdict['word']}"
             else:
                 if value:
-                    senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"  # type: ignore  # bleh
+                    senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"  # pyright: ignore[reportArgumentType,reportCallIssue]  # bleh webscrape code
 
         if senses:
             embed.description += to_codeblock(senses, language="prolog", escape_md=False)
@@ -390,11 +395,6 @@ class Nihongo(commands.Cog):
     def __init__(self, bot: Mipha) -> None:
         self.bot = bot
         self.kakasi = pykakasi.kakasi()
-        # self.nihongo_study_reminders.start()
-
-    def cog_unload(self) -> None:
-        # self.nihongo_study_reminders.cancel()
-        pass
 
     @commands.command()
     async def romaji(self, ctx: Context, *, text: str = commands.param(converter=commands.clean_content)) -> None:
@@ -487,17 +487,16 @@ class Nihongo(commands.Cog):
         await menu.start()
 
     def _draw_kana(self, text: str) -> BytesIO:
-        # font = ImageFont.truetype("static/Hiragino-Sans-GB.ttc", 60)
         text = fill(text, 25, replace_whitespace=False)
         font = ImageFont.truetype("static/fonts/W6.ttc", 60)
         padding = 50
 
         images = [Image.new("RGBA", (1, 1), color=0) for _ in range(2)]
-        for index, (image, colour) in enumerate(zip(images, ((47, 49, 54), "white"))):
+        for index, (image, colour) in enumerate(zip(images, ((47, 49, 54), "white"), strict=False)):
             draw = ImageDraw.Draw(image)
             left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
             w, h = right - left, bottom - top
-            images[index] = image = image.resize((w + padding, h + padding))
+            images[index] = image = image.resize((w + padding, h + padding))  # noqa: PLW2901 # correct usage
             draw = ImageDraw.Draw(image)
             draw.multiline_text((padding / 2, padding / 2), text=text, fill=colour, font=font)
         background, foreground = images
@@ -540,7 +539,7 @@ class Nihongo(commands.Cog):
         await ctx.send("Kana-racing begins in 5 seconds.")
         await asyncio.sleep(5)
 
-        randomized_kana = "".join(random.choices(chars, k=amount))
+        randomized_kana = "".join(random.choices(chars, k=amount))  # noqa: S311 # not crypto
 
         func = partial(self._draw_kana, randomized_kana)
         image = await ctx.bot.loop.run_in_executor(None, func)
@@ -560,7 +559,7 @@ class Nihongo(commands.Cog):
             ):
                 winners[message.author] = time.time() - start
                 is_ended.set()
-                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))
+                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))  # noqa: FBT003 # shortcut
             return False
 
         task = ctx.bot.loop.create_task(ctx.bot.wait_for("message", check=check))
@@ -592,12 +591,12 @@ class Nihongo(commands.Cog):
     async def jlpt(
         self,
         ctx: Context,
-        level: list[str] = commands.param(converter=JLPTConverter, default=JLPT_N5, displayed_default="n5"),
+        level: list[str] = commands.param(converter=JLPTConverter, default=JLPT_N5, displayed_default="n5"),  # noqa: B008 # this is how commands.param works
     ) -> None:
         """
         Returns a random word from the specified JLPT level.
         """
-        word, reading, meaning, _ = random.choice(level)
+        word, reading, meaning, _ = random.choice(level)  # noqa: S311 # not crypto
         embed = discord.Embed(title=word, description=meaning, colour=discord.Colour.random())
         embed.add_field(name="Reading", value=f"『{reading}』")
 

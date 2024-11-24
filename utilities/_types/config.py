@@ -35,6 +35,11 @@ class PyrightConfig(TypedDict):
     token: str
 
 
+class SonarrConfig(TypedDict):
+    url: str
+    token: str
+
+
 class RedisConfig(TypedDict):
     url: str
     port: int
@@ -50,9 +55,7 @@ class WebhookConfig(TypedDict):
 class TokenConfig(TypedDict, total=False):
     github: str
     wanikani: str
-    sonarr: str
     tiktok: str
-    pythonista_api: str
     deepl: str
 
 
@@ -93,11 +96,21 @@ class Logging(TypedDict):
     webhooks: list[str]
 
 
+class PythonistaLoggingConfig(TypedDict):
+    url: str
+    token: str
+
+
+class PythonistaConfig(TypedDict):
+    logging: PythonistaLoggingConfig
+
+
 class RootConfig(TypedDict, total=False):
     bot: Required[BotConfig]
     postgresql: Required[DatabaseConfig]
     rtfs: RTFSConfig
     pyright: PyrightConfig
+    sonarr: SonarrConfig
     webhooks: Required[WebhookConfig]
     tokens: TokenConfig
     mangadex: MangaDexConfig
@@ -106,3 +119,4 @@ class RootConfig(TypedDict, total=False):
     duckling: DucklingConfig
     lewd: LewdConfig
     logging_webhooks: dict[str, Logging]  # guild_id: [channels]
+    pythonista: PythonistaConfig

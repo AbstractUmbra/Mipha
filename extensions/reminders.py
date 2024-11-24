@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import operator
 import textwrap
 import zoneinfo
 from typing import TYPE_CHECKING, Any, NamedTuple
@@ -66,9 +67,10 @@ class TimeZone(NamedTuple):
         timezones = ctx.cog.find_timezones(argument)
 
         try:
-            return await ctx.disambiguate(timezones, lambda t: t[0], ephemeral=True)
-        except ValueError:
-            raise commands.BadArgument(f"Could not find timezone for {argument!r}")
+            return await ctx.disambiguate(timezones, operator.itemgetter(0), ephemeral=True)
+        except ValueError as err:
+            msg = f"Could not find timezone for {argument!r}"
+            raise commands.BadArgument(msg) from err
 
     def to_choice(self) -> app_commands.Choice[str]:
         return app_commands.Choice(name=self.label, value=self.key)
@@ -91,7 +93,7 @@ class SnoozeModal(discord.ui.Modal, title="Snooze"):
     async def on_submit(self, interaction: Interaction) -> None:
         try:
             when = await WhenAndWhatTransformer.transform(interaction, self.duration.value)
-        except Exception:
+        except BadDatetimeTransform:
             await interaction.response.send_message(
                 'Duration could not be parsed, sorry. Try something like "5 minutes" or "1 hour"',
                 ephemeral=True,
@@ -185,11 +187,11 @@ class Timer:
             "created": created,
             "expires": expires,
         }
-        return cls(record=pseudo)  # type: ignore # this gets complicated due to Record type
+        return cls(record=pseudo)  # pyright: ignore[reportArgumentType] # this gets complicated due to Record type
 
     def __eq__(self, other: object) -> bool:
         try:
-            return self.id == other.id  # type: ignore
+            return self.id == other.id  # pyright: ignore[reportAttributeAccessIssue] # eq will fail if it's not the correct type
         except AttributeError:
             return False
 
@@ -290,7 +292,7 @@ class Reminder(commands.Cog):
                 return
 
             parser = etree.XMLParser(ns_clean=True, recover=True, encoding="utf-8")
-            tree = etree.fromstring(await resp.read(), parser=parser)
+            tree = etree.fromstring(await resp.read(), parser=parser)  # noqa: S320 # trusted source.
 
             # Build a temporary dictionary to resolve "preferred" mappings
             entries: dict[str, CLDRDataEntry] = {
@@ -643,7 +645,7 @@ class Reminder(commands.Cog):
             view = ReminderView(url=url, timer=timer, cog=self, author_id=author_id)
 
         try:
-            msg = await channel.send(msg, allowed_mentions=discord.AllowedMentions(users=True), view=view)  # type: ignore # can't make this a non-messageable lol
+            msg = await channel.send(msg, allowed_mentions=discord.AllowedMentions(users=True), view=view)  # pyright: ignore[reportAttributeAccessIssue] # we know it's a Messageable
         except discord.HTTPException:
             return
         else:

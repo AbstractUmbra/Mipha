@@ -35,12 +35,12 @@ class BadTikTokData(Exception):
     def data(self) -> TikTokSynth:
         return self._data
 
-    def clean(self) -> dict[str, Any]:
+    def clean(self) -> TikTokSynth:
         data = self._data.copy()
         if data.get("data"):
-            data["data"].pop("v_str", None)  # type: ignore
+            data["data"].pop("v_str", None)  # pyright: ignore[reportArgumentType] # immutable typed dict
 
-        return data  # type: ignore
+        return data
 
 
 class SynthCog(commands.Cog, name="Synth"):
@@ -101,7 +101,9 @@ class SynthCog(commands.Cog, name="Synth"):
 
     async def _get_audio_from_kana(self, kana: KanaResponse, speaker_id: int) -> BytesIO:
         async with self.bot.session.post(
-            "http://synth:50021/synthesis", params={"speaker": str(speaker_id)}, json=kana
+            "http://synth:50021/synthesis",
+            params={"speaker": str(speaker_id)},
+            json=kana,
         ) as resp:
             data = await resp.read()
 
@@ -117,7 +119,10 @@ class SynthCog(commands.Cog, name="Synth"):
     async def _get_tiktok_response(self, *, engine: str, text: str) -> TikTokSynth | None:
         parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0", "aid": "1233"}
         headers: dict[str, str] = {
-            "User-Agent": "com.zhiliaoapp.musically/2022600030 (Linux; U; Android 7.1.2; es_ES; SM-G988N; Build/NRD90M;tt-ok/3.12.13.1)",
+            "User-Agent": (
+                "com.zhiliaoapp.musically/2022600030 "
+                "(Linux; U; Android 7.1.2; es_ES; SM-G988N; Build/NRD90M;tt-ok/3.12.13.1)"
+            ),
             "Cookie": f"sessionid={self.tiktok_session_id}",
         }
 
@@ -134,7 +139,7 @@ class SynthCog(commands.Cog, name="Synth"):
             try:
                 self._tiktok_data_verification(data)
             except BadTikTokData as error:
-                LOGGER.error(
+                LOGGER.exception(
                     "TikTok synth logging.\nURL: %r\nMessage: %r\nStatus Code: %d\nStatus Message: %r\nDict: %s",
                     url,
                     text,
@@ -154,6 +159,7 @@ class SynthCog(commands.Cog, name="Synth"):
                 data["data"]["duration"],
             )
             return data
+        return None
 
     @app_commands.command(
         name="tiktok-voice",
@@ -190,7 +196,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
         file = discord.File(fp=clean_data, filename="tiktok_synth.mp3")
 
-        await itx.followup.send(content=f">>> {text}", file=file)
+        return await itx.followup.send(content=f">>> {text}", file=file)
 
     @tiktok_callback.autocomplete("engine")
     async def tiktok_engine_autocomplete(self, itx: Interaction, current: str) -> list[app_commands.Choice[str]]:

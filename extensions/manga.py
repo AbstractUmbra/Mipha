@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import logging
 import secrets
+import traceback
 from textwrap import shorten
 from typing import TYPE_CHECKING
 
@@ -50,7 +51,9 @@ class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hon
         return table.get(item)
 
     async def convert(
-        self, ctx: Context[MangaCog], argument: str
+        self,
+        ctx: Context[MangaCog],
+        argument: str,
     ) -> hondana.Manga | hondana.Chapter | hondana.Author | None:
         search = hondana.MANGADEX_URL_REGEX.search(argument)
         if search is None:
@@ -60,8 +63,7 @@ class MangaDexConverter(commands.Converter[hondana.Manga | hondana.Chapter | hon
         if item is None:
             return None
 
-        true_item = await item(search["ID"])
-        return true_item
+        return await item(search["ID"])
 
 
 class MangaView(BaseView):
@@ -73,7 +75,9 @@ class MangaView(BaseView):
         for idx, mango in enumerate(manga, start=1):
             options.append(
                 discord.SelectOption(
-                    label=f"[{idx}] {shorten(mango.title, width=95)}", description=mango.id, value=mango.id
+                    label=f"[{idx}] {shorten(mango.title, width=95)}",
+                    description=mango.id,
+                    value=mango.id,
                 ),
             )
         self._lookup = {m.id: m for m in manga}
@@ -118,7 +122,7 @@ class MangaView(BaseView):
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
             return await interaction.response.send_message("You can't choose someone else's Manga!", ephemeral=True)
-        await super().on_error(interaction, error, item)
+        return await super().on_error(interaction, error, item)
 
 
 class MangaCog(commands.Cog, name="Manga"):
@@ -145,12 +149,14 @@ class MangaCog(commands.Cog, name="Manga"):
         if not ctx.invoked_subcommand:
             return await ctx.send_help(self)
 
+        return None
+
     @mangadex.command(name="get")
     async def get_(
         self,
         ctx: Context,
         *,
-        item: hondana.Manga | hondana.Chapter | hondana.Author = commands.param(converter=MangaDexConverter),
+        item: hondana.Manga | hondana.Chapter | hondana.Author = commands.param(converter=MangaDexConverter),  # noqa: B008 # this is how commands.param works
     ) -> None:
         """
         This command takes a mangadex link to a chapter or manga and returns the data.
@@ -297,9 +303,9 @@ class MangaCog(commands.Cog, name="Manga"):
             embed = await MangaDexEmbed.from_chapter(chapter, nsfw_allowed=True)
             embeds.append(embed)
 
-        for embeds in as_chunks(embeds, 10):
+        for chunked_embeds in as_chunks(embeds, 10):
             await self.webhook.send(
-                embeds=embeds,
+                embeds=chunked_embeds,
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
 
@@ -309,8 +315,6 @@ class MangaCog(commands.Cog, name="Manga"):
 
     @get_personal_feed.error
     async def on_loop_error(self, error: BaseException) -> None:
-        import traceback
-
         error = getattr(error, "original", error)
         lines = traceback.format_exception(type(error), error, error.__traceback__)
         fmt = "<@!155863164544614402> \n"

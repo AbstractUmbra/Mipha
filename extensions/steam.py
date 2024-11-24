@@ -51,7 +51,9 @@ class Steam(commands.GroupCog):
     @app_commands.rename(collection_id="collection")
     @app_commands.describe(collection_id="The collection ID to fetch mod IDs from.")
     async def mod_ids_from_collection(
-        self, interaction: Interaction, collection_id: app_commands.Range[int, 1, 4000000000]
+        self,
+        interaction: Interaction,
+        collection_id: app_commands.Range[int, 1, 4000000000],
     ) -> None:
         await interaction.response.defer()
 

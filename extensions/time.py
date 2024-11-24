@@ -2,12 +2,13 @@
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
-"""
+"""  # we access via namespace not directly
 
 from __future__ import annotations
 
 import collections
 import datetime
+import operator
 import zoneinfo
 from typing import TYPE_CHECKING, Literal, NamedTuple, TypedDict, overload
 
@@ -50,9 +51,10 @@ class TimeZone(NamedTuple):
         timezones = ctx.cog.find_timezones(argument)
 
         try:
-            return await ctx.disambiguate(timezones, lambda t: t[0], ephemeral=True)
-        except ValueError:
-            raise commands.BadArgument(f"Could not find timezone for {argument!r}")
+            return await ctx.disambiguate(timezones, operator.itemgetter(0), ephemeral=True)
+        except ValueError as err:
+            msg = f"Could not find timezone for {argument!r}"
+            raise commands.BadArgument(msg) from err
 
     def to_choice(self) -> app_commands.Choice[str]:
         return app_commands.Choice(name=self.label, value=self.key)
@@ -78,8 +80,7 @@ class TimezoneSource(SimpleListSource[tuple[str, datetime.timedelta]]):
             return seconds // (60 * 60)
 
         for member_str, offset in entries:
-            if not offset:
-                offset = datetime.timedelta(0)
+            offset = offset or datetime.timedelta(0)  # noqa: PLW2901 # shortcircuit
 
             houred_offset = to_hour(offset)
             tz_dict[houred_offset].append(member_str)
@@ -177,7 +178,7 @@ class Time(commands.Cog):
                 return
 
             parser = etree.XMLParser(ns_clean=True, recover=True, encoding="utf-8")
-            tree = etree.fromstring(await resp.read(), parser=parser)
+            tree = etree.fromstring(await resp.read(), parser=parser)  # noqa: S320 # trusted data source
 
             # Build a temporary dictionary to resolve "preferred" mappings
             entries: dict[str, CLDRDataEntry] = {
@@ -244,7 +245,7 @@ class Time(commands.Cog):
         for item in iterable:
             embed = discord.Embed(title="Timezone lists", colour=discord.Colour.green())
             embed.description = "\n".join(item)
-            fmt = f"Page {iterable.index(item)+1}/{len(iterable)}"
+            fmt = f"Page {iterable.index(item) + 1}/{len(iterable)}"
             embed.set_footer(text=f"{fmt} | Requested by: {requester}")
             embeds.append(embed)
         return embeds
@@ -383,7 +384,7 @@ class Time(commands.Cog):
 
             ret.append((user, offset))
 
-        ret.sort(key=lambda t: t[1])
+        ret.sort(key=operator.itemgetter(1))
 
         return ret
 
@@ -403,7 +404,7 @@ class Time(commands.Cog):
                 SELECT user_id, tz
                 FROM tz_store
                 """
-        records: list[TimezoneRecord] = await self.bot.pool.fetch(query)  # type: ignore
+        records: list[TimezoneRecord] = await self.bot.pool.fetch(query)  # pyright: ignore[reportAssignmentType] # stubs
         records = [*filter(lambda r: r["user_id"] in [m.id for m in context.guild.members], records)]
         if not records:
             return await interaction.followup.send("Sorry but there are no recorded timezones here!", ephemeral=True)
@@ -412,7 +413,7 @@ class Time(commands.Cog):
         source = TimezoneSource(data=transformed, per_page=10)
         pages = RoboPages(source=source, ctx=context, check_embeds=True, compact=False)
 
-        await pages.start(content=f"This is the current timezone list for {interaction.guild.name}!", ephemeral=True)
+        return await pages.start(content=f"This is the current timezone list for {interaction.guild.name}!", ephemeral=True)
 
 
 async def setup(bot: Mipha) -> None:
