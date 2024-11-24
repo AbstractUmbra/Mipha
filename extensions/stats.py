@@ -290,7 +290,10 @@ class Stats(commands.Cog):
         embed.add_field(name="Channels", value=f"{text + voice} total\n{text} text\n{voice} voice")
 
         memory_usage = self.process.memory_full_info().uss / 1024**2
-        cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
+        cpu_count = psutil.cpu_count()
+        assert cpu_count  # valid here
+
+        cpu_usage = self.process.cpu_percent() / cpu_count
         embed.add_field(name="Process", value=f"{memory_usage:.2f} MiB\n{cpu_usage:.2f}% CPU")
 
         version = metadata.version("discord.py")
@@ -760,7 +763,7 @@ class Stats(commands.Cog):
             (
                 f"Current Spammers: {', '.join(being_spammed) if being_spammed else 'None'}",
                 f"Questionable Connections: {questionable_connections}",
-            )
+            ),
         )
 
         total_warnings += questionable_connections
@@ -785,7 +788,10 @@ class Stats(commands.Cog):
         description.append(f"Commands Waiting: {command_waiters}, Batch Locked: {is_locked}")
 
         memory_usage = self.process.memory_full_info().uss / 1024**2
-        cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
+        cpu_count = psutil.cpu_count()
+        assert cpu_count  # valid here
+
+        cpu_usage = self.process.cpu_percent() / cpu_count
         embed.add_field(name="Process", value=f"{memory_usage:.2f} MiB\n{cpu_usage:.2f}% CPU", inline=False)
 
         global_rate_limit = not self.bot.http._global_over.is_set()
