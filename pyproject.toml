@@ -103,6 +103,7 @@ ignore = [
     "F402",
     "F403",
     "F405",
+    "INP001",   # due to how I load modules this results in annoyances
     "PD011",    # this is not a numpy codebase
     "PERF203",
     "PLC0414",  # pyright ruling for `as` imports needed
