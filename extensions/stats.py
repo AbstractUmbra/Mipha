@@ -1089,7 +1089,7 @@ async def setup(bot: Mipha) -> None:
     commands.Bot.on_error = on_error
 
 
-async def teardown(bot: Mipha) -> None:  # required for extension loading
+async def teardown(bot: Mipha) -> None:  # noqa: RUF029 # required for extension loading
     commands.Bot.on_error = old_on_error
     logging.getLogger().removeHandler(bot._stats_cog_gateway_handler)
     del bot._stats_cog_gateway_handler

@@ -40,7 +40,7 @@ __all__ = (
 )
 
 T = TypeVar("T")
-type Interaction = discord.Interaction["Mipha"]
+type Interaction = discord.Interaction[Mipha]
 
 
 # For typing purposes, `Context.db` returns a Protocol type
@@ -250,7 +250,7 @@ class Context(commands.Context["Mipha"], Generic[CogT_co]):
         await view.wait()
         return view.value
 
-    def tick(self, opt: bool | None, label: str | None = None) -> str:  # shortcut
+    def tick(self, opt: bool | None, label: str | None = None) -> str:  # noqa: FBT001 # shortcut
         lookup = {
             True: "<:TickYes:735498312861351937>",
             False: "<:CrossNo:735498453181923377>",

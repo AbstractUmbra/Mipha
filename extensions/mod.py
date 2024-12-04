@@ -2820,7 +2820,7 @@ class Mod(commands.Cog):
     @robomod.command(name="raid")
     @checks.is_mod()
     @app_commands.describe(enabled="Whether raid protection should be enabled or not, toggles if not given.")
-    async def robomod_raid(self, ctx: GuildContext, enabled: bool | None = None) -> None:  # required for callback parsing
+    async def robomod_raid(self, ctx: GuildContext, enabled: bool | None = None) -> None:  # noqa: FBT001 # required for callback parsing
         """Toggles raid protection on the server.
 
         Raid protection automatically bans members that spam messages in your server.

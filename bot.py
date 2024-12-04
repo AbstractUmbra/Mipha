@@ -24,7 +24,7 @@ import mystbin
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import (
-    _ColourFormatter as ColourFormatter,  # we do a little cheating
+    _ColourFormatter as ColourFormatter,  # noqa: PLC2701 # we do a little cheating
     stream_supports_colour,
 )
 
