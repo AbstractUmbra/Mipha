@@ -217,62 +217,6 @@ class MangaCog(commands.Cog, name="Manga"):
             await ctx.send("You did not format the command flags properly.")
             return
 
-    @mangadex.command(name="manga")
-    async def manga_(self, ctx: Context, *, manga_id: str) -> None:
-        """
-        Uses a MangaDex UUID (for manga) to retrieve the data for it.
-        """
-        manga = await self.client.get_manga(manga_id)
-
-        if manga.content_rating in (
-            hondana.ContentRating.pornographic,
-            hondana.ContentRating.suggestive,
-            hondana.ContentRating.erotica,
-        ):
-            await ctx.send("This manga is a bit too lewd for a non-lewd channel.")
-            return
-
-        embed = await MangaDexEmbed.from_manga(manga)
-
-        await ctx.send(embed=embed)
-
-    @mangadex_group.command(name="manga")
-    @app_commands.describe(manga_id="The ID of the manga!")
-    async def slash_manga(self, interaction: Interaction, manga_id: str) -> None:
-        """Fetch details about a manga from MangaDex."""
-        await interaction.response.defer()
-        manga = await self.client.get_manga(manga_id)
-
-        if manga.content_rating in (
-            hondana.ContentRating.pornographic,
-            hondana.ContentRating.suggestive,
-            hondana.ContentRating.erotica,
-        ):
-            await interaction.followup.send("This manga is a bit too lewd for a non-lewd channel.")
-            return
-
-        embed = await MangaDexEmbed.from_manga(manga)
-
-        await interaction.followup.send(embed=embed)
-
-    @mangadex.command(name="chapter")
-    async def chapter_(self, ctx: Context, *, chapter_id: str) -> None:
-        """
-        Returns data on a MangaDex chapter.
-        """
-        chapter = await self.client.get_chapter(chapter_id)
-
-        if chapter.manga is None:
-            await chapter.get_parent_manga()
-
-        assert chapter.manga is not None
-
-        nsfw_allowed = isinstance(ctx.channel, discord.DMChannel) or ctx.channel.is_nsfw()
-
-        embed = await MangaDexEmbed.from_chapter(chapter, nsfw_allowed=nsfw_allowed)
-
-        await ctx.send(embed=embed)
-
     @tasks.loop(hours=1)
     async def get_personal_feed(self) -> None:
         """Gets the current user (me)'s manga feed.
