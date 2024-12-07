@@ -290,11 +290,11 @@ class KanjiEmbed(discord.Embed):
 
         embed.add_field(name="(School) Grade learned:", value=f"**__{payload.grade}__**")
         embed.add_field(name="Stroke count:", value=f"**__{payload.stroke_count}__**")
-        embed.add_field(name="Kun Readings", value=("\n".join(payload.kun_readings) or "N/A"))
-        embed.add_field(name="On Readings", value=("\n".join(payload.on_readings) or "N/A"))
-        embed.add_field(name="Name Readings", value=("\n".join(payload.name_readings) or "N/A"))
+        embed.add_field(name="Kun Readings", value=(payload.kun_readings or "N/A"))
+        embed.add_field(name="On Readings", value=(payload.on_readings or "N/A"))
+        embed.add_field(name="Name Readings", value=(payload.name_readings or "N/A"))
         embed.add_field(name="Unicode", value=payload.unicode)
-        embed.description = to_codeblock(("\n".join(payload.meanings) or "N/A"), language="")
+        embed.description = to_codeblock(payload.meanings or "N/A", language="")
         embed.set_footer(text=f"JLPT Grade: {payload.jlpt_level or 'N/A'}")
 
         return embed
