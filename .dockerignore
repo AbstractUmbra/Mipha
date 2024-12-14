@@ -1,10 +1,14 @@
 __pycache__/
 *.py[cod]
-_pyright/
-.git/
-.github/
 .venv/
+
+.git/
+.gitignore
+.gitmodules
+.github/
 .vscode/
+
+_pyright/
 botw/
 buffer/
 configs/
@@ -12,8 +16,6 @@ duckling/
 extensions/
 logs/
 schemas/
-.gitignore
-.gitmodules
 **/*.ipynb
 docker-compose.yaml
 compose.override.yaml

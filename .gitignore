@@ -1,11 +1,11 @@
+__pycache__/
+.venv/
+*.py[cod]
+
+.pdm-python
 static/
 configs/**/*
 *.log*
-buffer/
-*.ipynb
 **/[!__]_*.py
-*.py[cod]
 .ruff_cache/
-.venv/
-__pycache__/
 compose.override.yaml

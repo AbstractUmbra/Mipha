@@ -1,48 +1,48 @@
-[tool.poetry]
+[project]
 name = "Mipha"
 version = "2.0.0"
 description = "A fun and lightweight Discord bot for personal use."
-authors = ["Alex Nørgaard <umbra@abstractumbra.dev>"]
-license = "MPL 2.0"
+authors = [{ name = "Alex Nørgaard", email = "umbra@abstractumbra.dev" }]
+dependencies = [
+    "discord-py[speedup,voice] @ git+https://github.com/Rapptz/discord.py.git@master",
+    "hondana[speed] @ git+https://github.com/AbstractUmbra/Hondana.git@main",
+    "discord-ext-menus @ git+https://github.com/Rapptz/discord-ext-menus@master",
+    "rcon @ git+https://github.com/conqp/rcon.git@master",
+    "asqlite @ git+https://github.com/Rapptz/asqlite.git@master",
+    "python-a2s @ git+https://github.com/Yepoleb/python-a2s.git@typing",
+    "pykakasi @ git+https://codeberg.org/miurahr/pykakasi.git@master",
+    "mystbin-py",
+    "jishaku",
+    "asyncpg",
+    "psutil",
+    "lru-dict",
+    "beautifulsoup4",
+    "Pillow",
+    "pygit2",
+    "yt-dlp",
+    "typing-extensions",
+    "parsedatetime",
+    "python-dateutil",
+    "lxml==5.3.0",
+    "legofy",
+    "mcrcon",
+    "tabulate",
+    "imagetext-py",
+    "orjson",
+    "uvloop",
+]
+requires-python = "<4.0,>=3.12"
+readme = "README.md"
+license = { text = "MPL 2.0" }
 
-[tool.poetry.dependencies]
-python = "^3.12"
-"discord.py" = { git = "https://github.com/Rapptz/discord.py.git", extras = [
-    "voice",
-    "speedup",
-], rev = "master" }
-hondana = { git = "https://github.com/AbstractUmbra/Hondana.git", extras = [
-    "speed",
-], rev = "main" }
-discord-ext-menus = { git = "https://github.com/Rapptz/discord-ext-menus", rev = "master" }
-rcon = { git = "https://github.com/conqp/rcon.git", rev = "master" }
-asqlite = { git = "https://github.com/Rapptz/asqlite.git", rev = "master" }
-"python-a2s" = { git = "https://github.com/Yepoleb/python-a2s.git", rev = "typing" }
-pykakasi = { git = "https://codeberg.org/miurahr/pykakasi.git", rev = "master" }
-"mystbin.py" = "*"
-jishaku = "*"
-asyncpg = "*"
-psutil = "*"
-lru_dict = "*"
-beautifulsoup4 = "*"
-Pillow = "*"
-pygit2 = "*"
-yt-dlp = "*"
-typing-extensions = "*"
-parsedatetime = "*"
-python-dateutil = "*"
-lxml = "5.3.0"
-legofy = "*"
-mcrcon = "*"
-tabulate = "*"
-"imagetext-py" = "*"
-orjson = "*"
-uvloop = "*"
+[tool.pdm]
+distribution = false
 
-[tool.poetry.group.dev.dependencies]
-ruff = "*"
-asyncpg-stubs = "*"
-pre-commit = "*"
+[dependency-groups]
+dev = ["ruff", "asyncpg-stubs", "pre-commit"]
+
+[tool.pdm.build]
+includes = []
 
 [tool.ruff]
 line-length = 125
@@ -177,8 +177,3 @@ reportGeneralTypeIssues = "error"
 reportDuplicateImport = "error"
 reportUntypedFunctionDecorator = "error"
 reportUnnecessaryTypeIgnoreComment = "warning"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
