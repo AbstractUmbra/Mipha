@@ -3208,11 +3208,11 @@ class Mod(commands.Cog):
                 predicates.append(lambda m: m.content.endswith(args.ends))
             if args.match:
                 try:
-                    _match = re.compile(args.match)
+                    match = re.compile(args.match)
                 except re.error as e:
                     return await ctx.send(f"Invalid regex passed to `match:` flag: {e}")
                 else:
-                    predicates.append(lambda m, x=_match: bool(x.match(m.content)))
+                    predicates.append(lambda m, x=match: bool(x.match(m.content)))
             if args.embeds:
                 predicates.append(lambda: bool(args.embeds))
             if args.files:
@@ -3238,11 +3238,11 @@ class Mod(commands.Cog):
 
         if args.username:
             try:
-                _regex = re.compile(args.username)
+                regex = re.compile(args.username)
             except re.error as e:
                 return await ctx.send(f"Invalid regex passed to `username:` flag: {e}")
             else:
-                predicates.append(lambda m, x=_regex: bool(x.match(m.name)))
+                predicates.append(lambda m, x=regex: bool(x.match(m.name)))
 
         if args.avatar is False:
             predicates.append(lambda m: m.avatar is None)

@@ -187,8 +187,7 @@ class SynthCog(commands.Cog, name="Synth"):
             )
 
         vstr: str = data["data"]["v_str"]
-        _padding = len(vstr) % 4
-        vstr = vstr + ("=" * _padding)
+        vstr = vstr + ("=" * (len(vstr) % 4))
 
         decoded = base64.b64decode(vstr)
         clean_data = io.BytesIO(decoded)
@@ -212,9 +211,9 @@ class SynthCog(commands.Cog, name="Synth"):
 
         ret: list[app_commands.Choice[str]] = []
         for item, _ in cleaned:
-            _x = discord.utils.get(self._tiktok_voice_choices, name=item.title())
-            if _x:
-                ret.append(_x)
+            engine = discord.utils.get(self._tiktok_voice_choices, name=item.title())
+            if engine:
+                ret.append(engine)
 
         return ret[:25]
 
@@ -238,9 +237,9 @@ class SynthCog(commands.Cog, name="Synth"):
 
         ret: list[app_commands.Choice[int]] = []
         for item, _ in cleaned:
-            _x = discord.utils.get(choices, name=item)
-            if _x:
-                ret.append(_x)
+            engine = discord.utils.get(choices, name=item)
+            if engine:
+                ret.append(engine)
 
         return ret[:25]
 

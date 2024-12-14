@@ -49,7 +49,7 @@ jobs:
       - name: Lint check
         uses: astral-sh/ruff-action@v2
         with:
-          args: "check . --preview"
+          args: check .
 
       - name: Formatting check
         uses: chartboost/ruff-action@v1

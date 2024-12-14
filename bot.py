@@ -99,15 +99,15 @@ class MiphaCommandTree(app_commands.CommandTree):
         if isinstance(command, str):
             # Try and find a command by that name. discord.py does not return children from tree.get_command, but
             # using walk_commands and utils.get is a simple way around that.
-            _command = discord.utils.get(self.walk_commands(guild=guild), qualified_name=command)
+            resolved = discord.utils.get(self.walk_commands(guild=guild), qualified_name=command)
 
-            if check_global and not _command:
-                _command = discord.utils.get(self.walk_commands(), qualified_name=command)
+            if check_global and not resolved:
+                resolved = discord.utils.get(self.walk_commands(), qualified_name=command)
 
         else:
-            _command = command
+            resolved = command
 
-        if not _command:
+        if not resolved:
             return None
 
         if guild:
@@ -116,7 +116,7 @@ class MiphaCommandTree(app_commands.CommandTree):
             except KeyError:
                 local_commands = await self.fetch_commands(guild=guild)
 
-            app_command_found = discord.utils.get(local_commands, name=(_command.root_parent or _command).name)
+            app_command_found = discord.utils.get(local_commands, name=(resolved.root_parent or resolved).name)
 
         else:
             app_command_found = None
@@ -127,12 +127,12 @@ class MiphaCommandTree(app_commands.CommandTree):
             except KeyError:
                 global_commands = await self.fetch_commands()
 
-            app_command_found = discord.utils.get(global_commands, name=(_command.root_parent or _command).name)
+            app_command_found = discord.utils.get(global_commands, name=(resolved.root_parent or resolved).name)
 
         if not app_command_found:
             return None
 
-        return f"</{_command.qualified_name}:{app_command_found.id}>"
+        return f"</{resolved.qualified_name}:{app_command_found.id}>"
 
     async def on_error(
         self,

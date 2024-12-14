@@ -108,7 +108,7 @@ class RepostView(BaseView):
         url = self.urls.pop(0)
 
         try:
-            _info = await self.tiktok._extract_video_info(url)
+            info = await self.tiktok._extract_video_info(url)
         except yt_dlp.utils.DownloadError as error:
             await interaction.followup.send(
                 "Sorry downloading this video broke somehow. Umbra knows don't worry.",
@@ -117,13 +117,13 @@ class RepostView(BaseView):
             await interaction.client.tree.on_error(interaction, error)  # pyright: ignore[reportArgumentType]
             return
 
-        if not _info:
+        if not info:
             await interaction.followup.send(content="I couldn't grab the video details.")
             self.repost_button.disabled = False
             await self.message.edit(view=self)
             return
 
-        file, _ = await self.tiktok._manipulate_video(_info, filesize_limit=interaction.guild.filesize_limit)
+        file, _ = await self.tiktok._manipulate_video(info, filesize_limit=interaction.guild.filesize_limit)
         await self.target_message.reply(content="I downloaded the video for you:-", file=file)
 
     @ui.button(label="No thanks", style=discord.ButtonStyle.danger, row=2, emoji="\U0001f5d1\U0000fe0f")
@@ -318,11 +318,11 @@ class MediaReposter(commands.Cog):
 
         new_urls = []
         for match in matches:
-            _url = yarl.URL(match[0])
-            if not _url.host or not (_sub := SUBSTITUTIONS.get(_url.host, None)):
+            url = yarl.URL(match[0])
+            if not url.host or not (_sub := SUBSTITUTIONS.get(url.host, None)):
                 return
 
-            new_url = _url.with_host(random.choice(_sub["repost_urls"]))  # noqa: S311 # not crypto
+            new_url = url.with_host(random.choice(_sub["repost_urls"]))  # noqa: S311 # not crypto
             if _sub["remove_query"] is True:
                 new_url = new_url.with_query(None)
 

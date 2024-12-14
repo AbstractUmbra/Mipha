@@ -49,6 +49,7 @@ line-length = 125
 target-version = "py312"
 
 [tool.ruff.lint]
+preview = true
 select = [
     "A",
     "ANN",
