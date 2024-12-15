@@ -64,7 +64,7 @@ class SynthCog(commands.Cog, name="Synth"):
     def __init__(self, bot: Mipha, /, *, session_id: str | None = None) -> None:
         self.bot: Mipha = bot
         self._engine_autocomplete: list[app_commands.Choice[int]] = []
-        self._tiktok_voice_choices: list[app_commands.Choice] = [
+        self._tiktok_voice_choices: list[app_commands.Choice[str]] = [
             app_commands.Choice(name=voice["name"], value=voice["value"]) for voice in _VOICE_DATA
         ]
         self.tiktok_session_id: str | None = session_id
@@ -210,22 +210,22 @@ class SynthCog(commands.Cog, name="Synth"):
         nsfw=False,
     )
     @app_commands.describe(engine="Which voice engine to use", text="What do you want the voice engine to say?")
-    async def tiktok_callback(self, itx: Interaction, engine: str, text: str) -> None:
-        await itx.response.defer(thinking=True)
+    async def tiktok_callback(self, interaction: Interaction, engine: str, text: str) -> None:
+        await interaction.response.defer(thinking=True)
 
         if not self.has_session_id():
-            return await itx.followup.send("Sorry, this feature is currently disabled.")
+            return await interaction.followup.send("Sorry, this feature is currently disabled.")
 
         data = await self._get_tiktok_response(engine=engine, text=text)
 
         if not data:
-            return await itx.followup.send(
+            return await interaction.followup.send(
                 "Tiktok broke, sorry. Your input might be too long or it might just be fucked.",
                 ephemeral=True,
             )
 
         if data["status_code"] != 0:
-            return await itx.followup.send(
+            return await interaction.followup.send(
                 f"Sorry, your synthetic audio cannot be created due to the following reason: {data['status_msg']!r}.",
             )
 
@@ -238,7 +238,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
         file = discord.File(fp=clean_data, filename="tiktok_synth.mp3")
 
-        return await itx.followup.send(content=f">>> {text}", file=file)
+        return await interaction.followup.send(content=f">>> {text}", file=file)
 
     @tiktok_callback.autocomplete("engine")
     async def tiktok_engine_autocomplete(self, itx: Interaction, current: str) -> list[app_commands.Choice[str]]:
