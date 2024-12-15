@@ -68,6 +68,17 @@ class SynthCog(commands.Cog, name="Synth"):
             app_commands.Choice(name=voice["name"], value=voice["value"]) for voice in _VOICE_DATA
         ]
         self.tiktok_session_id: str | None = session_id
+        self.tiktok_context_menu_command = app_commands.ContextMenu(
+            name="TiKTok Voice Synth",
+            callback=self.tiktok_ctx_menu_callback,
+            allowed_contexts=discord.app_commands.AppCommandContext(guild=True, dm_channel=True, private_channel=True),
+            allowed_installs=discord.app_commands.AppInstallationType(guild=True, user=True),
+        )
+        self.bot.tree.add_command(self.tiktok_context_menu_command)
+
+    async def cog_unload(self) -> None:
+        await super().cog_unload()
+        self.bot.tree.remove_command(self.tiktok_context_menu_command.name, type=self.tiktok_context_menu_command.type)
 
     def has_session_id(self) -> bool:
         return self.tiktok_session_id is not None
@@ -160,6 +171,38 @@ class SynthCog(commands.Cog, name="Synth"):
             )
             return data
         return None
+
+    async def tiktok_ctx_menu_callback(self, interaction: Interaction, message: discord.Message) -> None:
+        await interaction.response.defer()
+
+        if not self.has_session_id():
+            return await interaction.followup.send("Sorry, this feature is currently disabled.")
+
+        if not message.content:
+            return await interaction.followup.send("Sorry, this message has no text to synthesize.")
+
+        data = await self._get_tiktok_response(engine="en_us_001", text=message.content)
+
+        if not data:
+            return await interaction.followup.send(
+                "TikTok has broke this again. Your input might be too long or it might just be fucked.",
+            )
+
+        if data["status_code"] != 0:
+            return await interaction.followup.send(
+                f"Sorry, your audio cannot be created due to the following reason: {data['status_msg']!r}",
+            )
+
+        vstr = data["data"]["v_str"]
+        vstr = vstr + ("=" * (len(vstr) % 4))
+
+        decoded = base64.b64decode(vstr)
+        clean_data = io.BytesIO(decoded)
+        clean_data.seek(0)
+
+        file = discord.File(fp=clean_data, filename="tiktok_synth.mp3")
+
+        return await interaction.followup.send(content=f">>> {message.content}", file=file)
 
     @app_commands.command(
         name="tiktok-voice",
