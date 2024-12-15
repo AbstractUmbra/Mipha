@@ -38,8 +38,8 @@ REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\
 INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(?:www\.)instagram\.com/reel/(?P<id>[a-zA-Z0-9]+)\/?)\>?")
 
 SUBSTITUTIONS: dict[str, SubstitutionData] = {
-    # "twitter.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
-    # "x.com": {"repost_urls": ["vxtwitter.com", "fxtwitter.com"], "remove_query": True},
+    "twitter.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
+    "x.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
     "tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
     "www.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
     "vm.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
