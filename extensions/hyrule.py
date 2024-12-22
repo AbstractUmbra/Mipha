@@ -16,6 +16,7 @@ _IRL_FRIEND_SERVER = 174702278673039360
 HONDANA_ROLE_ID = 1086537644093231144
 GREAT_ASSET_ROLE_ID = 1189005762790441010
 BOT_BAIT_CHANNEL_ID = 1238074949424386121
+HONEYPOT_ROLE_ID = 1297563765436580010
 RULES_CHANNEL_ID = 1238076485600935977
 RULES_MESSAGE_ID = 1238077226528800779
 ROLE_ASSIGNMENT_CHANNEL_ID = 1086540538112647229
@@ -140,6 +141,18 @@ class Hyrule(commands.Cog):
 
         if message.channel.id == BOT_BAIT_CHANNEL_ID:
             await message.author.ban(delete_message_days=1, reason="Compromised account, fell for the bait.")
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
+        if before.guild.id != HYRULE_GUILD_ID:
+            return
+
+        if (not before.flags.completed_onboarding and after.flags.completed_onboarding) and after.get_role(HONEYPOT_ROLE_ID):
+            # joined and did role check
+            await after.ban(reason="Failed the honeypot check.")
+
+        if after.get_role(HONEYPOT_ROLE_ID) and not before.get_role(HONEYPOT_ROLE_ID):
+            await after.ban(reason="Opted into the honeypot ban.")
 
     @commands.is_owner()
     @restricted_guilds(HYRULE_GUILD_ID)
