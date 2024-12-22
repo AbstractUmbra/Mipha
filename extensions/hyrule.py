@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
-from utilities.shared.checks import restricted_guild
+from utilities.shared.checks import restricted_guilds
 from utilities.shared.formats import random_pastel_colour
 from utilities.shared.ui import BaseView
 
@@ -142,7 +142,7 @@ class Hyrule(commands.Cog):
             await message.author.ban(delete_message_days=1, reason="Compromised account, fell for the bait.")
 
     @commands.is_owner()
-    @restricted_guild(HYRULE_GUILD_ID)
+    @restricted_guilds(HYRULE_GUILD_ID)
     @commands.command()
     async def setup_role_assignments(self, ctx: GuildContext) -> None:
         """
@@ -163,7 +163,7 @@ class Hyrule(commands.Cog):
         )
 
     @commands.guild_only()
-    @restricted_guild(HYRULE_GUILD_ID)
+    @restricted_guilds(HYRULE_GUILD_ID)
     @commands.group(name="rules", aliases=["rule"])
     async def rules_command(self, ctx: GuildContext, rule_num: int) -> None:
         if not self.rules:
