@@ -89,6 +89,7 @@ class Libraries(discord.Enum):
     jishaku = "jishaku"
     wavelink = "wavelink"
     mystbin = "mystbin.py"
+    twitchio = "twitchio"
 
 
 class RTFSView(discord.ui.View):
