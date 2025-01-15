@@ -32,4 +32,4 @@ COPY --from=builder /project/.venv/ /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 COPY . /app/
 
-ENTRYPOINT [ "python", "-O", "bot.py" ]
+CMD [ "python", "-O", "bot.py" ]
