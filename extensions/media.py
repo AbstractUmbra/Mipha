@@ -47,8 +47,11 @@ SUBSTITUTIONS: dict[str, SubstitutionData] = {
     "www.instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
 }
 
-GUILDS: list[discord.Object] = [discord.Object(id=149998214810959872), discord.Object(id=774561547930304536)]
-
+GUILDS: list[discord.Object] = [
+    # discord.Object(id=149998214810959872, type=discord.Guild),
+    discord.Object(id=774561547930304536, type=discord.Guild),
+    discord.Object(id=174702278673039360, type=discord.Guild),
+]
 GUILD_IDS: set[int] = {guild.id for guild in GUILDS}
 
 
