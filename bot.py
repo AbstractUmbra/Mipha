@@ -58,7 +58,7 @@ jishaku.Flags.NO_UNDERSCORE = True
 jishaku.Flags.NO_DM_TRACEBACK = True
 INTENTS = discord.Intents.all()
 
-CONFIG_PATH = pathlib.Path("configs/bot.json")
+CONFIG_PATH = pathlib.Path("configs/bot_config.json")
 
 
 class MiphaCommandTree(app_commands.CommandTree):
