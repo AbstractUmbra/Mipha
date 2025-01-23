@@ -76,23 +76,6 @@ class HyruleRoleAssignmentView(BaseView):
 
         await interaction.user.add_roles(discord.Object(id=HONDANA_ROLE_ID))
 
-    @discord.ui.button(
-        label="Great Asset",
-        custom_id="HyruleGreatAsset__",
-        style=discord.ButtonStyle.blurple,
-        emoji="\U0001f480",
-        row=0,
-    )
-    async def add_great_asset_role(self, interaction: Interaction, item: discord.ui.Button[Self]) -> None:
-        """This role will allow you to send messages in the Great Asset category. Pings will be issued on major events."""
-        assert isinstance(interaction.user, discord.Member)
-
-        if interaction.user.get_role(GREAT_ASSET_ROLE_ID):
-            await interaction.response.send_message("You already have the Great Asset role!", ephemeral=True)
-            return
-
-        await interaction.user.add_roles(discord.Object(id=GREAT_ASSET_ROLE_ID))
-
 
 class Hyrule(commands.Cog):
     def __init__(self, bot: Mipha, /) -> None:
