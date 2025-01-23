@@ -11,7 +11,7 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Callable, Hashable, MutableMapping, Sequence
 from itertools import starmap
-from typing import TYPE_CHECKING, Annotated, Any, Generic, Literal, NoReturn, Self, TypeVar
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NoReturn, Self, TypeVar
 
 import asyncpg
 import discord
@@ -1637,7 +1637,7 @@ class MultipleSpammers(SpamCheckerResult):
         self.members: Sequence[discord.abc.Snowflake] = members
 
 
-class RateLimit(Generic[V]):
+class RateLimit[V]:
     def __init__(self, rate: int, per: float, *, key: Callable[[discord.Message], V], maxsize: int = 256) -> None:
         self.lookup = LRU(maxsize)
         self.rate = rate
@@ -1694,7 +1694,7 @@ class GatekeeperRateLimit:
         return []
 
 
-class TaggedRateLimit(Generic[V, HashableT]):
+class TaggedRateLimit[V, HashableT: Hashable]:
     def __init__(
         self,
         rate: int,

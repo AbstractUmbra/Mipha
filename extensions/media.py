@@ -48,7 +48,6 @@ SUBSTITUTIONS: dict[str, SubstitutionData] = {
 }
 
 GUILDS: list[discord.Object] = [
-    # discord.Object(id=149998214810959872, type=discord.Guild),
     discord.Object(id=774561547930304536, type=discord.Guild),
     discord.Object(id=174702278673039360, type=discord.Guild),
 ]

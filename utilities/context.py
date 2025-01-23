@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime
 import secrets
-from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, overload
 
 import discord
 from discord.ext import commands
@@ -104,7 +104,7 @@ class DatabaseProtocol(Protocol):
     def release(self, connection: Connection) -> None: ...
 
 
-class DisambiguatorView(BaseView, Generic[T]):
+class DisambiguatorView[T](BaseView):
     message: discord.Message
     selected: T
 
@@ -146,7 +146,7 @@ class DisambiguatorView(BaseView, Generic[T]):
         self.stop()
 
 
-class Context(commands.Context["Mipha"], Generic[CogT_co]):
+class Context[CogT_co: commands.Cog](commands.Context["Mipha"]):
     channel: discord.TextChannel | discord.VoiceChannel | discord.Thread | discord.DMChannel
     bot: Mipha
     command: commands.Command[Any, ..., Any]
