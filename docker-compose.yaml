@@ -14,6 +14,8 @@ services:
       - ./extensions/:/app/extensions/:ro
       - ./.git/:/app/.git/:ro
       - ./.safe-gitconfig:/root/.gitconfig:ro
+    depends_on:
+      - duckling
 
   duckling:
     container_name: mipha-duckling
