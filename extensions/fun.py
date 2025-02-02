@@ -221,7 +221,7 @@ class Fun(commands.Cog):
 
     def _draw_words(self, text: str) -> io.BytesIO:
         text = fill(text, 25)
-        font = ImageFont.truetype("static/fonts/W6.ttc", 60)
+        font = ImageFont.truetype("static/fonts/NotoSans-Bold.ttf", 60)
         padding = 50
 
         images = [Image.new("RGBA", (1, 1), color=0) for _ in range(2)]

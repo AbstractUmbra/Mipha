@@ -15,6 +15,7 @@ configs/
 duckling/
 extensions/
 logs/
+static/
 schemas/
 **/*.ipynb
 docker-compose.yaml

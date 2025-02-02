@@ -488,7 +488,7 @@ class Nihongo(commands.Cog):
 
     def _draw_kana(self, text: str) -> BytesIO:
         text = fill(text, 25, replace_whitespace=False)
-        font = ImageFont.truetype("static/fonts/W6.ttc", 60)
+        font = ImageFont.truetype("static/fonts/NotoSans-Bold.ttf", 60)
         padding = 50
 
         images = [Image.new("RGBA", (1, 1), color=0) for _ in range(2)]
