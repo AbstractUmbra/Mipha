@@ -47,11 +47,11 @@ jobs:
           annotate: "${{ matrix.python-version != '3.x' }}"
 
       - name: Lint check
-        uses: astral-sh/ruff-action@v2
+        uses: astral-sh/ruff-action@v3
         with:
           args: check .
 
       - name: Formatting check
-        uses: chartboost/ruff-action@v1
+        uses: astral-sh/ruff-action@v3
         with:
           args: format --check
