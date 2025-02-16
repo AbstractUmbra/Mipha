@@ -100,6 +100,8 @@ def kanji_in_response(kanji: str, soup: bs4.BeautifulSoup) -> bool:
     raw = soup.find("h1", class_="character")
     if raw is None:
         return False
+
+    assert isinstance(raw, bs4.Tag)
     return segment in raw
 
 
@@ -164,13 +166,14 @@ class JishoKanji:
         raw = self.data.find("div", class_="row compounds")
         if raw is None:
             raise ValueError("Something is None that shouldn't be None")
+        assert isinstance(raw, (bs4.Tag, bs4.element.NavigableString))
 
         fmt = defaultdict(list)
 
-        for x in raw:  # pyright: ignore[reportAssignmentType] # typeshed sucks here
-            x: bs4.Tag
-            if isinstance(x, (bs4.NavigableString, str)):
+        for x in raw:
+            if isinstance(x, (bs4.element.NavigableString, str)):
                 continue
+            assert isinstance(x, bs4.Tag)
 
             if hmm := x.select("h2"):
                 if hmm[0].text == "On reading compounds":
@@ -184,12 +187,14 @@ class JishoKanji:
         raw = self.data.find("div", class_="kanji-details__main-readings")
         if raw is None:
             return None
+        assert isinstance(raw, bs4.Tag)
 
-        raw = raw.find("dl", class_=f"dictionary_entry {key}_yomi")  # pyright: ignore[reportCallIssue] # bs4 types are bad
+        raw = raw.find("dl", class_=f"dictionary_entry {key}_yomi")
         if not raw:
             return None
 
-        raw = raw.select("dd", class_="kanji-details__main-readings")[0]  # pyright: ignore[reportAttributeAccessIssue,reportCallIssue] # bs4 types are bad
+        assert isinstance(raw, bs4.Tag)
+        raw = raw.select("dd", class_="kanji-details__main-readings")[0]
 
         fmt = []
 
@@ -234,8 +239,13 @@ class JishoKanji:
     @property
     def radical(self) -> list[str] | None:
         raw = self.data.find("div", class_="radicals")
+        assert isinstance(raw, bs4.Tag)
+
         if raw and raw.find("span"):
-            return raw.find("span").text.strip().rsplit()[:2]  # pyright: ignore[reportOptionalMemberAccess,reportAttributeAccessIssue] # guarded in earlier call
+            elem = raw.find("span")
+            assert isinstance(elem, bs4.Tag)
+
+            return elem.text.strip().rsplit()[:2]
         return None
 
     def to_dict(self) -> dict[str, str | list[str]]:
