@@ -99,6 +99,7 @@ select = [
 ignore = [
     "ANN401",
     "ASYNC109", # dpy commonly uses this parameter
+    "COM812",
     "EM101",    # in this case this is okay
     "F401",
     "F402",
