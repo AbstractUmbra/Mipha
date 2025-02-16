@@ -15,7 +15,7 @@ from discord.ext import commands
 
 from utilities.shared.async_config import Config
 from utilities.shared.cache import ExpiringCache
-from utilities.shared.ui import BaseView
+from utilities.shared.ui import BaseView, SelfDeleteView
 
 if TYPE_CHECKING:
     from bot import Mipha
@@ -47,11 +47,12 @@ SUBSTITUTIONS: dict[str, SubstitutionData] = {
     "www.instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
 }
 
-GUILDS: list[discord.Object] = [
+AUTO_REPOST_GUILDS: list[discord.Object] = [
     discord.Object(id=774561547930304536, type=discord.Guild),
     discord.Object(id=174702278673039360, type=discord.Guild),
+    discord.Object(id=149998214810959872, type=discord.Guild),
 ]
-GUILD_IDS: set[int] = {guild.id for guild in GUILDS}
+AUTO_REPOST_GUILD_IDS: set[int] = {guild.id for guild in AUTO_REPOST_GUILDS}
 
 
 class SubstitutionData(TypedDict):
@@ -152,7 +153,6 @@ class MediaReposter(commands.Cog):
         self.media_context_menu = app_commands.ContextMenu(
             name="Process media links",
             callback=self.media_context_menu_callback,
-            guild_ids=[guild.id for guild in GUILDS],
         )
 
         self.media_context_menu.error(self.media_context_menu_error)
@@ -298,7 +298,7 @@ class MediaReposter(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if not message.guild:
             return
-        if message.guild.id not in GUILD_IDS:
+        if message.guild.id not in AUTO_REPOST_GUILD_IDS:
             return
         if message.webhook_id:
             return
@@ -337,7 +337,7 @@ class MediaReposter(commands.Cog):
 
         content = content[:1000] + f"\n\nReposted (correctly) from:\n{message.author} ({message.author.id})"
 
-        await message.channel.send(content)
+        await message.channel.send(content, view=SelfDeleteView(author_id=message.author.id))
         if message.channel.permissions_for(message.guild.me).manage_messages and any(
             [
                 DESKTOP_PATTERN.fullmatch(message.content),
@@ -353,4 +353,4 @@ class MediaReposter(commands.Cog):
 async def setup(bot: Mipha) -> None:
     config_path = pathlib.Path("configs/media.json")
     config = Config(config_path)
-    await bot.add_cog(MediaReposter(bot, config), guilds=[discord.Object(id=x) for x in GUILD_IDS])
+    await bot.add_cog(MediaReposter(bot, config), guilds=[discord.Object(id=x) for x in AUTO_REPOST_GUILD_IDS])

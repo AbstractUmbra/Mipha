@@ -16,7 +16,7 @@ import discord
 from discord.ext import commands
 from discord.utils import MISSING
 
-from .shared.ui import BaseView, ConfirmationView
+from .shared.ui import BaseView, ConfirmationView, SelfDeleteView
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -369,6 +369,9 @@ class Context[CogT_co: commands.Cog](commands.Context["Mipha"]):
             )
 
             content = f"Sorry, the output was too large but I posted it to a paste for you here: {paste_url}"
+
+        if not view:
+            view = SelfDeleteView(author_id=self.author.id)
 
         sent = await super().send(  # pyright: ignore[reportCallIssue] # following the upstream *args and **kwargs sucks
             content=content,
