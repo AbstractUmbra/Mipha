@@ -132,10 +132,11 @@ class RepostView(BaseView):
     @ui.button(label="No thanks", style=discord.ButtonStyle.danger, row=2, emoji="\U0001f5d1\U0000fe0f")
     async def close_button(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
         if interaction.user.id != self.owner_id:
-            return await interaction.response.send_message(
+            await interaction.response.send_message(
                 "You're not allowed to close this, only the message author can!",
                 ephemeral=True,
             )
+            return None
         await self.message.delete()
         return self.stop()
 

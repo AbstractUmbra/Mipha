@@ -392,6 +392,8 @@ class Context[CogT_co: commands.Cog](commands.Context["Mipha"]):
             silent=silent,
             poll=poll,
         )
+        if view is not None:
+            view.message = sent  # pyright: ignore[reportAttributeAccessIssue] # we duck type the message
 
         if wait is True:
             return sent

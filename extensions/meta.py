@@ -66,7 +66,8 @@ class PatchedContext(Context):
             kwargs.pop("allowed_mentions", None)
             kwargs.pop("ephemeral", None)
 
-            return await _current.get().response.send_message(content=content, ephemeral=False, **kwargs)
+            await _current.get().response.send_message(content=content, ephemeral=False, **kwargs)
+            return None
         return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
@@ -96,21 +97,24 @@ class Meta(commands.Cog):
     @app_commands.allowed_installs(guilds=False, users=True)
     async def interpret_as_command_callback(self, interaction: Interaction, message: discord.Message, /) -> None:
         if message.author.bot:
-            return await interaction.response.send_message(
+            await interaction.response.send_message(
                 "Sorry I won't invoke commands based on a bot's messages.",
                 ephemeral=True,
             )
+            return
 
         if interaction.user.id != message.author.id:
-            return await interaction.response.send_message(content="Sorry, this is not your message.", ephemeral=True)
+            await interaction.response.send_message(content="Sorry, this is not your message.", ephemeral=True)
+            return
 
         context = await self.bot.get_context(message, cls=PatchedContext)
 
         if not context.valid:
-            return await interaction.response.send_message(
+            await interaction.response.send_message(
                 content="Sorry this doesn't look like a command for me.",
                 ephemeral=True,
             )
+            return
 
         _current.set(interaction)
         ticks = "`" * 3
@@ -133,7 +137,7 @@ class Meta(commands.Cog):
         if not context.first_interaction_sent:
             await interaction.response.send_message(content="Command finished with no output.", ephemeral=True)
 
-        return None
+        return
 
     @app_commands.command()
     @app_commands.describe(when="When to show a timestamp for, accepts 'tomorrow at 7pm' etc.")
@@ -151,7 +155,7 @@ class Meta(commands.Cog):
 
         ret = ["`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("t", "T", "D", "f", "F")]
         ret.insert(0, "\u200b\n")
-        return await interaction.response.send_message("\n".join(ret), ephemeral=True)
+        await interaction.response.send_message("\n".join(ret), ephemeral=True)
 
     @commands.command()
     async def ping(self, ctx: Context) -> None:

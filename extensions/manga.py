@@ -121,7 +121,8 @@ class MangaView(BaseView):
         item: discord.ui.Item[Self],
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
-            return await interaction.response.send_message("You can't choose someone else's Manga!", ephemeral=True)
+            await interaction.response.send_message("You can't choose someone else's Manga!", ephemeral=True)
+            return None
         return await super().on_error(interaction, error, item)
 
 

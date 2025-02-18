@@ -407,10 +407,11 @@ class RTFX(commands.Cog):
         """RTFM command for loading source code/searching from libraries."""
         rtfs = await self._get_rtfs(library=library, search=search, exact=exact)
         if not rtfs["results"]:
-            return await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
+            await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
+            return
 
         view = RTFSView(rtfs, lib=library.value, owner_id=interaction.user.id)
-        return await interaction.response.send_message(view=view, ephemeral=ephemeral)
+        await interaction.response.send_message(view=view, ephemeral=ephemeral)
 
     @group.command(name="refresh")
     @app_commands.checks.dynamic_cooldown(_rtfs_refresh_cooldown)
@@ -426,12 +427,13 @@ class RTFX(commands.Cog):
     @rtfs_refresh.error
     async def refresh_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         if isinstance(error, app_commands.CommandOnCooldown):
-            return await interaction.response.send_message(
+            await interaction.response.send_message(
                 "Sorry, this has already been requested recently. "
                 f"Please wait at least {error.retry_after:.2f}s before trying again.",
             )
+            return
 
-        return None
+        return
 
     @commands.command(name="rtfs", ignore_extra=True)
     async def rtfs_prefix(self, ctx: Context) -> None:

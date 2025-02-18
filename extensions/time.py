@@ -392,10 +392,11 @@ class Time(commands.Cog):
     async def time_board(self, interaction: Interaction) -> None:
         """This command will show a board of all public timezones in Dannyware."""
         if not interaction.guild:
-            return await interaction.response.send_message(
+            await interaction.response.send_message(
                 "Sorry, this command can only be used in a guild!",
                 ephemeral=True,
             )
+            return None
 
         await interaction.response.defer(ephemeral=True)
 

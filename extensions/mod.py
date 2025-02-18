@@ -1217,7 +1217,7 @@ class GatekeeperSetUpView(discord.ui.View):
                 await confirm.wait()
                 if not confirm.value:
                     await interaction.followup.send("Aborting", ephemeral=True)
-                    return None
+                    return
             else:
                 await interaction.response.defer()
 
@@ -1231,13 +1231,15 @@ class GatekeeperSetUpView(discord.ui.View):
                     "Could not enable gatekeeper due to either a role or channel being unset or the message failing to send",
                 )
             except discord.HTTPException as e:
-                return await interaction.response.send_message(f"Could not enable gatekeeper: {e}")
-            return await interaction.response.send_message("Successfully enabled gatekeeper.")
+                await interaction.response.send_message(f"Could not enable gatekeeper: {e}")
+                return
+            await interaction.response.send_message("Successfully enabled gatekeeper.")
+            return
 
         self.update_state()
         await interaction.message.edit(view=self)
 
-        return None
+        return
 
     @discord.ui.button(emoji="\N{WHITE QUESTION MARK ORNAMENT}", row=2)
     async def help_message(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
