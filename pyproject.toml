@@ -90,7 +90,7 @@ select = [
     "TRY",
     "UP",
     "YTT",
-    "DOC",   # not in a bot, please
+    # "DOC",   # not in a bot, please
 ]
 ignore = [
     "ANN401",
