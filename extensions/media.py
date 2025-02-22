@@ -5,17 +5,17 @@ import logging
 import pathlib
 import random
 import re
-from typing import TYPE_CHECKING, Any, Self, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import discord
 import yarl
 import yt_dlp
-from discord import app_commands, ui
+from discord import app_commands
 from discord.ext import commands
 
 from utilities.shared.async_config import Config
 from utilities.shared.cache import ExpiringCache
-from utilities.shared.ui import BaseView, SelfDeleteView
+from utilities.shared.ui import SelfDeleteView
 
 if TYPE_CHECKING:
     from bot import Mipha
@@ -63,82 +63,6 @@ class SubstitutionData(TypedDict):
 class MediaConfig(TypedDict):
     allowed_roles: list[int]
     allowed_members: list[int]
-
-
-class RepostView(BaseView):
-    message: discord.InteractionMessage
-
-    def __init__(
-        self,
-        urls: list[yarl.URL],
-        /,
-        *,
-        timeout: float | None = 10,
-        cog: MediaReposter,
-        owner_id: int,
-        target_message: discord.Message,
-    ) -> None:
-        self.urls: list[yarl.URL] = urls
-        self.tiktok: MediaReposter = cog
-        self.owner_id: int = owner_id
-        self.target_message: discord.Message = target_message
-        super().__init__(timeout=timeout)
-        if self.tiktok is None:
-            self.download_video.disabled = True
-
-    async def on_timeout(self) -> None:
-        await self.message.delete()
-
-    @ui.button(label="Repost?", emoji="\U0001f503")
-    async def repost_button(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
-        first_url = self.urls.pop(0)
-        await interaction.response.send_message(content=str(first_url))
-        self._disable_all_buttons()
-        await self.message.edit(view=self)
-
-        if self.urls:
-            for url in self.urls:
-                await interaction.channel.send(str(url))  # pyright: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess] # we only use messageable channels
-
-    @ui.button(label="Upload video?", emoji="\U0001f4fa")
-    async def download_video(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
-        assert self.tiktok
-        assert interaction.guild  # covered in the guard in message
-
-        await interaction.response.defer()
-        await self.message.delete()
-
-        url = self.urls.pop(0)
-
-        try:
-            info = await self.tiktok._extract_video_info(url)
-        except yt_dlp.utils.DownloadError as error:
-            await interaction.followup.send(
-                "Sorry downloading this video broke somehow. Umbra knows don't worry.",
-                ephemeral=True,
-            )
-            await interaction.client.tree.on_error(interaction, error)  # pyright: ignore[reportArgumentType]
-            return
-
-        if not info:
-            await interaction.followup.send(content="I couldn't grab the video details.")
-            self.repost_button.disabled = False
-            await self.message.edit(view=self)
-            return
-
-        file, _ = await self.tiktok._manipulate_video(info, filesize_limit=interaction.guild.filesize_limit)
-        await self.target_message.reply(content="I downloaded the video for you:-", file=file)
-
-    @ui.button(label="No thanks", style=discord.ButtonStyle.danger, row=2, emoji="\U0001f5d1\U0000fe0f")
-    async def close_button(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
-        if interaction.user.id != self.owner_id:
-            await interaction.response.send_message(
-                "You're not allowed to close this, only the message author can!",
-                ephemeral=True,
-            )
-            return None
-        await self.message.delete()
-        return self.stop()
 
 
 class FilesizeLimitExceeded(Exception):
@@ -338,7 +262,8 @@ class MediaReposter(commands.Cog):
 
         content = content[:1000] + f"\n\nReposted (correctly) from:\n{message.author} ({message.author.id})"
 
-        await message.channel.send(content, view=SelfDeleteView(author_id=message.author.id))
+        view = SelfDeleteView(author_id=message.author.id)
+        view.message = await message.channel.send(content, view=view)
         if message.channel.permissions_for(message.guild.me).manage_messages and any(
             [
                 DESKTOP_PATTERN.fullmatch(message.content),
