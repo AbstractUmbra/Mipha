@@ -4,10 +4,9 @@ version = "2.0.0"
 description = "A fun and lightweight Discord bot for personal use."
 authors = [{ name = "Alex Nørgaard", email = "umbra@abstractumbra.dev" }]
 dependencies = [
-    "discord-py[speedup,voice] @ git+https://github.com/Rapptz/discord.py.git@master",
+    "discord-py[speed,voice] @ git+https://github.com/Rapptz/discord.py.git@master",
     "hondana[speed] @ git+https://github.com/AbstractUmbra/Hondana.git@main",
     "discord-ext-menus @ git+https://github.com/Rapptz/discord-ext-menus@master",
-    "rcon @ git+https://github.com/conqp/rcon.git@master",
     "asqlite @ git+https://github.com/Rapptz/asqlite.git@master",
     "python-a2s @ git+https://github.com/Yepoleb/python-a2s.git@typing",
     "pykakasi @ git+https://codeberg.org/miurahr/pykakasi.git@master",
@@ -25,7 +24,6 @@ dependencies = [
     "python-dateutil",
     "lxml==5.3.0",
     "legofy",
-    "mcrcon",
     "tabulate",
     "imagetext-py",
     "orjson",
@@ -33,16 +31,14 @@ dependencies = [
 ]
 requires-python = "<4.0,>=3.12"
 readme = "README.md"
-license = { text = "MPL 2.0" }
-
-[tool.pdm]
-distribution = false
+license = { file = "LICENSE" }
 
 [dependency-groups]
 dev = ["ruff", "asyncpg-stubs", "pre-commit"]
-
-[tool.pdm.build]
-includes = []
+minecraft = [
+    "mcstatus>=11.1.1",
+    "rcon @ git+https://github.com/conqp/rcon.git@master",
+]
 
 [tool.ruff]
 line-length = 125
@@ -94,7 +90,7 @@ select = [
     "TRY",
     "UP",
     "YTT",
-    # "DOC", # not in a bot, please
+    "DOC",   # not in a bot, please
 ]
 ignore = [
     "ANN401",
