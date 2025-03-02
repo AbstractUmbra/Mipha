@@ -41,6 +41,7 @@ from utilities.prefix import callable_prefix as _callable_prefix
 from utilities.shared.async_config import Config
 from utilities.shared.db import db_init
 from utilities.shared.formats import to_json
+from utilities.shared.timezones import TimezoneHandler
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Coroutine, Iterable
@@ -257,6 +258,7 @@ class Mipha(commands.Bot):
     tree: MiphaCommandTree
     _original_help_command: commands.HelpCommand | None  # for help command overriding
     _stats_cog_gateway_handler: logging.Handler
+    tz_handler: TimezoneHandler
 
     __slots__ = (
         "_blacklist_data",
@@ -567,11 +569,15 @@ class Mipha(commands.Bot):
                     else:
                         f.write(f"{last_log}\n")
 
+    async def _reload_tz_handler(self) -> None:
+        self.tz_handler = await TimezoneHandler.startup(session=self.session)
+
     async def setup_hook(self) -> None:
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.UTC)
 
         self.bot_app_info = await self.application_info()
         self.mb_client = mystbin.Client(session=self.session)
+        await self._reload_tz_handler()
 
     async def create_paste(
         self,
