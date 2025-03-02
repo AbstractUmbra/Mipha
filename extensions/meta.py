@@ -140,22 +140,25 @@ class Meta(commands.Cog):
         return
 
     @app_commands.command()
-    @app_commands.describe(when="When to show a timestamp for, accepts 'tomorrow at 7pm' etc.")
+    @app_commands.describe(
+        when="When to show a timestamp for, accepts 'tomorrow at 7pm' etc.",
+        ephemeral="Whether to show the whole channel or just you.",
+    )
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
     async def timestamp(
         self,
         interaction: discord.Interaction,
         when: app_commands.Transform[datetime.datetime, DatetimeTransformer],
+        ephemeral: bool = True,  # noqa: FBT001, FBT002 # required for d.py callbacks
     ) -> None:
         """
         Enter a date and/or time to get a discord formatted datetime for it.
         Accepts friendly input like 'tomorrow at 3:30pm'.
         """
-
-        ret = ["`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("t", "T", "D", "f", "F")]
+        ret = ["`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("t", "T", "D", "f", "F", "R")]
         ret.insert(0, "\u200b\n")
-        await interaction.response.send_message("\n".join(ret), ephemeral=True)
+        await interaction.response.send_message("\n".join(ret), ephemeral=ephemeral)
 
     @commands.command()
     async def ping(self, ctx: Context) -> None:
