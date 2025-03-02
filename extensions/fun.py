@@ -242,7 +242,7 @@ class Fun(commands.Cog):
         return buf
 
     def random_words(self, amount: int) -> list[str]:
-        with open("static/words.txt", encoding="utf8") as fp:  # noqa: PTH123
+        with open("utilities/shared/scrabble.txt", encoding="utf8") as fp:  # noqa: PTH123
             words = fp.readlines()
 
         return random.sample(words, amount)
