@@ -368,7 +368,10 @@ class Context[CogT_co: commands.Cog](commands.Context["Mipha"]):
                 expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
             )
 
-            content = f"Sorry, the output was too large but I posted it to a paste for you here: {paste_url}"
+            content = (
+                f"Sorry, the output was too large but I posted it to a paste for you here: {paste_url}.\n"
+                f"Password is: `{password}`."
+            )
 
         if not view:
             view = SelfDeleteView(author_id=self.author.id)
