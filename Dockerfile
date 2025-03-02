@@ -36,7 +36,7 @@ USER 1000:1000
 
 WORKDIR /app
 
-COPY --from=builder --chown=1000:1000 /project /project
+COPY --from=builder --chown=1000:1000 /project /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 CMD [ "python", "-O", "bot.py" ]
