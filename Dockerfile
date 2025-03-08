@@ -13,12 +13,12 @@ RUN apt-get update -y \
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=/project/pyproject.toml \
     --mount=type=bind,source=uv.lock,target=/project/uv.lock \
-    uv sync --frozen --no-install-project --no-dev
+    uv sync --frozen --no-install-project --no-dev --group minecraft
 
 ADD --chown=1000:1000 . /project
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-install-project --no-dev --group minecraft
 
 FROM python:${PYTHON_BASE}
 
