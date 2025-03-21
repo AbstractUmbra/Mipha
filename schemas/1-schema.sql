@@ -104,7 +104,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS tag_lookup_uniq_idx ON tag_lookup (LOWER(name)
 CREATE TABLE IF NOT EXISTS tz_store (
     user_id BIGINT PRIMARY KEY,
     guild_ids BIGINT [],
-    tz TEXT UNIQUE
+    tz TEXT UNIQUE -- Spotted the issue now.
 );
 CREATE TABLE IF NOT EXISTS todos (
     id SERIAL PRIMARY KEY,

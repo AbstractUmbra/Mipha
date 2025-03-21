@@ -320,7 +320,7 @@ class Time(commands.Cog):
             if not confirm:
                 return
 
-            await self.bot.pool.execute(query, ctx.author.id, timezone.key)
+            _ = await self.bot.pool.fetchrow(query, ctx.author.id, timezone.key)
             if ctx.interaction:
                 await ctx.interaction.edit_original_response(content="Done!")
                 return
