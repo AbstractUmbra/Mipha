@@ -40,6 +40,8 @@ RTFM_PAGE_TYPES: dict[str, str] = {
     "python-jp": "https://docs.python.org/ja/3",
     "hondana": "https://hondana.readthedocs.io/en/stable",
     "hondana-latest": "https://hondana.readthedocs.io/en/latest",
+    "twitchio": "https://twitchio.dev/en/latest/",
+    "wavelink": "https://wavelink.dev/en/latest/",
 }
 
 
@@ -327,6 +329,20 @@ class RTFX(commands.Cog):
     async def rtfm_hondana_latest(self, ctx: Context, *, entity: str | None = None) -> None:
         """Gives you a documentation link for a Hondana entity."""
         await self.do_rtfm(ctx, "hondana-latest", entity)
+
+    @rtfm.command(name="twitchio", aliases=["tio"])
+    @app_commands.describe()
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm_twitchio(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a TwitchIO entity."""
+        await self.do_rtfm(ctx, "twitchio", entity)
+
+    @rtfm.command(name="wavelink", aliases=["wl"])
+    @app_commands.describe()
+    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
+    async def rtfm_wavelink(self, ctx: Context, *, entity: str | None = None) -> None:
+        """Gives you a documentation link for a WaveLink entity."""
+        await self.do_rtfm(ctx, "wavelink", entity)
 
     @rtfm.command(name="refresh", with_app_command=False)
     @commands.is_owner()
