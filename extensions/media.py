@@ -5,6 +5,7 @@ import logging
 import pathlib
 import random
 import re
+from enum import Enum
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import discord
@@ -20,10 +21,12 @@ from utilities.shared.ui import SelfDeleteView
 if TYPE_CHECKING:
     from bot import Mipha
     from utilities.context import Interaction
+    from utilities.shared._types.twitter import FXTwitterResponse
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 BUFFER_PATH = pathlib.Path("./buffer/")
 BUFFER_PATH.mkdir(exist_ok=True, mode=770)
+FXTWITTER_API_URL = "https://api.fxtwitter.com/{author}/status/{post_id}"
 
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
 
@@ -53,6 +56,13 @@ AUTO_REPOST_GUILDS: list[discord.Object] = [
     discord.Object(id=149998214810959872, type=discord.Guild),
 ]
 AUTO_REPOST_GUILD_IDS: set[int] = {guild.id for guild in AUTO_REPOST_GUILDS}
+
+
+class URLSource(Enum):
+    twitter = 1
+    tiktok = 2
+    reddit = 3
+    instagram = 4
 
 
 class SubstitutionData(TypedDict):
@@ -196,18 +206,6 @@ class MediaReposter(commands.Cog):
 
         return file, content
 
-    def _pull_matches(self, matches: list[re.Match[str]]) -> list[str]:
-        cleaned: list[str] = []
-        for _url in matches:
-            exposed_url: str = _url[1]
-
-            if not exposed_url.endswith("/"):
-                exposed_url = exposed_url + "/"
-
-            cleaned.append(exposed_url)
-
-        return cleaned
-
     def _check_author(self, author: discord.Member | discord.User) -> bool:
         if isinstance(author, discord.User):
             # dms?
@@ -219,6 +217,27 @@ class MediaReposter(commands.Cog):
 
         return any(author.get_role(r) for r in config_entry["allowed_roles"]) or author.id in config_entry["allowed_members"]
 
+    def _resolve_matches(self, content: str) -> tuple[URLSource, list[re.Match[str]]] | None:
+        if tiktok_matches := list((DESKTOP_PATTERN.finditer(content) or MOBILE_PATTERN.finditer(content))):
+            return URLSource.tiktok, tiktok_matches
+        if twitter_matches := list(TWITTER_PATTERN.finditer(content)):
+            return URLSource.twitter, list(twitter_matches)
+        if instagram_matches := list(INSTAGRAM_PATTERN.finditer(content)):
+            return URLSource.instagram, list(instagram_matches)
+        if reddit_matches := list(REDDIT_PATTERN.finditer(content)):
+            return URLSource.reddit, list(reddit_matches)
+
+        return None
+
+    async def _has_twitter_video(self, match: re.Match[str]) -> bool:
+        author = match["user"]
+        post_id = match["id"]
+
+        async with self.bot.session.get(FXTWITTER_API_URL.format(author=author, post_id=post_id)) as resp:
+            data: FXTwitterResponse = await resp.json()
+
+        return bool(data["tweet"].get("media", {}).get("videos"))
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if not message.guild:
@@ -228,23 +247,23 @@ class MediaReposter(commands.Cog):
         if message.webhook_id:
             return
 
-        matches: list[re.Match[str]] = (
-            list(DESKTOP_PATTERN.finditer(message.content))
-            + list(MOBILE_PATTERN.finditer(message.content))
-            + list(REDDIT_PATTERN.finditer(message.content))
-            + list(TWITTER_PATTERN.finditer(message.content))
-            + list(INSTAGRAM_PATTERN.finditer(message.content))
-        )
-
-        if not matches:
-            return
-
         assert isinstance(message.author, discord.Member)  # guarded in previous if
         if not self._check_author(message.author):
             return
 
+        resolved = self._resolve_matches(message.content)
+
+        if not resolved:
+            return
+
+        source, matches = resolved
+        if not matches:
+            return
+
         new_urls = []
         for match in matches:
+            if source is URLSource.twitter and not await self._has_twitter_video(match):
+                continue
             url = yarl.URL(match[0])
             if not url.host or not (_sub := SUBSTITUTIONS.get(url.host, None)):
                 return
