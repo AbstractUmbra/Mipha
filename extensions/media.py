@@ -127,7 +127,14 @@ class MediaReposter(commands.Cog):
         url = yarl.URL(url)
 
         LOGGER.info("%s is trying to process the url %r", str(interaction.user), str(url))
-        info = await self._extract_video_info(url, loop=loop)
+        try:
+            info = await self._extract_video_info(url, loop=loop)
+        except yt_dlp.DownloadError as err:
+            assert err.msg
+            if "no video" in err.msg.lower():
+                return await interaction.followup.send("This tweet has no video.", ephemeral=True)
+            raise
+
         if not info:
             await interaction.followup.send(
                 "This message could not be parsed. Are you sure it's a valid link?",
@@ -257,8 +264,6 @@ class MediaReposter(commands.Cog):
             return
 
         source, matches = resolved
-        if not matches:
-            return
 
         new_urls = []
         for match in matches:
@@ -273,6 +278,9 @@ class MediaReposter(commands.Cog):
                 new_url = new_url.with_query(None)
 
             new_urls.append(new_url)
+
+        if not new_urls:
+            return
 
         content = "\n".join([str(url) for url in new_urls])
 
