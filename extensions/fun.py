@@ -79,9 +79,9 @@ AL_BHED_CHARACTER_MAP = {
 }
 
 
-def has_deepl_key() -> Check[Context]:
-    def predicate(ctx: Context) -> bool:
-        return bool(ctx.bot.config.get("deepl"))
+def has_deepl_key() -> Check[Context[Fun]]:
+    def predicate(ctx: Context[Fun]) -> bool:
+        return bool(ctx.cog.deepl_key)
 
     return commands.check(predicate)
 
@@ -89,8 +89,9 @@ def has_deepl_key() -> Check[Context]:
 class Fun(commands.Cog):
     """Some fun stuff, not fleshed out yet."""
 
-    def __init__(self, bot: Mipha) -> None:
+    def __init__(self, bot: Mipha, /, *, deepl_key: str | None = None) -> None:
         self.bot: Mipha = bot
+        self.deepl_key: str | None = deepl_key
 
     # @commands.Cog.listener("on_message")
     async def quote(self, message: discord.Message) -> None:
@@ -203,7 +204,7 @@ class Fun(commands.Cog):
 
         url = "https://api-free.deepl.com/v2/translate"
         form = aiohttp.FormData()
-        form.add_field("auth_key", value=self.bot.config["deepl"]["api_key"])  # pyright: ignore[reportGeneralTypeIssues] # guarded by check
+        form.add_field("auth_key", value=self.deepl_key)
         form.add_field("text", value=new_content)
         form.add_field("target_lang", value="EN")
 
@@ -440,4 +441,5 @@ class Fun(commands.Cog):
 
 
 async def setup(bot: Mipha) -> None:
-    await bot.add_cog(Fun(bot))
+    deepl_key = bot.config.get("tokens", {}).get("deepl")
+    await bot.add_cog(Fun(bot, deepl_key=deepl_key))
