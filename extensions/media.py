@@ -38,7 +38,7 @@ DESKTOP_PATTERN: re.Pattern[str] = re.compile(
 )
 TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(twitter|x)\.com/(?P<user>\w+)/status/(?P<id>\d+))\>?")
 REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\w+))\>?")
-INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(?:www\.)instagram\.com/reel/(?P<id>[a-zA-Z0-9]+)\/?)\>?")
+INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(?:www\.)instagram\.com/reel/(?P<id>[a-zA-Z0-9\-_]+)\/?)\>?")
 
 SUBSTITUTIONS: dict[str, SubstitutionData] = {
     "twitter.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
