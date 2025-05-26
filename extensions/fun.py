@@ -215,10 +215,12 @@ class Fun(commands.Cog):
         text = data["translations"][0]["text"]
 
         embed = discord.Embed(title="Translation:", colour=discord.Colour.random())
-        embed.add_field(name="Source:", value=new_content, inline=False)
-        embed.add_field(name=f"Translated from {lang}", value=text, inline=False)
+        embed.description = f"Translated from {lang}:-\n\n{text}"
+        embed.set_footer(text=f"Requested by {ctx.author.display_name}", icon_url=ctx.author.display_avatar.url)
 
-        await ctx.send(embed=embed)
+        await ctx.reply(
+            embed=embed, mention_author=True, allowed_mentions=discord.AllowedMentions(users=True, replied_user=True)
+        )
 
     def _draw_words(self, text: str) -> io.BytesIO:
         text = fill(text, 25)
