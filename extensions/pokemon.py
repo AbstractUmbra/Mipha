@@ -34,7 +34,7 @@ class PokeType(Enum):
     def in_gen(self, generation: int) -> bool:
         return not (
             (generation == 1 and self in (PokeType.Dark, PokeType.Steel, PokeType.Fairy))
-            or (2 <= generation <= 4 and self is PokeType.Fairy)
+            or (2 <= generation <= 5 and self is PokeType.Fairy)
         )
 
 
