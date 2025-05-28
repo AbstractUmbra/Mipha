@@ -38,7 +38,7 @@ class BadTikTokData(Exception):
     def clean(self) -> TikTokSynth:
         data = self._data.copy()
         if data.get("data"):
-            data["data"].pop("v_str", None)  # pyright: ignore[reportArgumentType] # immutable typed dict
+            data["data"].pop("v_str", None)
 
         return data
 
