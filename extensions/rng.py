@@ -38,12 +38,12 @@ class RNG(commands.Cog):
             await ctx.send("Maximum is smaller than minimum.")
             return
 
-        await ctx.send(str(rng.randint(minimum, maximum)))
+        await ctx.send(str(rng.randint(minimum, maximum)))  # noqa: S311
 
     @random.command()
     async def lenny(self, ctx: Context) -> None:
         """Displays a random lenny face."""
-        lenny = rng.choice(
+        lenny = rng.choice(  # noqa: S311
             [
                 "( ͡° ͜ʖ ͡°)",
                 "( ͠° ͟ʖ ͡°)",
@@ -67,7 +67,7 @@ class RNG(commands.Cog):
         if len(choices) < 2:
             return await ctx.send("Not enough choices to pick from.")
 
-        await ctx.send(rng.choice(choices))
+        return await ctx.send(rng.choice(choices))  # noqa: S311
 
     def _bestof_choices(self, first: str, second: str, best_of: int) -> tuple[str, list[str]]:
         """Plays a best of N game between two choices and returns the status of each game in a list."""
@@ -75,7 +75,7 @@ class RNG(commands.Cog):
         wins: list[int] = [0, 0]
         results: list[str] = []
         for _ in range(best_of):
-            winner = rng.choice([0, 1])
+            winner = rng.choice([0, 1])  # noqa: S311
             wins[winner] += 1
             choice = first if winner == 0 else second
             results.append(choice)
@@ -122,8 +122,7 @@ class RNG(commands.Cog):
                 f"4. {second_winner} vs {third_winner}: **{fourth_winner} won the championship ({formatted_results})!**",
             )
             return to_send
-        else:
-            to_send.append(f"4. {second_winner} vs {third_winner}: {fourth_winner} wins! ({formatted_results})")
+        to_send.append(f"4. {second_winner} vs {third_winner}: {fourth_winner} wins! ({formatted_results})")
 
         # Upset round
         champion, results = self._bestof_choices(second_winner, third_winner, 5)
@@ -147,12 +146,12 @@ class RNG(commands.Cog):
 
     def simulate_round_robin(self, choices: list[str]) -> list[str]:
         """Simulates a round robin tournament between the choices."""
-        schedule = self.generate_round_robin(choices)  # type: ignore
+        schedule = self.generate_round_robin(choices)  # pyright: ignore[reportArgumentType]
         to_send: list[str] = []
         winners = Counter()
-        for index, round in enumerate(schedule, start=1):
+        for index, round_ in enumerate(schedule, start=1):
             to_send.append(f"**Round {index}:**")
-            for first, second in round:
+            for first, second in round_:
                 if first is None:
                     to_send.append(f"- {second} gets a bye!")
                     winners[second] += 1
@@ -200,7 +199,7 @@ class RNG(commands.Cog):
         else:
             results = self.simulate_round_robin(list(choices))
 
-        await ctx.send("\n".join(results))
+        return await ctx.send("\n".join(results))
 
 
 async def setup(bot: Mipha) -> None:
