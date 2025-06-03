@@ -44,6 +44,29 @@ RTFM_PAGE_TYPES: dict[str, str] = {
     "wavelink": "https://wavelink.dev/en/latest/",
 }
 
+PYTHON_VER: re.Pattern[str] = re.compile(r"^3\.\d{1,2}$")
+
+
+class python_ver_converter(commands.Converter[str]):
+    async def convert(self, ctx: Context, argument: str) -> str:
+        python_version = "3.13"
+
+        match = PYTHON_VER.fullmatch(argument)
+        if match:
+            match_attempt = match[0]
+            try:
+                maj, _, min_ = match_attempt.partition(".")
+                if 15 > int(min_) < 6:
+                    return python_version
+                if maj != "3":
+                    return python_version
+            except ValueError:
+                return python_version
+            else:
+                python_version = match_attempt
+
+        return python_version
+
 
 class SphinxObjectFileReader:
     # Inspired by Sphinx's InventoryFileReader
@@ -451,24 +474,14 @@ class RTFX(commands.Cog):
 
         return
 
-    @commands.command(name="rtfs", ignore_extra=True)
-    async def rtfs_prefix(self, ctx: Context) -> None:
-        mention = "/rtfs search"
-        app_group = ctx.bot.tree.get_command("rtfs", type=discord.AppCommandType.chat_input)
-        if app_group and isinstance(app_group, app_commands.Group):
-            app_command = app_group.get_command("search")
-            if app_command:
-                mention = await ctx.bot.tree.find_mention_for(app_command)
-        return await ctx.send(f"Migrated to a slash command, sorry. Use {mention}")
-
-    async def _perform_pyright(self, code: str, /) -> PyrightResponse:
+    async def _perform_pyright(self, code: str, /, *, python_version: str) -> PyrightResponse:
         if not self.pyright.url:
             raise ValueError("Sorry, this feature has not been configured.")
 
         async with self.bot.session.post(
             self.pyright.url,
             headers={"Authorization": self.pyright.token} if self.pyright.token else None,
-            json={"content": code},
+            json={"content": code, "version": python_version},
         ) as resp:
             return await resp.json()
 
@@ -476,6 +489,7 @@ class RTFX(commands.Cog):
     async def _pyright(
         self,
         ctx: Context,
+        python_version: str = commands.param(converter=python_ver_converter, default="3.13"),
         *,
         codeblock: Codeblock = commands.param(converter=codeblock_converter),  # noqa: B008 # this is how commands.param works
     ) -> None:
@@ -485,7 +499,7 @@ class RTFX(commands.Cog):
         code = codeblock.content
 
         try:
-            output: PyrightResponse = await self._perform_pyright(code)
+            output: PyrightResponse = await self._perform_pyright(code, python_version=python_version)
         except ValueError:
             return await ctx.send("Sorry, this functionality is currently disabled.")
 
