@@ -61,8 +61,11 @@ class VoiceStalking(commands.Cog):
 
         return ret
 
-    def _is_safe_channel(self, channel: VocalGuildChannel) -> bool:
-        config: VoiceStalkingConfig = self._config.get(channel.guild.id, {})  # type: ignore # dumb
+    def _is_safe_channel(self, channel: VocalGuildChannel | None) -> bool:
+        if channel is None:
+            return False
+
+        config = self._config.get(channel.guild.id)
         if not config:
             return False
 
@@ -74,10 +77,7 @@ class VoiceStalking(commands.Cog):
             return False
 
         default_role = channel.guild.default_role
-        if channel.permissions_for(default_role).view_channel is False:
-            return False
-
-        return True
+        return channel.permissions_for(default_role).view_channel is not False
 
     def generate_embed(
         self,
@@ -115,7 +115,7 @@ class VoiceStalking(commands.Cog):
         before: discord.VoiceState,
         after: discord.VoiceState,
     ) -> None:
-        config: VoiceStalkingConfig = self._config.get(member.guild.id, {})  # type: ignore # dumb
+        config = self._config.get(member.guild.id)
         if not config:
             return
 
@@ -131,20 +131,21 @@ class VoiceStalking(commands.Cog):
             raise RuntimeError("Unreachable code in voice stalking.")
 
         channel_id = config["notification_channel"]
-        channel: discord.TextChannel | None = self.bot.get_channel(channel_id)  # type: ignore # only text channels will be allowed.
+        channel = self.bot.get_channel(channel_id)
         if channel is None:
             raise BadStalkingConfig(member.guild)
+        assert isinstance(channel, (discord.TextChannel, discord.Thread))
 
         if state is VoiceStateType.move:
-            if self._is_safe_channel(before.channel) and self._is_safe_channel(after.channel):  # type: ignore # this is guarded by the state above
+            if self._is_safe_channel(before.channel) and self._is_safe_channel(after.channel):
                 state = VoiceStateType.move
-            elif self._is_safe_channel(before.channel) and not self._is_safe_channel(after.channel):  # type: ignore # this is guarded by the state above
+            elif self._is_safe_channel(before.channel) and not self._is_safe_channel(after.channel):
                 state = VoiceStateType.disconnect
-            elif not self._is_safe_channel(before.channel) and self._is_safe_channel(after.channel):  # type: ignore # this is guarded by the state above
+            elif not self._is_safe_channel(before.channel) and self._is_safe_channel(after.channel):
                 state = VoiceStateType.connect
-        if state is VoiceStateType.connect and not self._is_safe_channel(after.channel):  # type: ignore # this is guarded by the state above
+        if state is VoiceStateType.connect and not self._is_safe_channel(after.channel):
             return
-        if state is VoiceStateType.disconnect and not self._is_safe_channel(before.channel):  # type: ignore # this is guarded by the state above
+        if state is VoiceStateType.disconnect and not self._is_safe_channel(before.channel):
             return
 
         embed = self.generate_embed(member, state=state, before=before.channel, after=after.channel)
@@ -167,7 +168,7 @@ class VoiceStalking(commands.Cog):
         config = self._create_default_config()
         await self._config.put(ctx.guild.id, config)
 
-        await ctx.message.add_reaction(ctx.tick(True))
+        return await ctx.message.add_reaction(ctx.tick(True))  # noqa: FBT003
 
     @stalking.command()
     @commands.guild_only()
@@ -195,10 +196,10 @@ class VoiceStalking(commands.Cog):
             return
 
         no_perms_overwrite = discord.PermissionOverwrite.from_pair(discord.Permissions.none(), discord.Permissions.all())
-        overwrites = {item: no_perms_overwrite for item in exclude}
+        overwrites = dict.fromkeys(exclude, no_perms_overwrite)
 
-        tc = await ctx.guild.create_text_channel(name=name, overwrites=overwrites)
-        vc = await ctx.guild.create_voice_channel(name=name, overwrites=overwrites)
+        tc = await ctx.guild.create_text_channel(name=name, overwrites=overwrites)  # pyright: ignore[reportArgumentType]
+        vc = await ctx.guild.create_voice_channel(name=name, overwrites=overwrites)  # pyright: ignore[reportArgumentType]
 
         config["excluded_channels"].append(vc.id)
         await self._config.put(ctx.guild.id, config)

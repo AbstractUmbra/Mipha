@@ -58,9 +58,9 @@ class Colour(commands.Cog):
 
         if match_.group("RGB"):
             return discord.Colour.from_rgb(*map(int, map(match_.group, "RGB")))
-        elif match_.group("HSV"):
+        if match_.group("HSV"):
             return discord.Colour.from_hsv(*map(float, map(match_.group, "HSV")))
-        elif match_.group("Hex"):
+        if match_.group("Hex"):
             group = match_["Hex"]
             if len(group) == 4:
                 group = "#" + "".join(character * 2 for character in group.removeprefix("#"))
