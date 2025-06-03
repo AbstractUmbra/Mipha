@@ -419,11 +419,15 @@ class RTFX(commands.Cog):
         pyr_version = data["pyright_version"]
         py_version = data["python_version"]
         node_version = data["node_version"]
+        executed_version = data.get("executed_python_version", "3.13")
         diagnostics = "\n".join(diagnostics)
         totals = ", ".join(f"{count} {name}" for name, count in counts.items())
 
         return to_codeblock(
-            f"Pyright v{pyr_version} | Python v{py_version} | Node {node_version}:\n\n{diagnostics}\n\n{totals}\n",
+            (
+                f"Pyright v{pyr_version} | Python v{py_version} | Executed Python v{executed_version} "
+                f"| Node {node_version}:\n\n{diagnostics}\n\n{totals}\n"
+            ),
             language="diff",
             escape_md=False,
         )
