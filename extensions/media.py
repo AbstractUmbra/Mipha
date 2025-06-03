@@ -88,7 +88,10 @@ class MediaReposter(commands.Cog):
         self.media_context_menu = app_commands.ContextMenu(
             name="Process media links",
             callback=self.media_context_menu_callback,
+            allowed_contexts=app_commands.AppCommandContext(guild=True, dm_channel=True, private_channel=True),
+            allowed_installs=app_commands.AppInstallationType(guild=True, user=True),
         )
+        self.media_context_menu.add_check(self._interaction_check)
 
         self.media_context_menu.error(self.media_context_menu_error)
         self.bot.tree.add_command(self.media_context_menu)
@@ -102,13 +105,14 @@ class MediaReposter(commands.Cog):
 
         error = getattr(error, "original", error)
 
-        await send("Sorry but something broke. <@155863164544614402> knows and will fix it.")
+        msg = "Sorry but something broke. <@155863164544614402> knows and will fix it."
+        if isinstance(error, app_commands.CheckFailure):
+            msg = "Sorry, but you don't meet the role gate requirements to use this."
+
+        await send(msg)
 
     async def media_context_menu_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(thinking=True)
-
-        if not self._check_author(interaction.user):
-            return await interaction.followup.send("Sorry, you don't meet the role gate to use this.", ephemeral=True)
 
         if (
             match := MOBILE_PATTERN.search(message.content)
@@ -212,6 +216,15 @@ class MediaReposter(commands.Cog):
         self.task_mapping[file_loc.name] = task
 
         return file, content
+
+    def _interaction_check(self, interaction: Interaction) -> bool:
+        if interaction.is_user_integration() and not interaction.is_guild_integration():
+            return True
+
+        if interaction.is_guild_integration() or interaction.guild:
+            return self._check_author(interaction.user)
+
+        return True
 
     def _check_author(self, author: discord.Member | discord.User) -> bool:
         if isinstance(author, discord.User):
