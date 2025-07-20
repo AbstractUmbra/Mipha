@@ -41,7 +41,6 @@ RTFM_PAGE_TYPES: dict[str, str] = {
     "hondana": "https://hondana.readthedocs.io/en/stable",
     "hondana-latest": "https://hondana.readthedocs.io/en/latest",
     "twitchio": "https://twitchio.dev/en/latest/",
-    "wavelink": "https://wavelink.dev/en/latest/",
 }
 
 PYTHON_VER: re.Pattern[str] = re.compile(r"^3\.\d{1,2}$")
@@ -112,7 +111,6 @@ class Libraries(discord.Enum):
     hondana = "hondana"
     aiohttp = "aiohttp"
     jishaku = "jishaku"
-    wavelink = "wavelink"
     mystbin = "mystbin.py"
     twitchio = "twitchio"
 
@@ -359,13 +357,6 @@ class RTFX(commands.Cog):
     async def rtfm_twitchio(self, ctx: Context, *, entity: str | None = None) -> None:
         """Gives you a documentation link for a TwitchIO entity."""
         await self.do_rtfm(ctx, "twitchio", entity)
-
-    @rtfm.command(name="wavelink", aliases=["wl"])
-    @app_commands.describe()
-    @app_commands.autocomplete(entity=rtfm_slash_autocomplete)
-    async def rtfm_wavelink(self, ctx: Context, *, entity: str | None = None) -> None:
-        """Gives you a documentation link for a WaveLink entity."""
-        await self.do_rtfm(ctx, "wavelink", entity)
 
     @rtfm.command(name="refresh", with_app_command=False)
     @commands.is_owner()
