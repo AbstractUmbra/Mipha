@@ -28,7 +28,7 @@ BUFFER_PATH = pathlib.Path("./buffer/")
 BUFFER_PATH.mkdir(exist_ok=True, mode=0o770)
 FXTWITTER_API_URL = "https://api.fxtwitter.com/{author}/status/{post_id}"
 
-ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
+ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})  # pyright: ignore[reportArgumentType] # can't narrow this dict to typeshed
 
 MOBILE_PATTERN: re.Pattern[str] = re.compile(
     r"\<?(https?://(?:vt|vm|www)\.tiktok\.com/(?:t/)?[a-zA-Z\d]+\/?)(?:\/\?.*\>?)?\>?",
@@ -133,7 +133,7 @@ class MediaReposter(commands.Cog):
         LOGGER.info("%s is trying to process the url %r", str(interaction.user), str(url))
         try:
             info = await self._extract_video_info(url, loop=loop)
-        except yt_dlp.DownloadError as err:
+        except yt_dlp.DownloadError as err:  # pyright: ignore[reportAttributeAccessIssue] # this exists but isn't exported properly
             assert err.msg  # noqa: PT017 # not pytest
 
             if "no video" in err.msg.lower():
@@ -176,7 +176,7 @@ class MediaReposter(commands.Cog):
         if not info:
             return None
 
-        return info
+        return info  # pyright: ignore[reportReturnType] # this is a correct type
 
     async def _manipulate_video(
         self,
