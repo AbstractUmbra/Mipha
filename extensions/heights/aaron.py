@@ -132,8 +132,8 @@ def make_figure(inp_: dict[str, float], sort_key: SortKey = SortKey.height_desc)
             origin="upper",
             extent=(xs - (scaled_widths[xs] / 2), xs + (scaled_widths[xs] / 2), min_height, height),
         )
-        axes.annotate(f"{height}", (xs, height), va="bottom", ha="center")
-        axes.annotate(cm_to_ft_and_in(height, 0), (xs, height + 2), va="bottom", ha="center")
+        axes.annotate(f"{height}", (xs, height), va="bottom", ha="center") # pyright: ignore[reportArgumentType]
+        axes.annotate(cm_to_ft_and_in(height, 0), (xs, height + 2), va="bottom", ha="center") # pyright: ignore[reportArgumentType]
 
     mean = sum(heights) / len(heights)
     axes.axhline(mean, color="red", ls="-.")
