@@ -94,7 +94,7 @@ class Fun(commands.Cog):
         self.deepl_key: str | None = deepl_key
 
     # @commands.Cog.listener("on_message")
-    async def quote(self, message: discord.Message) -> None:
+    async def quote(self, message: discord.Message) -> None:  # noqa: PLR0911
         if message.author.bot or message.embeds or message.guild is None:
             return
 
@@ -153,7 +153,7 @@ class Fun(commands.Cog):
 
         await message.channel.send(embed=embed)
 
-    @commands.group(invoke_without_command=True, skip_extra=False)
+    @commands.group(name="abt", aliases=["albhed", "al-bhed"], invoke_without_command=True, ignore_extra=False)
     async def abt(self, ctx: Context, *, content: str = commands.param(converter=commands.clean_content)) -> None:
         """Translated a string into Al-Bhed."""
         keep = ABT_REG.findall(content)
@@ -232,7 +232,7 @@ class Fun(commands.Cog):
             draw = ImageDraw.Draw(image)
             left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
             w, h = right - left, bottom - top
-            images[index] = image = image.resize((w + padding, h + padding))  # noqa: PLW2901 # correct usage
+            images[index] = image = image.resize((round(w + padding), round(h + padding)))  # noqa: PLW2901 # correct usage
             draw = ImageDraw.Draw(image)
             draw.multiline_text((padding / 2, padding / 2), text=text, fill=colour, font=font)
         background, foreground = images

@@ -142,7 +142,7 @@ class MiphaCommandTree(app_commands.CommandTree):
     ) -> None:
         assert interaction.command is not None  # typechecking # disable assertions
 
-        self.client.log_handler.log.exception("Exception occurred in the CommandTree:\n%s", exc_info=error)
+        self.client.log_handler.log.error("Exception occurred in the CommandTree:\n%s", exc_info=error)
 
         e = discord.Embed(title="Command Error", colour=0xA32952)
         e.add_field(name="Command", value=(interaction.command and interaction.command.name) or "No command found.")
@@ -242,7 +242,7 @@ class LogHandler:
             self.log.removeHandler(hdlr)
 
 
-class Mipha(commands.Bot):
+class Mipha(commands.Bot):  # noqa: PLR0904
     """Mipha's bot class."""
 
     log_handler: LogHandler
@@ -540,9 +540,8 @@ class Mipha(commands.Bot):
         if self.owner_ids:
             if after.author.id in self.owner_ids:
                 can_edit = True
-        else:
-            if after.author.id == self.owner_id:
-                can_edit = True
+        elif after.author.id == self.owner_id:
+            can_edit = True
 
         if before.flags.suppress_embeds != after.flags.suppress_embeds:
             can_edit = False

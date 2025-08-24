@@ -371,9 +371,8 @@ class KanjiEmbed(discord.Embed):
                 if value:
                     subdict = value[0]  # pyright: ignore[reportIndexIssue]  # typeddict.items funny
                     sources += f"Language: {subdict['language']}\nWord: {subdict['word']}"
-            else:
-                if value:
-                    senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"  # pyright: ignore[reportArgumentType,reportCallIssue]  # bleh webscrape code
+            elif value:
+                senses += f"{JISHO_REPLACEMENTS.get(key, key).title()}: {', '.join(value)}\n"  # pyright: ignore[reportArgumentType,reportCallIssue]  # bleh webscrape code
 
         if senses:
             embed.description += to_codeblock(senses, language="prolog", escape_md=False)
@@ -506,7 +505,7 @@ class Nihongo(commands.Cog):
             draw = ImageDraw.Draw(image)
             left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
             w, h = right - left, bottom - top
-            images[index] = image = image.resize((w + padding, h + padding))  # noqa: PLW2901 # correct usage
+            images[index] = image = image.resize((round(w + padding), round(h + padding)))  # noqa: PLW2901 # correct usage
             draw = ImageDraw.Draw(image)
             draw.multiline_text((padding / 2, padding / 2), text=text, fill=colour, font=font)
         background, foreground = images
@@ -539,7 +538,7 @@ class Nihongo(commands.Cog):
         Please type and send this Kana in the same channel to qualify.
         """
 
-        if kana not in ("k", "h"):
+        if kana not in {"k", "h"}:
             kana = "k"
 
         chars = HIRAGANA if kana == "h" else KATAKANA

@@ -15,10 +15,12 @@ dependencies = [
     "legofy",
     "lru-dict",
     "lxml==5.3.0",
+    "matplotlib>=3.10.5",
     "mystbin-py",
+    "numpy>=2.3.2",
     "orjson",
     "parsedatetime",
-    "Pillow",
+    "pillow",
     "psutil",
     "pygit2",
     "pykakasi @ git+https://codeberg.org/miurahr/pykakasi.git@master",
@@ -43,59 +45,19 @@ minecraft = [
 [tool.ruff]
 line-length = 125
 target-version = "py312"
+exclude = ["extensions/heights"]
 
 [tool.ruff.lint]
 preview = true
-select = [
-    "A",
-    "ANN",
-    "ASYNC",
-    "B",
-    "BLE",
-    "C4",
-    "COM",
-    "DTZ",
-    "E",
-    "EM",
-    "ERA",
-    "F",
-    "FA",
-    "FBT",
-    "FURB",
-    "G",
-    "I",
-    "INP",
-    "ISC",
-    "NPY",
-    "PD",
-    "PERF",
-    "PGH",
-    "PIE",
-    "PLC",
-    "PLE",
-    "PLW",
-    "PTH",
-    "PYI",
-    "Q",
-    "Q003",
-    "RET",
-    "RSE",
-    "RUF",
-    "S",
-    "SIM",
-    "SLOT",
-    "T20",
-    "TC",
-    "TID",
-    "TRY",
-    "UP",
-    "YTT",
-    # "DOC",   # not in a bot, please
-]
+select = ["ALL"]
 ignore = [
     "ANN401",
     "ASYNC109", # dpy commonly uses this parameter
+    "C901",
     "COM812",
+    "CPY001",
+    "D",        # not needed here
+    "DOC",
     "EM101",    # in this case this is okay
     "F401",
     "F402",
@@ -105,10 +67,15 @@ ignore = [
     "PD011",    # this is not a numpy codebase
     "PERF203",
     "PLC0414",  # pyright ruling for `as` imports needed
+    "PLR0912",
+    "PLR0913",
+    "PLR2004",  # I hate this rule
+    "PLR6301",
     "Q000",
     "RUF001",
     "RUF009",
     "S101",     # assert is used for type checking in this codebase
+    "SLF001",
     "SIM105",
     "TRY003",   # over-eager rule
     "TRY301",   # unrealistic rule

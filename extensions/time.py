@@ -115,13 +115,12 @@ class Time(commands.Cog):
     def _curr_tz_time(self, curr_timezone: zoneinfo.ZoneInfo, *, ret_datetime: Literal[False]) -> str: ...
 
     def _curr_tz_time(self, curr_timezone: zoneinfo.ZoneInfo, *, ret_datetime: bool = False) -> datetime.datetime | str:
-        """We assume it's a good tz here."""
         dt_obj = datetime.datetime.now(curr_timezone)
         if ret_datetime:
             return dt_obj
         return time.hf_time(dt_obj)
 
-    @commands.hybrid_group(invoke_without_command=True, fallback="get", aliases=["time", "tz"])
+    @commands.hybrid_group(fallback="get", aliases=["time", "tz"])
     @app_commands.describe(member="The member to fetch the timezone of. Yours is shown if blank.")
     async def timezone(self, ctx: Context, *, member: discord.Member | None = None) -> None:
         """Get a member's stored timezone."""
@@ -211,7 +210,7 @@ class Time(commands.Cog):
 
     @_info.autocomplete("timezone")
     @_set.autocomplete("timezone")
-    async def timezone_autocomplete_callback(self, interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
+    async def timezone_autocomplete_callback(self, _: Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
             return self.bot.tz_handler._default_timezones
 

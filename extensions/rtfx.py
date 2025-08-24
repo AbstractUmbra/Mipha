@@ -46,8 +46,8 @@ RTFM_PAGE_TYPES: dict[str, str] = {
 PYTHON_VER: re.Pattern[str] = re.compile(r"^3\.\d{1,2}$")
 
 
-class python_ver_converter(commands.Converter[str]):
-    async def convert(self, ctx: Context, argument: str) -> str:
+class PythonVersionConverter(commands.Converter[str]):
+    async def convert(self, __: Context, argument: str) -> str:
         python_version = "3.13"
 
         match = PYTHON_VER.fullmatch(argument)
@@ -147,7 +147,7 @@ class RTFSView(discord.ui.View):
         await interaction.edit_original_response(content=content, view=self)
 
     @discord.ui.button(emoji="\U0001f5d1\U0000fe0f", style=discord.ButtonStyle.danger)
-    async def stop_view(self, interaction: Interaction, button: discord.ui.Button[Self]) -> None:
+    async def stop_view(self, interaction: Interaction, _: discord.ui.Button[Self]) -> None:
         if interaction.message:
             await interaction.message.delete()
         self.stop()
@@ -484,7 +484,7 @@ class RTFX(commands.Cog):
     async def _pyright(
         self,
         ctx: Context,
-        python_version: str = commands.param(converter=python_ver_converter, default="3.13"),
+        python_version: str = commands.param(converter=PythonVersionConverter, default="3.13"),
         *,
         codeblock: Codeblock = commands.param(converter=codeblock_converter),  # noqa: B008 # this is how commands.param works
     ) -> None:

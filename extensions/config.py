@@ -57,7 +57,7 @@ class CommandName(commands.Converter):
 
         command = ctx.bot.get_command(lowered)
 
-        if command is None or command.cog_name in ("Config", "Admin"):
+        if command is None or command.cog_name in {"Config", "Admin"}:
             msg = f"Command {lowered!r} is not valid."
             raise commands.BadArgument(msg)
 
@@ -153,7 +153,7 @@ class ResolvedCommandPermissions:
         return self._is_command_blocked(ctx.command.qualified_name, ctx.channel.id)
 
 
-class Config(commands.Cog):
+class Config(commands.Cog):  # noqa: PLR0904
     """Handles the bot's configuration system.
 
     This is how you disable or enable certain commands
@@ -192,13 +192,12 @@ class Config(commands.Cog):
         if channel is None:
             query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id=$2;"
             row = await connection.fetchrow(query, guild_id, member_id)
+        elif isinstance(channel, discord.Thread):
+            query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3, $4);"
+            row = await connection.fetchrow(query, guild_id, member_id, channel.id, channel.parent_id)
         else:
-            if isinstance(channel, discord.Thread):
-                query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3, $4);"
-                row = await connection.fetchrow(query, guild_id, member_id, channel.id, channel.parent_id)
-            else:
-                query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3);"
-                row = await connection.fetchrow(query, guild_id, member_id, channel.id)
+            query = "SELECT 1 FROM plonks WHERE guild_id=$1 AND entity_id IN ($2, $3);"
+            row = await connection.fetchrow(query, guild_id, member_id, channel.id)
 
         return row is not None
 
@@ -232,7 +231,7 @@ class Config(commands.Cog):
         query = "SELECT name, channel_id, whitelist FROM command_config WHERE guild_id=$1;"
 
         records = await connection.fetch(query, guild_id)
-        return ResolvedCommandPermissions(guild_id, records)
+        return ResolvedCommandPermissions(guild_id, records)  # pyright: ignore[reportArgumentType] # we can treat them as tuples
 
     async def bot_check(self, ctx: Context) -> bool:
         if ctx.guild is None:
@@ -349,7 +348,7 @@ class Config(commands.Cog):
         self.is_plonked.invalidate_containing(f"{ctx.guild.id!r}:")
         await ctx.send("Successfully cleared all ignores.")
 
-    @config.group(pass_context=True, invoke_without_command=True, aliases=["unplonk"])
+    @config.group(invoke_without_command=True, aliases=["unplonk"])
     @checks.is_mod()
     async def unignore(
         self,

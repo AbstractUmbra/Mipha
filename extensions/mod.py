@@ -77,7 +77,7 @@ class AutoModFlags(BaseFlags):
         return 8
 
 
-class CannotEnableGatekeeper(Exception):
+class CannotEnableGatekeeperError(Exception):
     pass
 
 
@@ -405,7 +405,7 @@ class Gatekeeper:
                 self.queue.put(member_id, (member_id, action))
             except discord.NotFound as e:
                 # Unknown role/user
-                if e.code not in (10011, 10013):
+                if e.code not in {10011, 10013}:
                     break
             except Exception:
                 log.exception("[Gatekeeper] An exception happened in the role loop of guild ID %d", self.id)
@@ -528,7 +528,7 @@ class MigrateJoinLogView(discord.ui.View):
         self.cog: Mod = cog
 
     @discord.ui.button(label="Migrate", custom_id="migrate_robomod_join_logs", style=discord.ButtonStyle.green)
-    async def migrate(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def migrate(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         assert interaction.message is not None
         await interaction.response.defer(ephemeral=True, thinking=True)
 
@@ -563,19 +563,19 @@ class PreExistingMuteRoleView(discord.ui.View):
         return True
 
     @discord.ui.button(label="Merge", style=discord.ButtonStyle.blurple)
-    async def merge_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def merge_button(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.merge = True
 
     @discord.ui.button(label="Replace", style=discord.ButtonStyle.grey)
-    async def replace_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def replace_button(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.merge = False
 
     @discord.ui.button(label="Quit", style=discord.ButtonStyle.red)
-    async def abort_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def abort_button(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await interaction.response.send_message("Aborting", ephemeral=True)
         self.merge = None
         await self.message.delete()
@@ -599,7 +599,7 @@ class LockdownPermissionIssueView(discord.ui.View):
             pass
 
     @discord.ui.button(label="Resolve Permission Issue", style=discord.ButtonStyle.green)
-    async def resolve_permissions(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def resolve_permissions(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         overwrites = self.channel.overwrites
         ow = overwrites.setdefault(self.me, discord.PermissionOverwrite())
         ow.send_messages = True
@@ -619,7 +619,7 @@ class LockdownPermissionIssueView(discord.ui.View):
             self.stop()
 
     @discord.ui.button(label="Quit", style=discord.ButtonStyle.red)
-    async def abort_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def abort_button(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         self.abort = True
         await interaction.response.send_message(
             "Alright, feel free to edit the permissions yourself to "
@@ -728,7 +728,7 @@ class GatekeeperSetupRoleView(discord.ui.View):
         await interaction.message.delete()
 
     @discord.ui.button(label="Create New Role", style=discord.ButtonStyle.blurple)
-    async def create_role(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def create_role(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         assert interaction.message is not None
         assert isinstance(interaction.channel, discord.abc.Messageable)
 
@@ -848,7 +848,7 @@ class GatekeeperRateLimitConfirmationView(discord.ui.View):
             await self.message.delete()
 
     @discord.ui.button(label="Update", style=discord.ButtonStyle.green)
-    async def update(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def update(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         modal = GatekeeperRateLimitModal()
         rate, per = self.existing_rate
         modal.rate.default = str(rate)
@@ -862,7 +862,7 @@ class GatekeeperRateLimitConfirmationView(discord.ui.View):
         self.stop()
 
     @discord.ui.button(label="Remove", style=discord.ButtonStyle.red)
-    async def remove(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         self.value = None
         await interaction.response.defer()
         await interaction.delete_original_response()
@@ -1083,7 +1083,7 @@ class GatekeeperSetUpView(discord.ui.View):
         self.cog._gatekeeper_menus.pop(self.gatekeeper.id, None)
 
     @discord.ui.button(label="Set up Role", style=discord.ButtonStyle.blurple, row=2)
-    async def setup_role(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def setup_role(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         assert interaction.message is not None
 
         if not interaction.app_permissions.manage_roles:
@@ -1110,7 +1110,7 @@ class GatekeeperSetUpView(discord.ui.View):
         await interaction.message.edit(view=self)
 
     @discord.ui.button(label="Send Starter Message", style=discord.ButtonStyle.blurple, row=2)
-    async def setup_message(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def setup_message(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         assert interaction.message is not None
 
         channel = self.gatekeeper.channel
@@ -1169,7 +1169,7 @@ class GatekeeperSetUpView(discord.ui.View):
         await interaction.followup.send(f"Successfully set bypass action to {value}", ephemeral=True)
 
     @discord.ui.button(label="Auto", style=discord.ButtonStyle.blurple, row=2)
-    async def setup_auto(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def setup_auto(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         assert interaction.message is not None
 
         rate = self.gatekeeper.rate
@@ -1194,7 +1194,7 @@ class GatekeeperSetUpView(discord.ui.View):
         await interaction.message.edit(view=self)
 
     @discord.ui.button(label="Enable", style=discord.ButtonStyle.green, row=2)
-    async def toggle_flag(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def toggle_flag(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         assert interaction.message is not None
 
         enabled = self.gatekeeper.started_at is not None
@@ -1242,7 +1242,7 @@ class GatekeeperSetUpView(discord.ui.View):
         return
 
     @discord.ui.button(emoji="\N{WHITE QUESTION MARK ORNAMENT}", row=2)
-    async def help_message(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+    async def help_message(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         msg = (
             "Gatekeeper is a feature that automatically assigns a role to a member when they join, "
             "for the sole purpose of blocking them from accessing the server.\n"
@@ -1268,7 +1268,7 @@ class GatekeeperVerifyButton(discord.ui.DynamicItem[discord.ui.Button], template
         self.gatekeeper = gatekeeper
 
     @classmethod
-    async def from_custom_id(cls, interaction: Interaction, item: discord.ui.Button, match: re.Match[str], /) -> Self:
+    async def from_custom_id(cls, interaction: Interaction, _: discord.ui.Button, __: re.Match[str], /) -> Self:
         cog: Mod | None = interaction.client.get_cog("Mod")  # pyright: ignore[reportAssignmentType] # no downcasting
         if cog is None:
             await interaction.response.send_message(
@@ -1313,7 +1313,7 @@ class GatekeeperAlertResolveButton(discord.ui.DynamicItem[discord.ui.Button], te
         self.gatekeeper = gatekeeper
 
     @classmethod
-    async def from_custom_id(cls, interaction: Interaction, item: discord.ui.Button, match: re.Match[str], /) -> Self:
+    async def from_custom_id(cls, interaction: Interaction, _: discord.ui.Button, __: re.Match[str], /) -> Self:
         cog: Mod | None = interaction.client.get_cog("Mod")  # pyright: ignore[reportAssignmentType] # no downcasting
         if cog is None:
             await interaction.response.send_message(
@@ -1374,7 +1374,7 @@ class GatekeeperAlertMassbanButton(discord.ui.DynamicItem[discord.ui.Button], te
         self.cog: Mod = cog
 
     @classmethod
-    async def from_custom_id(cls, interaction: Interaction, item: discord.ui.Button, match: re.Match[str], /) -> Self:
+    async def from_custom_id(cls, interaction: Interaction, _: discord.ui.Button, __: re.Match[str], /) -> Self:
         cog: Mod | None = interaction.client.get_cog("Mod")  # pyright: ignore[reportAssignmentType] # no downcasting
         if cog is None:
             await interaction.response.send_message(
@@ -1809,7 +1809,7 @@ class SpamChecker:
         ninety_days_ago = now - datetime.timedelta(days=90)
         return member.created_at > ninety_days_ago and member.joined_at is not None and member.joined_at > seven_days_ago
 
-    def is_spamming(self, message: discord.Message) -> SpamCheckerResult | None:
+    def is_spamming(self, message: discord.Message) -> SpamCheckerResult | None:  # noqa: PLR0911
         if message.guild is None:
             return None
 
@@ -1938,7 +1938,7 @@ def can_mute() -> Check[ModGuildContext]:
 # The actual cog
 
 
-class Mod(commands.Cog):
+class Mod(commands.Cog):  # noqa: PLR0904
     """Moderation related commands."""
 
     def __init__(self, bot: Mipha) -> None:
@@ -2166,9 +2166,9 @@ class Mod(commands.Cog):
             log.info("[Mention Spam] Member %s (ID: %s) has been banned from guild ID %s", member, member.id, guild_id)
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message) -> None:
+    async def on_message(self, message: discord.Message) -> None:  # noqa: PLR0911
         author = message.author
-        if author.id in (self.bot.user.id, self.bot.owner_id):
+        if author.id in {self.bot.user.id, self.bot.owner_id}:
             return
 
         if message.guild is None:
@@ -2236,7 +2236,7 @@ class Mod(commands.Cog):
         await self.ban_for_mention_spam(mention_count, guild_id, message, author)
 
     @commands.Cog.listener()
-    async def on_member_join(self, member: discord.Member) -> None:
+    async def on_member_join(self, member: discord.Member) -> None:  # noqa: PLR0915
         guild_id = member.guild.id
         config = await self.get_guild_config(guild_id)
         if config is None:
@@ -2262,8 +2262,8 @@ class Mod(commands.Cog):
                     spammers = checker.check_gatekeeper(member, gatekeeper)
                     if spammers:
                         await gatekeeper.force_enable_with(spammers)
-                        for member in spammers:
-                            checker.flag_member(member)
+                        for spam_member in spammers:
+                            checker.flag_member(spam_member)
 
                         if config.automod_flags.alerts:
                             msg = (
@@ -2736,7 +2736,7 @@ class Mod(commands.Cog):
             app_commands.Choice(name="Gatekeeper", value="gatekeeper"),
         ],
     )
-    async def robomod_disable(
+    async def robomod_disable(  # noqa: PLR0915
         self,
         ctx: GuildContext,
         *,
@@ -2785,7 +2785,7 @@ class Mod(commands.Cog):
         self.get_guild_config.invalidate(self, guild_id)
         warnings = []
         if record is not None:
-            if record[0] is not None and protection in ("all", "joins"):
+            if record[0] is not None and protection in {"all", "joins"}:
                 url: str = record[0]
                 wh = discord.Webhook.from_url(url, session=self.bot.session)
                 try:
@@ -2793,7 +2793,7 @@ class Mod(commands.Cog):
                 except discord.HTTPException:
                     warnings.append("Join broadcast webhook could not be deleted")
 
-            if record[1] is not None and protection in ("all", "alerts"):
+            if record[1] is not None and protection in {"all", "alerts"}:
                 url: str = record[1]
                 wh = discord.Webhook.from_url(url, session=self.bot.session)
                 try:
@@ -2801,7 +2801,7 @@ class Mod(commands.Cog):
                 except discord.HTTPException:
                     warnings.append("Message alerts webhook could not be deleted")
 
-        if protection in ("all", "gatekeeper"):
+        if protection in {"all", "gatekeeper"}:
             gatekeeper = await self.get_guild_gatekeeper(guild_id)
             if gatekeeper is not None and gatekeeper.started_at is not None:
                 await gatekeeper.disable()
@@ -3159,7 +3159,7 @@ class Mod(commands.Cog):
     @commands.hybrid_command(usage="[flags...]")
     @commands.guild_only()
     @checks.hybrid_permissions_check(ban_members=True)
-    async def massban(self, ctx: GuildContext, *, args: MassbanFlags) -> None:
+    async def massban(self, ctx: GuildContext, *, args: MassbanFlags) -> None:  # noqa: PLR0911, PLR0914, PLR0915
         """Mass bans multiple members from the server.
 
         This command uses a syntax similar to Discord's search bar. To use this command
@@ -3223,13 +3223,12 @@ class Mod(commands.Cog):
             async for message in args.channel.history(limit=args.search, before=before, after=after):
                 assert isinstance(message.author, discord.Member)
                 members.extend([message.author for p in predicates if p(message)])
+        elif ctx.guild.chunked:
+            members = ctx.guild.members
         else:
-            if ctx.guild.chunked:
-                members = ctx.guild.members
-            else:
-                async with ctx.typing():
-                    await ctx.guild.chunk(cache=True)
-                members = ctx.guild.members
+            async with ctx.typing():
+                await ctx.guild.chunk(cache=True)
+            members = ctx.guild.members
 
         # member filters
         predicates: list[Callable[..., bool]] = [
@@ -3482,7 +3481,7 @@ class Mod(commands.Cog):
     @commands.guild_only()
     @checks.hybrid_permissions_check(manage_messages=True)
     @app_commands.describe(search="How many messages to search for")
-    async def purge(
+    async def purge(  # noqa: PLR0911, PLR0915
         self,
         ctx: GuildContext,
         search: commands.Range[int, 1, 2000] | None = None,
@@ -3558,7 +3557,7 @@ class Mod(commands.Cog):
         if not predicates:
             # If nothing is passed then default to `True` to emulate ?purge all behaviour
             require_prompt = True
-            predicates.append(lambda m: True)
+            predicates.append(lambda _: True)
 
         threshold = discord.utils.utcnow() - datetime.timedelta(days=14)
         predicates.append(lambda m: m.created_at >= threshold)

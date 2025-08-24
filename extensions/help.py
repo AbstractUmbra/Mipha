@@ -36,8 +36,8 @@ class PaginatedHelpCommand(commands.HelpCommand):
         yield ("" if indent == 1 else "├" if subc != 0 else "└") + f"`{command.qualified_name}`: {command.short_doc}"
         if isinstance(command, commands.Group):
             last = len(command.commands) - 1
-            for _, command in enumerate(await self.filter_commands(command.commands, sort=True)):  # noqa: B020 # correct usage
-                async for result in self.recursive_command_format(command, indent=indent + 1, subc=last):
+            for _, inner_command in enumerate(await self.filter_commands(command.commands, sort=True)):
+                async for result in self.recursive_command_format(inner_command, indent=indent + 1, subc=last):
                     yield result
                 last -= 1
 

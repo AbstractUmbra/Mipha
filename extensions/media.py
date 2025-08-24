@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 BUFFER_PATH = pathlib.Path("./buffer/")
-BUFFER_PATH.mkdir(exist_ok=True, mode=770)
+BUFFER_PATH.mkdir(exist_ok=True, mode=0o770)
 FXTWITTER_API_URL = "https://api.fxtwitter.com/{author}/status/{post_id}"
 
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})
@@ -75,7 +75,7 @@ class MediaConfig(TypedDict):
     allowed_members: list[int]
 
 
-class FilesizeLimitExceeded(Exception):
+class FilesizeLimitExceededError(Exception):
     def __init__(self, *, post: bool) -> None:
         self.post: bool = post
         super().__init__("The filesize limit was exceeded for this guild.")
@@ -134,7 +134,8 @@ class MediaReposter(commands.Cog):
         try:
             info = await self._extract_video_info(url, loop=loop)
         except yt_dlp.DownloadError as err:
-            assert err.msg
+            assert err.msg  # noqa: PT017 # not pytest
+
             if "no video" in err.msg.lower():
                 return await interaction.followup.send("This tweet has no video.", ephemeral=True)
             raise
@@ -149,7 +150,7 @@ class MediaReposter(commands.Cog):
         filesize_limit = (interaction.guild and interaction.guild.filesize_limit) or 8388608
         try:
             file, content = await self._manipulate_video(info, filesize_limit=filesize_limit, loop=loop)
-        except FilesizeLimitExceeded as error:
+        except FilesizeLimitExceededError as error:
             await interaction.followup.send(content=str(error))
             return None
 
@@ -190,7 +191,7 @@ class MediaReposter(commands.Cog):
 
         if file_loc.stat().st_size > filesize_limit:
             file_loc.unlink(missing_ok=True)
-            raise FilesizeLimitExceeded(post=False)
+            raise FilesizeLimitExceededError(post=False)
 
         proc = await asyncio.subprocess.create_subprocess_shell(
             f'ffmpeg -y -i "{file_loc}" "{fixed_file_loc}" -hide_banner -loglevel warning',
@@ -203,7 +204,7 @@ class MediaReposter(commands.Cog):
         if fixed_file_loc.stat().st_size > filesize_limit:
             file_loc.unlink(missing_ok=True)
             fixed_file_loc.unlink(missing_ok=True)
-            raise FilesizeLimitExceeded(post=True)
+            raise FilesizeLimitExceededError(post=True)
 
         file = discord.File(str(fixed_file_loc), filename=fixed_file_loc.name)
         content = f"**Uploader**: {info['uploader']}\n\n" * (bool(info["uploader"]))
@@ -260,11 +261,7 @@ class MediaReposter(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
-        if not message.guild:
-            return
-        if message.guild.id not in AUTO_REPOST_GUILD_IDS:
-            return
-        if message.webhook_id:
+        if not message.guild or message.guild.id not in AUTO_REPOST_GUILD_IDS or message.webhook_id:
             return
 
         assert isinstance(message.author, discord.Member)  # guarded in previous if

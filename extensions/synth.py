@@ -22,11 +22,11 @@ if TYPE_CHECKING:
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _VOICE_PATH = pathlib.Path("configs/tiktok_voices.json")
-with _VOICE_PATH.open("r") as fp:
+with _VOICE_PATH.open("r", encoding="utf-8") as fp:
     _VOICE_DATA: list[dict[str, str]] = from_json(fp.read())
 
 
-class BadTikTokData(Exception):
+class BadTikTokDataError(Exception):
     def __init__(self, data: TikTokSynth, /) -> None:
         self._data = data
         super().__init__("TikTok Voice Synth failed.")
@@ -125,7 +125,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
     def _tiktok_data_verification(self, data: TikTokSynth, /) -> None:
         if data["message"] == "Couldn’t load speech. Try again." or data["status_code"] != 0:
-            raise BadTikTokData(data)
+            raise BadTikTokDataError(data)
 
     async def _get_tiktok_response(self, *, engine: str, text: str) -> TikTokSynth | None:
         parameters: dict[str, Any] = {"text_speaker": engine, "req_text": text, "speaker_map_type": "0", "aid": "1233"}
@@ -149,7 +149,7 @@ class SynthCog(commands.Cog, name="Synth"):
 
             try:
                 self._tiktok_data_verification(data)
-            except BadTikTokData as error:
+            except BadTikTokDataError as error:
                 LOGGER.exception(
                     "TikTok synth logging.\nURL: %r\nMessage: %r\nStatus Code: %d\nStatus Message: %r\nDict: %s",
                     url,
@@ -194,7 +194,7 @@ class SynthCog(commands.Cog, name="Synth"):
             )
 
         vstr = data["data"]["v_str"]
-        vstr = vstr + ("=" * (len(vstr) % 4))
+        vstr += "=" * (len(vstr) % 4)
 
         decoded = base64.b64decode(vstr)
         clean_data = io.BytesIO(decoded)
@@ -230,7 +230,7 @@ class SynthCog(commands.Cog, name="Synth"):
             )
 
         vstr: str = data["data"]["v_str"]
-        vstr = vstr + ("=" * (len(vstr) % 4))
+        vstr += "=" * (len(vstr) % 4)
 
         decoded = base64.b64decode(vstr)
         clean_data = io.BytesIO(decoded)
@@ -241,7 +241,7 @@ class SynthCog(commands.Cog, name="Synth"):
         return await interaction.followup.send(content=f">>> {text}", file=file)
 
     @tiktok_callback.autocomplete("engine")
-    async def tiktok_engine_autocomplete(self, itx: Interaction, current: str) -> list[app_commands.Choice[str]]:
+    async def tiktok_engine_autocomplete(self, __: Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
             return self._tiktok_voice_choices[:25]
 
@@ -270,7 +270,7 @@ class SynthCog(commands.Cog, name="Synth"):
         await itx.followup.send(f"`{kana['kana']}`", file=file)
 
     @synth_callback.autocomplete("engine")
-    async def synth_engine_autocomplete(self, itx: Interaction, current: str) -> list[app_commands.Choice[int]]:
+    async def synth_engine_autocomplete(self, __: Interaction, current: str) -> list[app_commands.Choice[int]]:
         choices = await self._get_engine_choices()
 
         if not current:

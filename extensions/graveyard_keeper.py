@@ -116,7 +116,7 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
         )
 
     @wiki.autocomplete("item")
-    async def wiki_autocomplete(self, interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
+    async def wiki_autocomplete(self, _: Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not current:
             return self.cached_choices[:25]
 

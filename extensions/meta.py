@@ -71,11 +71,11 @@ class PatchedContext(Context):
         return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
-    async def typing(self, *args, **kwargs) -> AsyncGenerator[None, None]:  # noqa: ANN003, ANN002
+    async def typing(self, *_, **__) -> AsyncGenerator[None, None]:  # noqa: ANN003, ANN002
         yield
 
 
-class Meta(commands.Cog):
+class Meta(commands.Cog):  # noqa: PLR0904
     """Commands for utilities related to Discord or the Bot itself."""
 
     def __init__(self, bot: Mipha) -> None:
@@ -391,7 +391,7 @@ class Meta(commands.Cog):
 
     @commands.command(aliases=["guildinfo"], usage="")
     @commands.guild_only()
-    async def serverinfo(self, ctx: GuildContext, *, guild_id: int | None = None) -> None:
+    async def serverinfo(self, ctx: GuildContext, *, guild_id: int | None = None) -> None:  # noqa: PLR0914, PLR0915
         """Shows info about the current server."""
 
         if guild_id is not None and await self.bot.is_owner(ctx.author):

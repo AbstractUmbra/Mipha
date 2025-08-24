@@ -32,6 +32,9 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 LOGGING_CHANNEL = 309632009427222529
+HEALTHY = discord.Colour(value=0x43B581)
+UNHEALTHY = discord.Colour(value=0xF04947)
+WARNING = discord.Colour(value=0xF09E47)
 
 
 class DataBatchEntry(TypedDict):
@@ -51,7 +54,7 @@ class LoggingHandler(logging.Handler):
         super().__init__(logging.INFO)
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return record.name in ("discord.gateway", "cogs.splatoon")
+        return record.name in {"discord.gateway", "cogs.splatoon"}
 
     def emit(self, record: logging.LogRecord) -> None:
         self.cog.add_record(record)
@@ -75,7 +78,7 @@ def object_at(addr: int) -> Any | None:
     return None
 
 
-class Stats(commands.Cog):
+class Stats(commands.Cog):  # noqa: PLR0904
     """Bot usage statistics."""
 
     def __init__(self, bot: Mipha) -> None:
@@ -719,15 +722,11 @@ class Stats(commands.Cog):
 
     @commands.command(hidden=True)
     @commands.is_owner()
-    async def bothealth(self, ctx: Context) -> None:
+    async def bothealth(self, ctx: Context) -> None:  # noqa: PLR0914, PLR0915
         """Various bot health monitoring tools."""
 
         # This uses a lot of private methods because there is no
         # clean way of doing this otherwise.
-
-        HEALTHY = discord.Colour(value=0x43B581)
-        UNHEALTHY = discord.Colour(value=0xF04947)
-        WARNING = discord.Colour(value=0xF09E47)
         total_warnings = 0
 
         embed = discord.Embed(title="Bot Health Report", colour=HEALTHY)
@@ -1050,7 +1049,7 @@ class Stats(commands.Cog):
 old_on_error = commands.Bot.on_error
 
 
-async def on_error(self: commands.Bot, event: str, *args: Any, **kwargs: Any) -> None:
+async def on_error(self: commands.Bot, event: str, *args: Any, **_: Any) -> None:
     (exc_type, exc, tb) = sys.exc_info()
     # Silence command errors that somehow get bubbled up far enough here
     if isinstance(exc, commands.CommandInvokeError):

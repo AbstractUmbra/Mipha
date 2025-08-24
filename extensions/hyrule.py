@@ -37,9 +37,9 @@ class HyruleRoleAssignmentView(BaseView):
         super().__init__(timeout=None)
         self.bot: Mipha = bot
         self._descriptions: dict[str, str] = {
-            c.label: c.callback.callback.__doc__.format(owner=self.bot.owner.display_name)
+            c.label: c.callback.callback.__doc__.format(owner=self.bot.owner.display_name)  # pyright: ignore[reportAttributeAccessIssue]
             for c in self.children
-            if isinstance(c, discord.ui.Button) and c.callback.callback.__doc__ and c.label
+            if isinstance(c, discord.ui.Button) and c.callback.callback.__doc__ and c.label  # pyright: ignore[reportAttributeAccessIssue]
         }
 
     def sanitise_user(self, member: discord.Member) -> None:
@@ -66,7 +66,7 @@ class HyruleRoleAssignmentView(BaseView):
         emoji="\U0001f4da",
         row=0,
     )
-    async def add_hondana_role(self, interaction: Interaction, item: discord.ui.Button[Self]) -> None:
+    async def add_hondana_role(self, interaction: Interaction, _: discord.ui.Button[Self]) -> None:
         """This role will allow you to send messages in the Hondana category. Pings will be issued on major events."""
         assert isinstance(interaction.user, discord.Member)
 
