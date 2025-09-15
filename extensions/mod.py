@@ -45,6 +45,12 @@ HashableT = TypeVar("HashableT", bound=Hashable)
 K = TypeVar("K")
 V = TypeVar("V")
 
+LOWERCASE_A = ord("a")
+UPPERCASE_A = ord("A")
+UPPERCASE_Z = ord("Z")
+ZERO_ORDINAL = ord("0")
+NINE_ORDINAL = ord("9")
+
 log = logging.getLogger(__name__)
 
 # Misc utilities
@@ -1946,6 +1952,9 @@ class Mod(commands.Cog):  # noqa: PLR0904
 
         # guild_id: SpamChecker  # noqa: ERA001
         self._spam_check: defaultdict[int, SpamChecker] = defaultdict(SpamChecker)
+
+        # hoister cache
+        self._hoist_cache: cache.ExpiringCache[str] = cache.ExpiringCache(3600)
 
         # guild_id: List[(member_id, insertion)]  # noqa: ERA001
         # A batch of data for bulk inserting mute role changes
@@ -4106,6 +4115,50 @@ class Mod(commands.Cog):  # noqa: PLR0904
     async def on_selfmute_error(self, ctx: GuildContext, error: commands.CommandError) -> None:
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send("Missing a duration to selfmute for.")
+
+    @staticmethod
+    def name_check(inp: str, *, include_numbers: bool = True) -> bool:
+        character = ord(inp[0])
+        alpha_num = bool(character < LOWERCASE_A and (character < UPPERCASE_A or character > UPPERCASE_Z))
+        if include_numbers:
+            return alpha_num
+        return bool((character < ZERO_ORDINAL or character > NINE_ORDINAL) and alpha_num)
+
+    @app_commands.command(name="hoisters")
+    @app_commands.guild_only()
+    @app_commands.describe(
+        include_numbers="Whether to include numberic characters as 'hoist' characters",
+        ignore_cache="Whether to force a cache refresh or not. Ignore unless you're the bot owner.",
+    )
+    async def hoisters(self, interaction: Interaction, *, include_numbers: bool = True, ignore_cache: bool = False) -> None:
+        """Get the current member list who are hoisting."""
+        await interaction.response.defer(ephemeral=True)
+
+        assert interaction.guild
+
+        cache = self._hoist_cache.get(str(interaction.guild.id))
+        if not cache or (ignore_cache and interaction.user.id == self.bot.owner.id):
+            members = await interaction.guild.chunk()
+            hoisters = [
+                member for member in members if self.name_check(member.display_name, include_numbers=include_numbers)
+            ]
+            cache = "\n".join(f"{member.display_name:<20} ({member.id})" for member in hoisters)
+            self._hoist_cache[str(interaction.guild.id)] = cache
+
+        buffer = io.BytesIO()
+        buffer.write(cache.encode())
+
+        buffer.seek(0)
+        await interaction.followup.send(
+            "Here's a list of all current hoisters!",
+            file=discord.File(
+                buffer,
+                filename="hoisters.txt",
+                spoiler=True,
+                description=f"All the current hoisters in {interaction.guild.name}",
+            ),
+            ephemeral=True,
+        )
 
     async def get_lockdown_information(
         self,
