@@ -43,11 +43,6 @@ INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(?:www\.)instagra
 SUBSTITUTIONS: dict[str, SubstitutionData] = {
     "twitter.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
     "x.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
-    "tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
-    "www.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
-    "vm.tiktok.com": {"repost_urls": ["vxtiktok.com"], "remove_query": False},
-    "instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
-    "www.instagram.com": {"repost_urls": ["ddinstagram.com"], "remove_query": True},
 }
 
 AUTO_REPOST_GUILDS: list[discord.Object] = [
@@ -239,12 +234,12 @@ class MediaReposter(commands.Cog):
         return any(author.get_role(r) for r in config_entry["allowed_roles"]) or author.id in config_entry["allowed_members"]
 
     def _resolve_matches(self, content: str) -> tuple[URLSource, list[re.Match[str]]] | None:
-        if tiktok_matches := list((DESKTOP_PATTERN.finditer(content) or MOBILE_PATTERN.finditer(content))):
-            return URLSource.tiktok, tiktok_matches
+        # if tiktok_matches := list((DESKTOP_PATTERN.finditer(content) or MOBILE_PATTERN.finditer(content))):
+        #     return URLSource.tiktok, tiktok_matches
         if twitter_matches := list(TWITTER_PATTERN.finditer(content)):
             return URLSource.twitter, list(twitter_matches)
-        if instagram_matches := list(INSTAGRAM_PATTERN.finditer(content)):
-            return URLSource.instagram, list(instagram_matches)
+        # if instagram_matches := list(INSTAGRAM_PATTERN.finditer(content)):
+        #     return URLSource.instagram, list(instagram_matches)
         if reddit_matches := list(REDDIT_PATTERN.finditer(content)):
             return URLSource.reddit, list(reddit_matches)
 
@@ -279,6 +274,7 @@ class MediaReposter(commands.Cog):
         for match in matches:
             if source is URLSource.twitter and not await self._has_twitter_video(match):
                 continue
+
             url = yarl.URL(match[0])
             if not url.host or not (_sub := SUBSTITUTIONS.get(url.host, None)):
                 return
@@ -297,17 +293,17 @@ class MediaReposter(commands.Cog):
         if message.mentions:
             content = " ".join(m.mention for m in message.mentions) + "\n\n" + content
 
-        content = content[:1000] + f"\n\nReposted (correctly) from:\n{message.author} ({message.author.id})"
+        content = content[:1000] + f"\n\n-# Reposted (correctly) from:\n{message.author} ({message.author.id})"
 
         view = SelfDeleteView(author_id=message.author.id)
         view.message = await message.channel.send(content, view=view)
         if message.channel.permissions_for(message.guild.me).manage_messages and any(
             [
-                DESKTOP_PATTERN.fullmatch(message.content),
-                MOBILE_PATTERN.fullmatch(message.content),
-                REDDIT_PATTERN.fullmatch(message.content),
+                # DESKTOP_PATTERN.fullmatch(message.content),
+                # MOBILE_PATTERN.fullmatch(message.content),
+                # REDDIT_PATTERN.fullmatch(message.content),
                 TWITTER_PATTERN.fullmatch(message.content),
-                INSTAGRAM_PATTERN.fullmatch(message.content),
+                # INSTAGRAM_PATTERN.fullmatch(message.content),
             ],
         ):
             await message.delete()
