@@ -77,8 +77,9 @@ class FilesizeLimitExceededError(Exception):
 
 
 class MediaReposter(commands.Cog):
-    def __init__(self, bot: Mipha, config: Config[MediaConfig]) -> None:
+    def __init__(self, bot: Mipha, *, enabled: bool, config: Config[MediaConfig]) -> None:
         self.bot: Mipha = bot
+        self.enabled: bool = enabled
         self.config: Config[MediaConfig] = config
         self.media_context_menu = app_commands.ContextMenu(
             name="Process media links",
@@ -125,7 +126,7 @@ class MediaReposter(commands.Cog):
 
         url = yarl.URL(url)
 
-        LOGGER.info("%s is trying to process the url %r", str(interaction.user), str(url))
+        LOGGER.info("%s is trying to process the url %r", interaction.user, str(url))
         try:
             info = await self._extract_video_info(url, loop=loop)
         except yt_dlp.DownloadError as err:  # pyright: ignore[reportAttributeAccessIssue] # this exists but isn't exported properly
@@ -234,12 +235,12 @@ class MediaReposter(commands.Cog):
         return any(author.get_role(r) for r in config_entry["allowed_roles"]) or author.id in config_entry["allowed_members"]
 
     def _resolve_matches(self, content: str) -> tuple[URLSource, list[re.Match[str]]] | None:
-        # if tiktok_matches := list((DESKTOP_PATTERN.finditer(content) or MOBILE_PATTERN.finditer(content))):
-        #     return URLSource.tiktok, tiktok_matches
+        if tiktok_matches := list((DESKTOP_PATTERN.finditer(content) or MOBILE_PATTERN.finditer(content))):
+            return URLSource.tiktok, tiktok_matches
         if twitter_matches := list(TWITTER_PATTERN.finditer(content)):
             return URLSource.twitter, list(twitter_matches)
-        # if instagram_matches := list(INSTAGRAM_PATTERN.finditer(content)):
-        #     return URLSource.instagram, list(instagram_matches)
+        if instagram_matches := list(INSTAGRAM_PATTERN.finditer(content)):
+            return URLSource.instagram, list(instagram_matches)
         if reddit_matches := list(REDDIT_PATTERN.finditer(content)):
             return URLSource.reddit, list(reddit_matches)
 
@@ -256,6 +257,9 @@ class MediaReposter(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
+        if self.enabled is False:
+            return
+
         if not message.guild or message.guild.id not in AUTO_REPOST_GUILD_IDS or message.webhook_id:
             return
 
@@ -276,7 +280,7 @@ class MediaReposter(commands.Cog):
                 continue
 
             url = yarl.URL(match[0])
-            if not url.host or not (_sub := SUBSTITUTIONS.get(url.host, None)):
+            if not url.host or not (_sub := SUBSTITUTIONS.get(url.host)):
                 return
 
             new_url = url.with_host(random.choice(_sub["repost_urls"]))  # noqa: S311 # not crypto
@@ -299,11 +303,11 @@ class MediaReposter(commands.Cog):
         view.message = await message.channel.send(content, view=view)
         if message.channel.permissions_for(message.guild.me).manage_messages and any(
             [
-                # DESKTOP_PATTERN.fullmatch(message.content),
-                # MOBILE_PATTERN.fullmatch(message.content),
-                # REDDIT_PATTERN.fullmatch(message.content),
+                DESKTOP_PATTERN.fullmatch(message.content),
+                MOBILE_PATTERN.fullmatch(message.content),
+                REDDIT_PATTERN.fullmatch(message.content),
                 TWITTER_PATTERN.fullmatch(message.content),
-                # INSTAGRAM_PATTERN.fullmatch(message.content),
+                INSTAGRAM_PATTERN.fullmatch(message.content),
             ],
         ):
             await message.delete()
@@ -312,4 +316,7 @@ class MediaReposter(commands.Cog):
 async def setup(bot: Mipha) -> None:
     config_path = pathlib.Path("configs/media.json")
     config = Config(config_path)
-    await bot.add_cog(MediaReposter(bot, config), guilds=[discord.Object(id=x) for x in AUTO_REPOST_GUILD_IDS])
+    enabled: bool = config.get("enabled", False)
+    await bot.add_cog(
+        MediaReposter(bot, enabled=enabled, config=config), guilds=[discord.Object(id=x) for x in AUTO_REPOST_GUILD_IDS]
+    )

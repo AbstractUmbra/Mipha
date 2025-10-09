@@ -119,7 +119,7 @@ class JishoKanji:
     def taught_in(self) -> str | None:
         raw = self.data.find("div", class_="grade")
         if raw:
-            return raw.select("strong")[0].text.title()  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
+            return raw.select("strong")[0].text.title()
         return None
 
     @property
@@ -128,7 +128,7 @@ class JishoKanji:
         if raw is None:
             return None
 
-        level = raw.select("strong")[0].text  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
+        level = raw.select("strong")[0].text
         return level.title()
 
     @property
@@ -137,7 +137,7 @@ class JishoKanji:
         if raw is None:
             return None
 
-        count = raw.select("strong")[0].text  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
+        count = raw.select("strong")[0].text
 
         return f"{plural(int(count)):Stroke}"
 
@@ -159,7 +159,7 @@ class JishoKanji:
         if raw is None:
             return None
 
-        raw = raw.select("strong")[0].text  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad
+        raw = raw.select("strong")[0].text
         return f"{raw} of 2500 most used Kanji in newspapers."
 
     def reading_compounds(self) -> defaultdict[str, list[str]]:

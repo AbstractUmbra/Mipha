@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 from typing import TYPE_CHECKING, ClassVar, NamedTuple
 
 import bs4
@@ -13,6 +15,9 @@ if TYPE_CHECKING:
     from bot import Mipha
     from utilities.context import Interaction
 
+LOGGER = logging.getLogger(__name__)
+NEXT_PAGE_PATTERN: re.Pattern[str] = re.compile(r"^Next page")
+
 
 class GYKWikiPage(NamedTuple):
     label: str
@@ -23,13 +28,8 @@ class GYKWikiPage(NamedTuple):
 
 
 class GYK(commands.GroupCog, name="graveyard_keeper"):
+    BASE_URL: ClassVar[str] = "https://graveyardkeeper.fandom.com/wiki/Special:AllPages"
     ROOT_PAGE: ClassVar[str] = "https://graveyardkeeper.fandom.com{href}"
-    INDEX_URLS: ClassVar[list[str]] = [
-        "https://graveyardkeeper.fandom.com/wiki/Special:AllPages",
-        "https://graveyardkeeper.fandom.com/wiki/Special:AllPages?from=Fence+supplies+For+Garden",
-        "https://graveyardkeeper.fandom.com/wiki/Special:AllPages?from=Potters+wheel",
-        "https://graveyardkeeper.fandom.com/wiki/Special:AllPages?from=Zombie+Brewery",
-    ]
 
     def __init__(self, bot: Mipha, /) -> None:
         self.bot: Mipha = bot
@@ -37,27 +37,49 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
         self.cached_choices: list[app_commands.Choice[str]] = []
 
     async def cog_load(self) -> None:
+        LOGGER.info("[GYK] :: Beginning local cache of webpages.")
         soups = await self._fetch_index_pages()
         filtered_pages = await self._filter_all_items(soups)
+        LOGGER.info("[GYK] :: Finished caching wiki.")
 
         self.cached_pages = filtered_pages
         self.cached_choices = [page.to_choice() for page in self.cached_pages]
 
-    async def _cache_pages(self, items: list[GYKWikiPage], /) -> None:
-        query = """
-                """
-
-        await self.bot.pool.executemany(query, items)
-
     async def _fetch_index_pages(self) -> list[bs4.BeautifulSoup]:
         ret: list[bs4.BeautifulSoup] = []
-        for url in self.INDEX_URLS:
-            async with self.bot.session.get(url) as resp:
+        index_url = self.BASE_URL
+        async with self.bot.session.get(index_url) as resp:
+            resp.raise_for_status()
+            data = await resp.read()
+
+        soup = bs4.BeautifulSoup(data, features="lxml")
+        ret.append(soup)
+
+        while True:
+            try:
+                next_slug = await self.find_next_index_url(soup)
+                LOGGER.debug("[GYK] :: Found next slug: %r", next_slug)
+                index_url = self.ROOT_PAGE.format(href=next_slug)
+                LOGGER.debug("[GYK] :: Loading url %r", index_url)
+            except ValueError:
+                break
+
+            async with self.bot.session.get(index_url) as resp:
+                resp.raise_for_status()
                 data = await resp.read()
 
-            ret.append(bs4.BeautifulSoup(data, features="lxml"))
+            soup = bs4.BeautifulSoup(data, features="lxml")
+            ret.append(soup)
 
         return ret
+
+    @executor_function
+    def find_next_index_url(self, soup: bs4.BeautifulSoup) -> str:
+        nav = soup.find(name="a", string=NEXT_PAGE_PATTERN)  # pyright: ignore[reportArgumentType, reportCallIssue] # shitty typeshed
+        if not nav or not isinstance(nav, bs4.Tag):
+            raise ValueError("Soup was not valid.")
+
+        return str(nav["href"])
 
     @executor_function
     def _filter_all_items(self, root_pages: list[bs4.BeautifulSoup], /) -> list[GYKWikiPage]:

@@ -34,7 +34,7 @@ class TimezoneRecord(TypedDict):
 
 class TimezoneSource(SimpleListSource[tuple[str, datetime.timedelta]]):
     def format_page(self, _: RoboPages, entries: list[tuple[str, datetime.timedelta]]) -> discord.Embed:
-        embed = discord.Embed(title="Dannyware Timezones!", colour=random_pastel_colour())
+        embed = discord.Embed(title="Time & Timezones!", colour=random_pastel_colour())
         tz_dict: collections.defaultdict[int, list[str]] = collections.defaultdict(list)
 
         def to_hour(td: datetime.timedelta) -> int:
@@ -247,7 +247,7 @@ class Time(commands.Cog):
 
     @app_commands.command(name="time-board")
     async def time_board(self, interaction: Interaction) -> None:
-        """This command will show a board of all public timezones in Dannyware."""
+        """This command will show a board of all public timezones in the current guild."""
         if not interaction.guild:
             await interaction.response.send_message(
                 "Sorry, this command can only be used in a guild!",

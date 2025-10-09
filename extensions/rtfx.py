@@ -242,7 +242,8 @@ class RTFX(commands.Cog):
             cache[key] = {}
             async with self.bot.session.get(page + "/objects.inv") as resp:
                 if resp.status != 200:
-                    raise RuntimeError("Cannot build rtfm lookup table, try again later.")
+                    msg_ = f"Cannot build rtfm lookup table for {page}, try again later."
+                    raise RuntimeError(msg_)
 
                 stream = SphinxObjectFileReader(await resp.read())
                 cache[key] = self.parse_object_inv(stream, page)
