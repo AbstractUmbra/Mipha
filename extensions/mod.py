@@ -8,6 +8,7 @@ import io
 import logging
 import operator
 import re
+import string
 from collections import Counter, defaultdict
 from collections.abc import Callable, Hashable, MutableMapping, Sequence
 from itertools import starmap
@@ -46,10 +47,14 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 LOWERCASE_A = ord("a")
+LOWERCASE_Z = ord("z")
 UPPERCASE_A = ord("A")
 UPPERCASE_Z = ord("Z")
 ZERO_ORDINAL = ord("0")
 NINE_ORDINAL = ord("9")
+DISCORD_HOIST_SYMBOLS = set(string.punctuation)
+DISCORD_HOIST_UNICODE = {"⭐", "✦", "✪", "❖", "❗", "❌", "❄", "🔥", "💎"}
+ALLOWED_DISCORD_UNICODE = {"💩"}
 
 log = logging.getLogger(__name__)
 
@@ -4117,20 +4122,38 @@ class Mod(commands.Cog):  # noqa: PLR0904
             await ctx.send("Missing a duration to selfmute for.")
 
     @staticmethod
-    def name_check(inp: str, *, include_numbers: bool = True) -> bool:
-        character = ord(inp[0])
-        alpha_num = bool(character < LOWERCASE_A and (character < UPPERCASE_A or character > UPPERCASE_Z))
-        if include_numbers:
-            return alpha_num
-        return bool((character < ZERO_ORDINAL or character > NINE_ORDINAL) and alpha_num)
+    def name_check(inp: str, *, allow_numbers: bool = True) -> bool:
+        if not inp:
+            return False
+
+        first_char = inp[0]
+
+        # Letters never hoist
+        if first_char.isalpha():
+            return False
+
+        # Numbers optionally allowed
+        if allow_numbers and first_char.isdigit():
+            return False
+
+        # allow certain emoji through
+        if first_char in ALLOWED_DISCORD_UNICODE:
+            return False
+
+        # Check ASCII symbols and Unicode hoisting characters
+        if first_char in DISCORD_HOIST_SYMBOLS or first_char in DISCORD_HOIST_UNICODE:
+            return True
+
+        # Any other symbol not a letter or allowed digit is also considered hoisting
+        return True
 
     @app_commands.command(name="hoisters")
     @app_commands.guild_only()
     @app_commands.describe(
-        include_numbers="Whether to include numberic characters as 'hoist' characters",
-        ignore_cache="Whether to force a cache refresh or not. Ignore unless you're the bot owner.",
+        allow_numbers="Whether to allow numeric characters as non-'hoist' characters",
+        ignore_cache="Whether to force a cache refresh or not. Ignored unless you're the bot owner.",
     )
-    async def hoisters(self, interaction: Interaction, *, include_numbers: bool = True, ignore_cache: bool = False) -> None:
+    async def hoisters(self, interaction: Interaction, *, allow_numbers: bool = True, ignore_cache: bool = False) -> None:
         """Get the current member list who are hoisting."""
         await interaction.response.defer(ephemeral=True)
 
@@ -4139,10 +4162,9 @@ class Mod(commands.Cog):  # noqa: PLR0904
         cache = self._hoist_cache.get(str(interaction.guild.id))
         if not cache or (ignore_cache and interaction.user.id == self.bot.owner.id):
             members = await interaction.guild.chunk()
-            hoisters = [
-                member for member in members if self.name_check(member.display_name, include_numbers=include_numbers)
-            ]
-            cache = "\n".join(f"{member.display_name:<20} ({member.id})" for member in hoisters)
+            hoisters = [member for member in members if self.name_check(member.display_name, allow_numbers=allow_numbers)]
+            max_length = max(len(member.display_name) for member in hoisters) + 2
+            cache = "\n".join(f"{member.display_name:<{max_length}} ({member.id})" for member in hoisters)
             self._hoist_cache[str(interaction.guild.id)] = cache
 
         buffer = io.BytesIO()
@@ -4154,7 +4176,6 @@ class Mod(commands.Cog):  # noqa: PLR0904
             file=discord.File(
                 buffer,
                 filename="hoisters.txt",
-                spoiler=True,
                 description=f"All the current hoisters in {interaction.guild.name}",
             ),
             ephemeral=True,
