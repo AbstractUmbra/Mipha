@@ -32,7 +32,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         *,
         indent: int = 1,
         subc: int = 0,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         yield ("" if indent == 1 else "├" if subc != 0 else "└") + f"`{command.qualified_name}`: {command.short_doc}"
         if isinstance(command, commands.Group):
             last = len(command.commands) - 1

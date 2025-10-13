@@ -71,7 +71,7 @@ class PatchedContext(Context):
         return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
-    async def typing(self, *_, **__) -> AsyncGenerator[None, None]:  # noqa: ANN003, ANN002
+    async def typing(self, *_, **__) -> AsyncGenerator[None]:  # noqa: ANN003, ANN002
         yield
 
 

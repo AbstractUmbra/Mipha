@@ -13,7 +13,7 @@ dependencies = [
     "imagetext-py",
     "jishaku",
     "legofy",
-    "lru-dict",
+    "lru_dict",
     "lxml==5.3.0",
     "matplotlib>=3.10.5",
     "mystbin-py",
@@ -31,7 +31,7 @@ dependencies = [
     "uvloop",
     "yt-dlp",
 ]
-requires-python = "<4.0,>=3.12"
+requires-python = "<4.0,>=3.13"
 readme = "README.md"
 license = { file = "LICENSE" }
 
@@ -42,9 +42,17 @@ minecraft = [
     "rcon @ git+https://github.com/conqp/rcon.git@master",
 ]
 
+[tool.uv.sources]
+"lru_dict" = { index = "umbra" }
+
+[[tool.uv.index]]
+name = "umbra"
+url = "https://about.abstractumbra.dev/pip/"
+explicit = true
+
 [tool.ruff]
 line-length = 125
-target-version = "py312"
+target-version = "py313"
 exclude = ["extensions/heights"]
 
 [tool.ruff.lint]
@@ -127,7 +135,7 @@ inline-quotes = "double"
 [tool.pyright]
 useLibraryCodeForTypes = true
 typeCheckingMode = "basic"
-pythonVersion = "3.12"
+pythonVersion = "3.13"
 strictListInference = true
 strictDictionaryInference = true
 strictSetInference = true

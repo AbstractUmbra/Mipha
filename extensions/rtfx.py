@@ -80,7 +80,7 @@ class SphinxObjectFileReader:
     def skipline(self) -> None:
         self.stream.readline()
 
-    def read_compressed_chunks(self) -> Generator[bytes, None, None]:
+    def read_compressed_chunks(self) -> Generator[bytes]:
         decompressor = zlib.decompressobj()
         while True:
             chunk = self.stream.read(self.BUFSIZE)
@@ -89,7 +89,7 @@ class SphinxObjectFileReader:
             yield decompressor.decompress(chunk)
         yield decompressor.flush()
 
-    def read_compressed_lines(self) -> Generator[str, None, None]:
+    def read_compressed_lines(self) -> Generator[str]:
         buf = b""
         for chunk in self.read_compressed_chunks():
             buf += chunk

@@ -1,5 +1,5 @@
-ARG PYTHON_BASE=3.12-slim-bookworm
-ARG UV_BASE=python3.12-bookworm-slim
+ARG PYTHON_BASE=3.13-slim-bookworm
+ARG UV_BASE=python3.13-bookworm-slim
 
 FROM ghcr.io/astral-sh/uv:${UV_BASE} AS builder
 
