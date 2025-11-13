@@ -32,6 +32,10 @@ class TimezoneRecord(TypedDict):
     tz: str
 
 
+class TimeContext(Context["Time"]):
+    author_tz: zoneinfo.ZoneInfo | None
+
+
 class TimezoneSource(SimpleListSource[tuple[str, datetime.timedelta]]):
     def format_page(self, _: RoboPages, entries: list[tuple[str, datetime.timedelta]]) -> discord.Embed:
         embed = discord.Embed(title="Time & Timezones!", colour=random_pastel_colour())
@@ -85,17 +89,20 @@ class Time(commands.Cog):
         record = await self.bot.pool.fetchrow(query, user_id)
         return record["tz"] if record else None
 
-    async def get_tzinfo(self, user_id: int, /) -> datetime.tzinfo:
+    async def get_tzinfo(self, user_id: int, /) -> zoneinfo.ZoneInfo | None:
         tz = await self.get_timezone(user_id)
         if tz is None:
-            return datetime.UTC
+            return zoneinfo.ZoneInfo("UTC")
 
         try:
             tz = zoneinfo.ZoneInfo(tz)
         except zoneinfo.ZoneInfoNotFoundError:
-            tz = datetime.UTC
+            tz = None
 
         return tz
+
+    async def cog_before_invoke(self, ctx: TimeContext) -> None:
+        ctx.author_tz = await self.get_tzinfo(ctx.author.id)
 
     def _gen_tz_embeds(self, requester: str, iterable: list[str]) -> list[discord.Embed]:
         embeds = []
@@ -106,6 +113,7 @@ class Time(commands.Cog):
             fmt = f"Page {iterable.index(item) + 1}/{len(iterable)}"
             embed.set_footer(text=f"{fmt} | Requested by: {requester}")
             embeds.append(embed)
+
         return embeds
 
     @overload
@@ -122,7 +130,7 @@ class Time(commands.Cog):
 
     @commands.hybrid_group(fallback="get", aliases=["time", "tz"])
     @app_commands.describe(member="The member to fetch the timezone of. Yours is shown if blank.")
-    async def timezone(self, ctx: Context, *, member: discord.Member | None = None) -> None:
+    async def timezone(self, ctx: TimeContext, *, member: discord.Member | None = None) -> None:
         """Get a member's stored timezone."""
         if ctx.invoked_subcommand:
             pass
@@ -141,9 +149,14 @@ class Time(commands.Cog):
                 return
 
             member_timezone = result["tz"]
-            tz = await TimeZone.convert(ctx, member_timezone)
+            tz = await TimeZone.convert(ctx, member_timezone)  # pyright: ignore[reportArgumentType]  # type is not invariant we're just lying about an attr
             current_time = self._curr_tz_time(zoneinfo.ZoneInfo(tz.key), ret_datetime=False)
-            embed = discord.Embed(title=f"Time for {full_member}", description=f"```\n{current_time}\n```")
+            embed = discord.Embed(title=f"Time for {full_member}")
+            embed.add_field(name="Current time and info:", value=f"```\n{current_time}\n```")
+            if ctx.author_tz:
+                author_time = self._curr_tz_time(ctx.author_tz, ret_datetime=False)
+                embed.add_field(name="Yours for comparison", value=f"```\n{author_time}\n```")
+
             embed.set_footer(text=member_timezone)
             embed.timestamp = datetime.datetime.now(datetime.UTC)
 
@@ -152,7 +165,7 @@ class Time(commands.Cog):
     @timezone.command(name="set")
     async def _set(
         self,
-        ctx: Context,
+        ctx: TimeContext,
         *,
         timezone: TimeZone,
     ) -> None:
@@ -185,7 +198,7 @@ class Time(commands.Cog):
             await ctx.send("Done!", ephemeral=True)
 
     @timezone.command(name="remove")
-    async def _remove(self, ctx: Context) -> None:
+    async def _remove(self, ctx: TimeContext) -> None:
         """Remove your timezone from the bot."""
         query = """
             DELETE
@@ -198,11 +211,15 @@ class Time(commands.Cog):
         await ctx.send("Done!", ephemeral=True)
 
     @timezone.command(name="info", aliases=["tz"])
-    async def _info(self, ctx: Context, *, timezone: TimeZone) -> None:
+    async def _info(self, ctx: TimeContext, *, timezone: TimeZone) -> None:
         """This will return the time in a specified timezone."""
+        tz = timezone.to_zone()
+        current_time = self._curr_tz_time(tz, ret_datetime=False)
+        friendly_timezone = datetime.datetime.now(tz).tzname()
+        prose = f"{timezone.label} ({friendly_timezone})" if friendly_timezone else timezone.label
         embed = discord.Embed(
-            title=f"Current time in {timezone.label}",
-            description=f"```\n{self._curr_tz_time(timezone.to_zone(), ret_datetime=False)}\n```",
+            title=f"Current time in {prose}",
+            description=f"```\n{current_time}\n```",
         )
         embed.set_footer(text=f"Requested by: {ctx.author}")
         embed.timestamp = datetime.datetime.now(datetime.UTC)
