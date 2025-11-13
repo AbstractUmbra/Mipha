@@ -369,14 +369,19 @@ class RTFX(commands.Cog):
 
         await ctx.send("\N{THUMBS UP SIGN}")
 
-    async def _get_rtfs(self, *, library: Libraries, search: str, exact: bool) -> RTFSResponse:
+    async def _get_rtfs(self, *, library: Libraries, search: str, limit: int, exact: bool) -> RTFSResponse:
         if not self.rtfs.url:
             raise ValueError("RTFS details not configured correctly")
 
         headers = {"Authorization": self.rtfs.token} if self.rtfs.token else None
         async with self.bot.session.get(
             self.rtfs.url,
-            params={"format": "source", "library": library.value, "search": search, "direct": "true" if exact else "false"},
+            params={
+                "library": library.value,
+                "search": search,
+                "limit": limit,
+                "direct": "true" if exact else "false",
+            },
             headers=headers,
         ) as resp:
             return await resp.json()
@@ -428,19 +433,23 @@ class RTFX(commands.Cog):
     @app_commands.describe(
         library="Which library to search the source for.",
         search="Your search query.",
+        limit="The maximum amount of responses to return if possible, defaults to 3, max of 25",
         exact="If you want to access the item by the exact name you're passing.",
         ephemeral="If you want this command execution to be private.",
     )
-    async def rtfs_callback(
+    async def rtfs_callback(  # noqa: PLR0917
         self,
         interaction: Interaction,
         library: Libraries,
         search: str,
+        limit: int = 3,
         exact: bool = False,  # noqa: FBT001, FBT002 # required for slash parameters
         ephemeral: bool = False,  # noqa: FBT001, FBT002 # required for slash parameters
     ) -> None:
         """RTFM command for loading source code/searching from libraries."""
-        rtfs = await self._get_rtfs(library=library, search=search, exact=exact)
+        limit = min(max(3, limit), 25)
+
+        rtfs = await self._get_rtfs(library=library, search=search, limit=limit, exact=exact)
         if not rtfs["results"]:
             await interaction.response.send_message("Sorry, that search returned no results.", ephemeral=True)
             return
