@@ -53,7 +53,7 @@ explicit = true
 [tool.ruff]
 line-length = 125
 target-version = "py313"
-exclude = ["extensions/heights"]
+extend-exclude = ["extensions/heights"]
 
 [tool.ruff.lint]
 preview = true
