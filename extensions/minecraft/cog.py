@@ -107,7 +107,7 @@ class Minecraft(commands.GroupCog):
 
             return uuid
 
-    @commands.hybrid_command(name="avatar")
+    @commands.hybrid_command(name="mcavatar")
     @app_commands.describe(username="The minecraft username to search for.")
     async def player_avatar(self, ctx: Context, *, username: str) -> None:
         """Display a minecraft avatar."""
