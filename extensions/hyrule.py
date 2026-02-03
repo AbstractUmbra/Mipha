@@ -15,6 +15,7 @@ HYRULE_GUILD_ID = 705500489248145459
 _IRL_FRIEND_SERVER = 174702278673039360
 HONDANA_ROLE_ID = 1086537644093231144
 GREAT_ASSET_ROLE_ID = 1189005762790441010
+YUREI_ROLE_ID = 1443946612454981684
 BOT_BAIT_CHANNEL_ID = 1238074949424386121
 HONEYPOT_ROLE_ID = 1297563765436580010
 RULES_CHANNEL_ID = 1238076485600935977
@@ -37,7 +38,7 @@ class HyruleRoleAssignmentView(BaseView):
         super().__init__(timeout=None)
         self.bot: Mipha = bot
         self._descriptions: dict[str, str] = {
-            c.label: c.callback.callback.__doc__.format(owner=self.bot.owner.display_name)  # pyright: ignore[reportAttributeAccessIssue]
+            f"{c.emoji} {c.label}": c.callback.callback.__doc__.format(owner=self.bot.owner.display_name)  # pyright: ignore[reportAttributeAccessIssue]
             for c in self.children
             if isinstance(c, discord.ui.Button) and c.callback.callback.__doc__ and c.label  # pyright: ignore[reportAttributeAccessIssue]
         }
@@ -75,6 +76,23 @@ class HyruleRoleAssignmentView(BaseView):
             return
 
         await interaction.user.add_roles(discord.Object(id=HONDANA_ROLE_ID))
+
+    @discord.ui.button(
+        label="Yurei",
+        custom_id="HyruleYurei__",
+        style=discord.ButtonStyle.blurple,
+        emoji="\U0001f480",
+        row=0,
+    )
+    async def add_yurei_role(self, interaction: Interaction, _: discord.ui.Button[Self]) -> None:
+        """This role will allow you to send messages in the Yurei category. Pings will be issued on major events."""
+        assert isinstance(interaction.user, discord.Member)
+
+        if interaction.user.get_role(YUREI_ROLE_ID):
+            await interaction.response.send_message("You already have the Hondana role!", ephemeral=True)
+            return
+
+        await interaction.user.add_roles(discord.Object(id=YUREI_ROLE_ID))
 
 
 class Hyrule(commands.Cog):
