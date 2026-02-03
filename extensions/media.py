@@ -280,11 +280,11 @@ class MediaReposter(commands.Cog):
                 continue
 
             url = yarl.URL(match[0])
-            if not url.host or not (_sub := SUBSTITUTIONS.get(url.host)):
+            if not url.host or not (sub_ := SUBSTITUTIONS.get(url.host)):
                 return
 
-            new_url = url.with_host(random.choice(_sub["repost_urls"]))  # noqa: S311 # not crypto
-            if _sub["remove_query"] is True:
+            new_url = url.with_host(random.choice(sub_["repost_urls"]))  # noqa: S311 # not crypto
+            if sub_["remove_query"] is True:
                 new_url = new_url.with_query(None)
 
             new_urls.append(new_url)

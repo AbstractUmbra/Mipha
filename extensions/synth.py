@@ -22,8 +22,7 @@ if TYPE_CHECKING:
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _VOICE_PATH = pathlib.Path("configs/tiktok_voices.json")
-with _VOICE_PATH.open("r", encoding="utf-8") as fp:
-    _VOICE_DATA: list[dict[str, str]] = from_json(fp.read())
+_VOICE_DATA: list[dict[str, str]] = from_json(_VOICE_PATH.read_text(encoding="utf-8"))
 
 
 class BadTikTokDataError(Exception):

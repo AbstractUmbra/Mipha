@@ -83,6 +83,7 @@ ignore = [
     "Q000",
     "RUF001",
     "RUF009",
+    "RUF067",   # we do some stuff here
     "S101",     # assert is used for type checking in this codebase
     "SLF001",
     "SIM105",
