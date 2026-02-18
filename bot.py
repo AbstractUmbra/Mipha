@@ -191,13 +191,14 @@ class ProxyObject(discord.Object):
 class LogHandler:
     def __init__(self, *, stream: bool = True) -> None:
         self.log: logging.Logger = logging.getLogger()
-        self.max_bytes: int = 32 * 1024 * 1024
+        self.max_bytes: int = 10 * 1024 * 1024
         self.logging_path = pathlib.Path("./logs/")
         self.logging_path.mkdir(exist_ok=True)
         self.stream: bool = stream
 
         self.info = self.log.info
         self.error = self.log.error
+        self.exception = self.log.exception
         self.warning = self.log.warning
         self.debug = self.log.debug
 
@@ -575,7 +576,7 @@ class Mipha(commands.Bot):  # noqa: PLR0904
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.UTC)
 
         self.bot_app_info = await self.application_info()
-        self.mb_client = mystbin.Client(session=self.session)
+        self.mb_client = mystbin.Client(session=self.session, root_url="https://mystbin.abstractumbra.dev")
         await self._reload_tz_handler()
 
     async def create_paste(
@@ -627,7 +628,13 @@ async def main() -> None:
 
         await bot.load_extension("jishaku")
         for extension in EXTENSIONS:
-            await bot.load_extension(extension.name)
+            try:
+                await bot.load_extension(extension.name)
+            except Exception as err:
+                bot.log_handler.exception(
+                    "Unable to load %sextension: %s", "module " if extension.ispkg else "", extension.name, exc_info=err
+                )
+                continue
             bot.log_handler.log.info("Loaded %sextension: %s", "module " if extension.ispkg else "", extension.name)
 
         await bot.start()
