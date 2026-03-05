@@ -12,3 +12,5 @@ ignorePaths:
   - "utilities/shared/scrabble.txt"
   - "utilities/shared/time.py"
   - "utilities/shared/timezones.py"
+  - "static"
+  - "configs"

@@ -139,8 +139,9 @@ class MangaCog(commands.Cog, name="Manga"):
             return
 
         self.webhook: discord.Webhook = discord.Webhook.from_url(webhook_url, session=bot.session)
-        self.get_personal_feed.add_exception_type(hondana.APIException)
-        self.get_personal_feed.start()
+        if config.get("feed_enabled", False):
+            self.get_personal_feed.add_exception_type(hondana.APIException)
+            self.get_personal_feed.start()
 
     mangadex_group = app_commands.Group(name="mangadex", description="commands for interacting with MangaDex!")
 

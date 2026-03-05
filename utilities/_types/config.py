@@ -64,6 +64,7 @@ class MangaDexConfig(TypedDict):
     password: str
     client_id: str
     client_secret: str
+    feed_enabled: bool
 
 
 class UploaderConfig(TypedDict):

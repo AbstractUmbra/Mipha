@@ -91,17 +91,17 @@ class VoiceStalking(commands.Cog):
         embed = discord.Embed(colour=COLOUR_LOOKUP[state])
         embed.set_author(name=member.name, icon_url=member.display_avatar.url)
 
-        normalised = NORMALIZE_STATE[state]
+        normalized = NORMALIZE_STATE[state]
         if state is VoiceStateType.connect:
             assert after is not None
-            fmt = f"{member.mention} has {normalised} {after.mention}."
+            fmt = f"{member.mention} has {normalized} {after.mention}."
         elif state is VoiceStateType.disconnect:
             assert before is not None
-            fmt = f"{member.mention} has {normalised} {before.mention}."
+            fmt = f"{member.mention} has {normalized} {before.mention}."
         elif state is VoiceStateType.move:
             assert before is not None
             assert after is not None
-            fmt = f"{member.mention} has {normalised} from {before.mention} to {after.mention}."
+            fmt = f"{member.mention} has {normalized} from {before.mention} to {after.mention}."
 
         embed.description = fmt
         embed.timestamp = datetime.datetime.now(datetime.UTC)
