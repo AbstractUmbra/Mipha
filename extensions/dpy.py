@@ -57,8 +57,8 @@ class Dpy(commands.Cog):
         if message.content:
             files.append(mystbin.File(filename="message-contents.txt", content=message.content))
 
-            for i, content in enumerate(CODE_BLOCK_PATTERN.findall(message.content), start=1):
-                file = mystbin.File(filename=f"message-contents-code_block_{i}.py", content=content)
+            for idx, content in enumerate(CODE_BLOCK_PATTERN.findall(message.content), start=1):
+                file = mystbin.File(filename=f"message-contents-code_block_{idx}.py", content=content)
                 files.append(file)
 
         for attachment in message.attachments:
