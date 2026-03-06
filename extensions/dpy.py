@@ -54,7 +54,8 @@ class Dpy(commands.Cog):
             for attachment in message.attachments
             if attachment.content_type and attachment.content_type.split("/")[0].lower() == "text"
         ]
-        files.insert(0, mystbin.File(filename="message-contents.txt", content=message.content))
+        if message.content:
+            files.insert(0, mystbin.File(filename="message-contents.txt", content=message.content))
 
         paste = await self.bot.mb_client.create_paste(
             files=files, expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24))
