@@ -53,17 +53,20 @@ class Dpy(commands.Cog):
     async def to_mystbin_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(ephemeral=False, thinking=True)
 
-        files = [
-            mystbin.File(filename=attachment.filename, content=(await attachment.read()).decode("utf-8"))
-            for attachment in message.attachments
-            if attachment.content_type and attachment.content_type.split("/")[0].lower() == "text"
-        ]
+        files = []
         if message.content:
-            files.insert(0, mystbin.File(filename="message-contents.txt", content=message.content))
+            files.append(mystbin.File(filename="message-contents.txt", content=message.content))
 
             for i, content in enumerate(CODE_BLOCK_PATTERN.findall(message.content), start=1):
                 file = mystbin.File(filename=f"message-contents-code_block_{i}.py", content=content)
                 files.append(file)
+
+        for attachment in message.attachments:
+            if not attachment.content_type or attachment.content_type.split("/")[0].lower() != "text":
+                continue
+
+            file = mystbin.File(filename=attachment.filename, content=(await attachment.read()).decode("utf-8"))
+            files.append(file)
 
         paste = await self.bot.mb_client.create_paste(
             files=files, expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24))
