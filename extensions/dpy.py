@@ -7,12 +7,16 @@ import discord
 import mystbin
 from discord import app_commands
 from discord.ext import commands
+import re
 
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
     from bot import Mipha
     from utilities.context import Interaction
+
+
+CODE_BLOCK_PATTERN = re.compile(r'```(?:py|python)\b\s*([\s\S]*?)```')
 
 
 class PasteView(BaseView):
@@ -56,6 +60,10 @@ class Dpy(commands.Cog):
         ]
         if message.content:
             files.insert(0, mystbin.File(filename="message-contents.txt", content=message.content))
+
+            for i, content in enumerate(CODE_BLOCK_PATTERN.findall(message.content), start=1):
+                file = mystbin.File(filename=f"message-contents-code_block_{i}.py", content=content)
+                files.append(file)
 
         paste = await self.bot.mb_client.create_paste(
             files=files, expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24))
