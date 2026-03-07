@@ -63,7 +63,7 @@ class PasteView(BaseView):
         self.add_item(discord.ui.Button(style=discord.ButtonStyle.url, label="Paste URL", url=paste.url))
 
     @discord.ui.button(label="Delete this paste", style=discord.ButtonStyle.red, emoji="\U0001f5d1\U0000fe0f")
-    async def delete_button(self, interaction: Interaction, _: discord.ui.Button) -> None:
+    async def delete_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
                 "You are not the author of the message/creator of the paste.", ephemeral=True
@@ -72,6 +72,15 @@ class PasteView(BaseView):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.paste.delete()
+
+        button.label = "Paste deleted"
+        button.disabled = True
+        if interaction.message is not None:
+            try:
+                await interaction.message.edit(view=button.view)
+            except discord.NotFound:
+                pass
+
         await interaction.followup.send("Deleted!", ephemeral=True)
 
 
