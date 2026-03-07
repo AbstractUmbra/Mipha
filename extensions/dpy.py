@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from typing import TYPE_CHECKING
 
 import discord
@@ -11,54 +12,58 @@ from discord.ext import commands
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
-
     from bot import Mipha
     from utilities.context import Interaction
 
+CODEBLOCK_RE = re.compile(r"```(?P<lang>\w+)?\n(?P<content>.*?)```", re.DOTALL)
+BLANK_LINES_RE = re.compile(r"\n\s*\n+")
 
-# helper function to extract codeblocks
-def codeblock_converter(text: str) -> Generator[tuple[str, str]]:
-    in_codeblock: bool = False
-    curr_index: int = 0
-    start_index: int = 0
-    language: str = ""
 
-    # -2 as there are 3 backticks, so we want to stop at the first backtick to prevent index out of range
-    while curr_index < len(text) - 2:
-        if not (text[curr_index] == "`" and text[curr_index + 1] == "`" and text[curr_index + 2] == "`"):
-            curr_index += 1
-            continue
+class Codeblock:
+    def __init__(self, match: re.Match[str], /) -> None:
+        self._match = match
+        self.language: str = match["lang"] or ""
+        self.content: str = match["content"]
 
-        if in_codeblock:
-            yield language, text[start_index:curr_index]
-            in_codeblock = False
-            language = ""
-            curr_index += 3  # jump outside of codeblock
-        else:
-            curr_index += 3  # jump to start of codeblock
+    def __repr__(self) -> str:
+        return f"<Codeblock language={self.language} span={self.span()}>"
 
-            # traverse until we hit a newline or a space
-            # if we hit a newline, it means it is a language hint (e.g, ```py\n...text```)
-            # then we do not include it
-            # else we include it as part of the codeblock (e.g, ```text``)
-            temp_index: int = curr_index
+    def __str__(self) -> str:
+        return self.to_string()
 
-            # -4 to help with early exits
-            while temp_index < len(text) - 4:
-                if text[temp_index] == " ":
-                    break
+    def to_string(self) -> str:
+        return f"```{self.language}\n{self.content}\n```"
 
-                if text[temp_index] == "\n":
-                    # 15 is just an arbitrary number to ensure the hint isn't infinitely long which might crash something
-                    if 0 < (temp_index - curr_index) < 15:
-                        language = text[curr_index:temp_index]
-                    # jump to the start as we don't want to include the language hint
-                    curr_index = temp_index + 1  # + 1 to remove the newline
-                    break
-                temp_index += 1
-            start_index = curr_index
-            in_codeblock = True
+    def span(self) -> tuple[int, int]:
+        return self._match.span()
+
+
+def collapse_blank_lines(text: str, max_blank: int = 1) -> str:
+    replacement = "\n" * (max_blank + 1)
+    return BLANK_LINES_RE.sub(replacement, text)
+
+
+def extract_codeblocks_with_placeholders(input_: str) -> tuple[str, list[Codeblock]]:
+    codeblocks = []
+    output = []
+    last = 0
+    idx = 1
+
+    for idx, match in enumerate(CODEBLOCK_RE.finditer(input_), start=1):
+        start, end = match.span()
+
+        # keep text before the codeblock
+        output.extend([input_[last:start], f"<Codeblock #{idx} extracted here>"])
+
+        # extract codeblock
+        codeblocks.append(Codeblock(match))
+
+        last = end
+
+    # append remaining text
+    output.append(input_[last:])
+
+    return "\n".join(output), codeblocks
 
 
 class PasteView(BaseView):
@@ -106,14 +111,15 @@ class Dpy(commands.Cog):
 
         files = []
         if message.content:
-            files.append(mystbin.File(filename="message-contents.txt", content=message.content))
+            contents, codeblocks = extract_codeblocks_with_placeholders(message.content)
+            files.append(mystbin.File(filename="message-contents.txt", content=collapse_blank_lines(contents)))
 
-            for idx, (lang, codeblock) in enumerate(codeblock_converter(message.content), start=1):
+            for idx, codeblock in enumerate(codeblocks, start=1):
                 # handle edge-cases like empty codeblocks (i.e., ``````)
                 if not codeblock:
                     continue
-                file_ext = f".{lang}" if lang else ""
-                file = mystbin.File(filename=f"message-contents-code_block_{idx}{file_ext}", content=codeblock)
+                file_ext = f".{codeblock.language}" if codeblock.language else ""
+                file = mystbin.File(filename=f"message-contents-code_block_{idx}{file_ext}", content=codeblock.content)
                 files.append(file)
 
         for attachment in message.attachments:
