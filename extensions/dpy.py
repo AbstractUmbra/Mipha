@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 # helper function to extract codeblocks
-def converter(text: str) -> Generator[tuple[str, str]]:
+def codeblock_converter(text: str) -> Generator[tuple[str, str]]:
     in_codeblock: bool = False
     curr_index: int = 0
     start_index: int = 0
