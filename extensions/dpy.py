@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING
+from typing import Generator, TYPE_CHECKING
 
 import discord
 import mystbin
 from discord import app_commands
 from discord.ext import commands
-import re
 
 from utilities.shared.ui import BaseView
 
@@ -16,7 +15,44 @@ if TYPE_CHECKING:
     from utilities.context import Interaction
 
 
-CODE_BLOCK_PATTERN = re.compile(r'```(?:py|python)\b\s*([\s\S]*?)```')
+# helper function to extract codeblocks
+def codeblock_converter(text: str) -> Generator[str]:
+    in_codeblock: bool = False
+    curr_index: int = 0
+    start_index: int = 0
+
+    # -2 as there are 3 backticks, so we want to stop at the first backtick to prevent index out of range
+    while curr_index < len(text) - 2:
+        # check if this is the start/end of a codeblock
+        if not (text[curr_index] == '`' and text[curr_index + 1] == '`' and text[curr_index + 2] == '`'):
+            curr_index += 1
+            continue
+
+        if in_codeblock:
+            yield text[start_index : curr_index]
+            in_codeblock = False
+            curr_index += 3 # jump outside of codeblock
+        else:
+            curr_index += 3 # jump to start of codeblock
+
+            # traverse until we hit a newline or a space
+            # if we hit a newline, it means it is a language hint (e.g, ```py\n...text```)
+            # then we do not include it
+            # else we include it as part of the codeblock (e.g, ```text``)
+            temp_index: int = curr_index
+
+            # -4 to help with early exits
+            while temp_index < len(text) - 4:
+                if text[temp_index] == ' ':
+                    break
+                # check if this is a language hint
+                if text[temp_index] == '\n':
+                    # jump to the start as we don't want to include the language hint
+                    curr_index = temp_index + 1 # + 1 to remove the newline
+                    break
+                temp_index += 1
+            start_index = curr_index
+            in_codeblock = True
 
 
 class PasteView(BaseView):
@@ -57,8 +93,11 @@ class Dpy(commands.Cog):
         if message.content:
             files.append(mystbin.File(filename="message-contents.txt", content=message.content))
 
-            for idx, content in enumerate(CODE_BLOCK_PATTERN.findall(message.content), start=1):
-                file = mystbin.File(filename=f"message-contents-code_block_{idx}.py", content=content)
+            for idx, codeblock in enumerate(codeblock_converter(message.content), start=1):
+                # handle edge-cases like empty codeblocks (i.e., ``````)
+                if not codeblock:
+                    continue
+                file = mystbin.File(filename=f"message-contents-code_block_{idx}.py", content=codeblock)
                 files.append(file)
 
         for attachment in message.attachments:
