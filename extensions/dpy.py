@@ -11,8 +11,54 @@ from discord.ext import commands
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from bot import Mipha
     from utilities.context import Interaction
+
+
+# helper function to extract codeblocks
+def codeblock_converter(text: str) -> Generator[tuple[str, str]]:
+    in_codeblock: bool = False
+    curr_index: int = 0
+    start_index: int = 0
+    language: str = ""
+
+    # -2 as there are 3 backticks, so we want to stop at the first backtick to prevent index out of range
+    while curr_index < len(text) - 2:
+        if not (text[curr_index] == "`" and text[curr_index + 1] == "`" and text[curr_index + 2] == "`"):
+            curr_index += 1
+            continue
+
+        if in_codeblock:
+            yield language, text[start_index:curr_index]
+            in_codeblock = False
+            language = ""
+            curr_index += 3  # jump outside of codeblock
+        else:
+            curr_index += 3  # jump to start of codeblock
+
+            # traverse until we hit a newline or a space
+            # if we hit a newline, it means it is a language hint (e.g, ```py\n...text```)
+            # then we do not include it
+            # else we include it as part of the codeblock (e.g, ```text``)
+            temp_index: int = curr_index
+
+            # -4 to help with early exits
+            while temp_index < len(text) - 4:
+                if text[temp_index] == " ":
+                    break
+
+                if text[temp_index] == "\n":
+                    # 15 is just an arbitrary number to ensure the hint isn't infinitely long which might crash something
+                    if 0 < (temp_index - curr_index) < 15:
+                        language = text[curr_index:temp_index]
+                    # jump to the start as we don't want to include the language hint
+                    curr_index = temp_index + 1  # + 1 to remove the newline
+                    break
+                temp_index += 1
+            start_index = curr_index
+            in_codeblock = True
 
 
 class PasteView(BaseView):
@@ -23,7 +69,7 @@ class PasteView(BaseView):
         self.add_item(discord.ui.Button(style=discord.ButtonStyle.url, label="Paste URL", url=paste.url))
 
     @discord.ui.button(label="Delete this paste", style=discord.ButtonStyle.red, emoji="\U0001f5d1\U0000fe0f")
-    async def delete_button(self, interaction: Interaction, _: discord.ui.Button) -> None:
+    async def delete_button(self, interaction: Interaction, button: discord.ui.Button) -> None:
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
                 "You are not the author of the message/creator of the paste.", ephemeral=True
@@ -32,6 +78,15 @@ class PasteView(BaseView):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.paste.delete()
+
+        button.label = "Paste deleted"
+        button.disabled = True
+        if interaction.message is not None:
+            try:
+                await interaction.message.edit(view=button.view)
+            except discord.NotFound:
+                pass
+
         await interaction.followup.send("Deleted!", ephemeral=True)
 
 
@@ -49,13 +104,24 @@ class Dpy(commands.Cog):
     async def to_mystbin_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(ephemeral=False, thinking=True)
 
-        files = [
-            mystbin.File(filename=attachment.filename, content=(await attachment.read()).decode("utf-8"))
-            for attachment in message.attachments
-            if attachment.content_type and attachment.content_type.split("/")[0].lower() == "text"
-        ]
+        files = []
         if message.content:
-            files.insert(0, mystbin.File(filename="message-contents.txt", content=message.content))
+            files.append(mystbin.File(filename="message-contents.txt", content=message.content))
+
+            for idx, (lang, codeblock) in enumerate(codeblock_converter(message.content), start=1):
+                # handle edge-cases like empty codeblocks (i.e., ``````)
+                if not codeblock:
+                    continue
+                file_ext = f".{lang}" if lang else ""
+                file = mystbin.File(filename=f"message-contents-code_block_{idx}{file_ext}", content=codeblock)
+                files.append(file)
+
+        for attachment in message.attachments:
+            if not attachment.content_type or attachment.content_type.split("/")[0].lower() != "text":
+                continue
+
+            file = mystbin.File(filename=attachment.filename, content=(await attachment.read()).decode("utf-8"))
+            files.append(file)
 
         paste = await self.bot.mb_client.create_paste(
             files=files, expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24))
