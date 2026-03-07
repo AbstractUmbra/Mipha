@@ -24,9 +24,7 @@ def codeblock_converter(text: str) -> Generator[tuple[str, str]]:
 
     # -2 as there are 3 backticks, so we want to stop at the first backtick to prevent index out of range
     while curr_index < len(text) - 2:
-        if not (text[curr_index] == '`' 
-                and text[curr_index + 1] == '`' 
-                and text[curr_index + 2] == '`'):
+        if not (text[curr_index] == '`' and text[curr_index + 1] == '`' and text[curr_index + 2] == '`'):
             curr_index += 1
             continue
 
