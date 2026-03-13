@@ -133,7 +133,7 @@ class MangaCog(commands.Cog, name="Manga"):
 
     def __init__(self, bot: Mipha, /, *, config: MangaDexConfig, webhook_url: str | None = None) -> None:
         self.bot: Mipha = bot
-        self.client = hondana.Client(**config, session=bot.session)
+        self.client = hondana.Client(**config, session=bot.session)  # pyright: ignore[reportCallIssue] # the typeddict is invariant
         if not webhook_url:
             LOGGER.warning("No webhook defined for MangaDex logging. Skipping.")
             return
