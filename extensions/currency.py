@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from utilities.context import Context, Interaction
 
 CONFIG_FILE_PATH = pathlib.Path("configs/currency.json")
-API_KEY = "sgiPfh4j3aXFR3l2CnjWqdKQzxpqGn9pX5b3CUsz"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -108,6 +107,21 @@ class CurrencyCog(commands.Cog):
     def __init__(self, bot: Mipha, /, *, config: Config[dict[CurrencyLiteral, CurrencyConfig]]) -> None:
         self.bot: Mipha = bot
         self.config: Config[dict[CurrencyLiteral, CurrencyConfig]] = config
+        self.__token: str = self.config["token"]  # pyright: ignore[reportAttributeAccessIssue] # we lie
+
+    async def perform_updates(self, from_: CurrencyLiteral, to: CurrencyLiteral, /) -> None:
+        now = datetime.datetime.now(datetime.UTC)
+
+        arr: list[CurrencyLiteral] = [from_, to]
+        for item in arr:
+            config_entry = self.config["0"][item]
+            last_updated = self.get_last_updated(config_entry)
+
+            if (now - last_updated).days >= 1:
+                LOGGER.info("Expired or missing information on %r, updating", item)
+                await self.update_config(item)
+            else:
+                LOGGER.info("Cache hit for %r", from_)
 
     def get_last_updated(self, key: CurrencyConfig) -> datetime.datetime:
         value = key["last_updated"]
@@ -120,7 +134,9 @@ class CurrencyCog(commands.Cog):
     async def update_config(self, key: CurrencyLiteral) -> None:
         LOGGER.info("Updating currency config for key %r", key)
         async with self.bot.session.get(
-            "https://api.freecurrencyapi.com/v1/latest", headers={"apikey": API_KEY}, params={"base_currency": key}
+            "https://api.freecurrencyapi.com/v1/latest",
+            headers={"apikey": self.__token},
+            params={"base_currency": key},
         ) as resp:
             resp.raise_for_status()
             data: dict[Literal["data"], dict[CurrencyLiteral, float]] = await resp.json()
@@ -148,18 +164,10 @@ class CurrencyCog(commands.Cog):
         if ctx.interaction:
             await ctx.interaction.response.defer()
 
+        await self.perform_updates(from_, to)
+
         from_config_key = self.config["0"][from_]
         to_config_key = self.config["0"][to]
-        now = datetime.datetime.now(datetime.UTC)
-        last_updated = self.get_last_updated(from_config_key)
-
-        if (now - last_updated).days >= 1:
-            LOGGER.info("Expired or missing information on %r, updating", from_)
-            await self.update_config(to)
-            from_config_key = self.config["0"][from_]
-            to_config_key = self.config["0"][to]
-        else:
-            LOGGER.info("Cache hit for %r", from_)
 
         target = from_config_key["values"][to]
         calculated = round(amount * target, 2)
@@ -177,7 +185,7 @@ class CurrencyCog(commands.Cog):
         if not value:
             return APP_COMMAND_CHOICES[:25]
 
-        matches = [x[0] for x in extract(value, [choice.name for choice in APP_COMMAND_CHOICES], score_cutoff=50, limit=25)]
+        matches = [x[0] for x in extract(value, [choice.name for choice in APP_COMMAND_CHOICES], score_cutoff=20, limit=25)]
         return [x for x in APP_COMMAND_CHOICES if x.name in matches]
 
 
