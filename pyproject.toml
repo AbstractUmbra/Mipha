@@ -14,7 +14,7 @@ dependencies = [
     "jishaku",
     "legofy",
     "lru_dict",
-    "lxml==5.3.0",
+    "lxml==6.0.2",
     "matplotlib>=3.10.5",
     "mystbin-py",
     "numpy>=2.3.2",
