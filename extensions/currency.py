@@ -13,6 +13,8 @@ from utilities.shared.async_config import Config
 from utilities.shared.fuzzy import extract
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from bot import Mipha
     from utilities.context import Context, Interaction
 
@@ -113,15 +115,21 @@ class CurrencyCog(commands.Cog):
         now = datetime.datetime.now(datetime.UTC)
 
         arr: list[CurrencyLiteral] = [from_, to]
+
+        to_update: list[CurrencyLiteral] = []
         for item in arr:
             config_entry = self.config["0"][item]
             last_updated = self.get_last_updated(config_entry)
 
             if (now - last_updated).days >= 1:
                 LOGGER.info("Expired or missing information on %r, updating", item)
-                await self.update_config(item)
-            else:
-                LOGGER.info("Cache hit for %r", from_)
+                to_update.append(item)
+
+        if to_update:
+            LOGGER.info("Expired or missing information on %r, updating", " & ".join(map(repr, item)))
+            await self.update_config(to_update)
+        else:
+            LOGGER.info("Cache hit for %r", " & ".join(map(repr, item)))
 
     def get_last_updated(self, key: CurrencyConfig) -> datetime.datetime:
         value = key["last_updated"]
@@ -131,19 +139,20 @@ class CurrencyCog(commands.Cog):
             else (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=30))
         )
 
-    async def update_config(self, key: CurrencyLiteral) -> None:
-        LOGGER.info("Updating currency config for key %r", key)
+    async def update_config(self, keys: Sequence[CurrencyLiteral]) -> None:
         async with self.bot.session.get(
             "https://api.freecurrencyapi.com/v1/latest",
             headers={"apikey": self.__token},
-            params={"base_currency": key},
+            params={"base_currency": ",".join(keys)},
         ) as resp:
             resp.raise_for_status()
             data: dict[Literal["data"], dict[CurrencyLiteral, float]] = await resp.json()
 
             local_data = self.config["0"]
             now = datetime.datetime.now(datetime.UTC).isoformat()
-            local_data[key].update({"last_updated": now, "values": data["data"]})
+            for key in keys:
+                LOGGER.info("Updating currency config for key %r", key)
+                local_data[key].update({"last_updated": now, "values": data["data"]})
 
             await self.config.put("0", local_data)
         LOGGER.info("Currency config for %r now updated.", key)
