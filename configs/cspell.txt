@@ -121,6 +121,7 @@ imdb
 imshow
 invis
 inviteable
+irls
 isort
 ispkg
 JCUY
@@ -199,7 +200,6 @@ pykakasi
 pykaksi
 pyproject
 pytest
-pythonista
 pythonista
 rawm
 rcon
