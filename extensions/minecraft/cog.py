@@ -37,20 +37,25 @@ class MCServerConverter(commands.Converter["Details | None"]):
         return resolved
 
 
-class Minecraft(commands.GroupCog):
+class Minecraft(commands.Cog):
     def __init__(self, bot: Mipha, /, *, config: dict[str, Details]) -> None:
         self.bot = bot
         self.config: dict[str, Details] = config
         self.status_handler = StatusHandler(config)
         self._mc_uuid_cache: LRU[str, str | None] = LRU(256)
 
-    @commands.hybrid_command(aliases=["mc"])
+    @commands.hybrid_group(name="minecraft")
+    async def inner_minecraft(self, ctx: Context) -> None:
+        if not ctx.invoked_subcommand and not ctx.interaction:
+            await ctx.send_help(ctx.command)
+
+    @inner_minecraft.command()
     @app_commands.describe(
         server="Which server to send the command to?", args="The command and command arguments to send to the server."
     )
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
-    async def minecraft(self, ctx: Context, server: Annotated["Details | None", MCServerConverter], *, args: str) -> None:  # noqa: UP037 # required for converter use
+    async def rcon(self, ctx: Context, server: Annotated["Details | None", MCServerConverter], *, args: str) -> None:  # noqa: UP037 # required for converter use
         """Command for quickly executing RCON commands within a managed minecraft server!"""
         async with ctx.typing(ephemeral=True):
             if not server:
@@ -66,15 +71,18 @@ class Minecraft(commands.GroupCog):
             if ctx.author.id not in server["ops"]:
                 return await ctx.send("You're not authorized to mess with this server.", ephemeral=True)
 
-            output = await rcon(
-                command,
-                *command_args,
-                host=server["host"],
-                port=server["port"],
-                passwd=server["password"],
-                timeout=None,
-                enforce_id=False,
-            )
+            try:
+                output = await rcon(
+                    command,
+                    *command_args,
+                    host=server["host"],
+                    port=server["rcon_port"],
+                    passwd=server["password"],
+                    timeout=15,
+                    enforce_id=False,
+                )
+            except TimeoutError:
+                return await ctx.send("The command timed out. Check the logs?")
 
             if output:
                 output = to_codeblock(output, language="txt", escape_md=False)
@@ -107,7 +115,7 @@ class Minecraft(commands.GroupCog):
 
             return uuid
 
-    @commands.hybrid_command(name="mcavatar")
+    @inner_minecraft.command(name="mcavatar")
     @app_commands.describe(username="The minecraft username to search for.")
     async def player_avatar(self, ctx: Context, *, username: str) -> None:
         """Display a minecraft avatar."""
@@ -121,7 +129,7 @@ class Minecraft(commands.GroupCog):
 
         return await ctx.send(file=discord.File(io.BytesIO(data), filename=f"{username}.png"))
 
-    @commands.hybrid_command(name="status")
+    @inner_minecraft.command(name="status")
     @app_commands.describe(
         server="The minecraft server to query, autocomplete will search my managed servers, but type whatever you need."
     )
@@ -137,7 +145,7 @@ class Minecraft(commands.GroupCog):
 
         return await ctx.send(embed=embed, file=file)
 
-    @minecraft.autocomplete("server")
+    @rcon.autocomplete("server")
     @server_status.autocomplete("server")
     async def minecraft_server_autocomplete(self, interaction: Interaction, _: str) -> list[app_commands.Choice[str]]:
         ret: list[str] = []
