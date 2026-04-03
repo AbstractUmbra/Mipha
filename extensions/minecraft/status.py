@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING, NamedTuple, Self
 import discord
 import mcstatus
 
+from utilities.shared.formats import random_pastel_colour
+from utilities.shared.markdown import MarkdownBuilder
+
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
@@ -177,9 +180,9 @@ class StatusHandler:
         return status.players
 
     def mcstatus_message(self, status: JavaStatusResponse) -> tuple[discord.Embed, discord.File | None]:
-        status.description = MCDescription.from_text(status.description)  # pyright: ignore[reportAttributeAccessIssue]
+        new_description = MCDescription.from_text(status.description)
 
-        embed = discord.Embed()
+        embed = discord.Embed(colour=random_pastel_colour(), title="Server details!")
 
         file = None
         if status.icon:
@@ -187,13 +190,18 @@ class StatusHandler:
             file = discord.File(io.BytesIO(base64.b64decode(b64)), filename="icon.png")
             embed.set_thumbnail(url="attachment://icon.png")
 
-        embed.description = "\u200b" + status.description.discord_text
+        embed.description = "\u200b" + new_description.discord_text
 
-        embed.add_field(name="version", value=f"{status.version.name} (proto {status.version.protocol})    \u200b")
-        embed.add_field(name="ping", value=status.latency)
-        players_string = f"{status.players.online}/{status.players.max}    \u200b"
+        players_string = f"{status.players.online}/{status.players.max}    \u200b\n"
         if status.players.sample:
-            players_string += "".join(f"\n[{p.name}]({p.id})" for p in status.players.sample)
-        embed.add_field(name="players", value=players_string)
+            players_string += (
+                MarkdownBuilder().add_bulletpoints(texts=[f"\n{p.name} ({p.id})" for p in status.players.sample]).text
+            )
+        embed.add_field(name="players", value=players_string, inline=False)
+
+        embed.add_field(
+            name="version", value=f"{status.version.name} (proto {status.version.protocol})    \u200b", inline=True
+        )
+        embed.add_field(name="ping", value=status.latency)
 
         return (embed, file)
