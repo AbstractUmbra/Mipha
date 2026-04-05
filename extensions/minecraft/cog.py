@@ -129,6 +129,50 @@ class Minecraft(commands.Cog):
 
         return await ctx.send(file=discord.File(io.BytesIO(data), filename=f"{username}.png"))
 
+    @inner_minecraft.command(name="backup")
+    @app_commands.describe(server="The modded minecraft server to execute a backup for, provided I am able to.")
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    async def backup_execution(self, ctx: Context, *, server: Annotated["Details | None", MCServerConverter]) -> None:  # noqa: UP037
+        """Executes a backup of a modded server, provided I both manage it and have backup details configured."""
+        async with ctx.typing(ephemeral=True):
+            if not server:
+                await ctx.send("Sorry, but I don't think I manage that server?", ephemeral=True)
+                return None
+
+            backup_details = server.get("backup")
+            if not backup_details:
+                await ctx.send("Sorry, but that server doesn't have backup details saved.", ephemeral=True)
+                return None
+
+            if ctx.author.id not in server["ops"]:
+                return await ctx.send("You're not authorized to interact with this server.", ephemeral=True)
+
+            try:
+                output = await rcon(
+                    backup_details["command"],
+                    *backup_details["args"],
+                    host=server["host"],
+                    port=server["rcon_port"],
+                    passwd=server["password"],
+                    timeout=15,
+                    enforce_id=False,
+                )
+            except TimeoutError:
+                return await ctx.send("The command timed out. Check the logs.", ephemeral=True)
+
+            if output:
+                output = to_codeblock(output, language="txt", escape_md=False)
+                return await ctx.send(
+                    f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` has output:-\n\n{output}",
+                    ephemeral=True,
+                )
+
+            return await ctx.send(
+                f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` returned with no output.",
+                ephemeral=True,
+            )
+
     @inner_minecraft.command(name="status")
     @app_commands.describe(
         server="The minecraft server to query, autocomplete will search my managed servers, but type whatever you need."
