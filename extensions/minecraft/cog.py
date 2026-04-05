@@ -119,15 +119,19 @@ class Minecraft(commands.Cog):
     @app_commands.describe(username="The minecraft username to search for.")
     async def player_avatar(self, ctx: Context, *, username: str) -> None:
         """Display a minecraft avatar."""
-        uuid = await self._uuid_lookup(username)
-        if not uuid:
-            return await ctx.send(f"No such user {username!r}")
+        async with ctx.typing(ephemeral=False):
+            uuid = await self._uuid_lookup(username)
+            if not uuid:
+                return await ctx.send(f"No such user {username!r}")
 
-        async with self.bot.session.get(f"https://visage.surgeplay.com/full/512/{uuid}.png") as resp:
-            resp.raise_for_status()
-            data = await resp.read()
+            async with self.bot.session.get(
+                f"https://vzge.me/full/512/{uuid}.png",
+                headers={"User-Agent": "Mipha Discord bot (https://github.com/AbstractUmbra/Mipha)"},
+            ) as resp:
+                resp.raise_for_status()
+                data = await resp.read()
 
-        return await ctx.send(file=discord.File(io.BytesIO(data), filename=f"{username}.png"))
+            return await ctx.send(file=discord.File(io.BytesIO(data), filename=f"{username}.png"))
 
     @inner_minecraft.command(name="backup")
     @app_commands.describe(server="The modded minecraft server to execute a backup for, provided I am able to.")
@@ -177,7 +181,10 @@ class Minecraft(commands.Cog):
     @app_commands.describe(
         server="The minecraft server to query, autocomplete will search my managed servers, but type whatever you need."
     )
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=True, users=True)
     async def server_status(self, ctx: Context, *, server: str) -> None:
+        """Grabs and presents the server status about a server. This includes online players and their names."""
         config = self.config.get(server)
         kwargs = {"server_string": server, "server_config": config}
         try:
@@ -191,6 +198,7 @@ class Minecraft(commands.Cog):
 
     @rcon.autocomplete("server")
     @server_status.autocomplete("server")
+    @backup_execution.autocomplete("server")
     async def minecraft_server_autocomplete(self, interaction: Interaction, _: str) -> list[app_commands.Choice[str]]:
         ret: list[str] = []
 
