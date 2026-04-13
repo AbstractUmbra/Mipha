@@ -133,13 +133,14 @@ class MangaCog(commands.Cog, name="Manga"):
 
     def __init__(self, bot: Mipha, /, *, config: MangaDexConfig, webhook_url: str | None = None) -> None:
         self.bot: Mipha = bot
-        self.client = hondana.Client(**config, session=bot.session)  # pyright: ignore[reportCallIssue] # the typeddict is invariant
+        feed_enabled: bool = config.pop("feed_enabled", False)  # pyright: ignore[reportAssignmentType] # popping from typed dict is a trick
+        self.client = hondana.Client(**config, session=bot.session)  # pyright: ignore[reportCallIssue] # the erroneous key is popped
         if not webhook_url:
             LOGGER.warning("No webhook defined for MangaDex logging. Skipping.")
             return
 
         self.webhook: discord.Webhook = discord.Webhook.from_url(webhook_url, session=bot.session)
-        if config.get("feed_enabled", False):
+        if feed_enabled:
             self.get_personal_feed.add_exception_type(hondana.APIException)
             self.get_personal_feed.start()
 
