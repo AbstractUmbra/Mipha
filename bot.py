@@ -189,8 +189,9 @@ class ProxyObject(discord.Object):
 
 
 class LogHandler:
-    def __init__(self, *, stream: bool = True) -> None:
+    def __init__(self, *, level: logging._Level = logging.INFO, stream: bool = True) -> None:
         self.log: logging.Logger = logging.getLogger()
+        self._set_level = level
         self.max_bytes: int = 10 * 1024 * 1024
         self.logging_path = pathlib.Path("./logs/")
         self.logging_path.mkdir(exist_ok=True)
@@ -206,13 +207,13 @@ class LogHandler:
         return self.__enter__()
 
     def __enter__(self: Self) -> Self:
-        logging.getLogger("discord").setLevel(logging.INFO)
-        logging.getLogger("discord.http").setLevel(logging.INFO)
-        logging.getLogger("discord.ext.tasks").setLevel(logging.INFO)
-        logging.getLogger("hondana.http").setLevel(logging.INFO)
+        logging.getLogger("discord").setLevel(self._set_level)
+        logging.getLogger("discord.http").setLevel(self._set_level)
+        logging.getLogger("discord.ext.tasks").setLevel(self._set_level)
+        logging.getLogger("hondana.http").setLevel(self._set_level)
         logging.getLogger("discord.state").addFilter(RemoveNoise())
 
-        self.log.setLevel(logging.INFO)
+        self.log.setLevel(self._set_level)
         handler = RotatingFileHandler(
             filename=self.logging_path / "Mipha.log",
             encoding="utf-8",
@@ -619,13 +620,14 @@ async def main() -> None:
             max_inactive_connection_lifetime=0,
             init=db_init,
         ) as pool,
-        LogHandler() as log_handler,
+        LogHandler(level=raw_cfg["bot"].get("log_level", 20)) as log_handler,
     ):
         bot.log_handler = log_handler
         bot.pool = pool
 
         bot.session = session
 
+        bot.log_handler.debug("Made it to extension loading.")
         await bot.load_extension("jishaku")
         for extension in EXTENSIONS:
             try:
@@ -636,6 +638,7 @@ async def main() -> None:
                 )
                 continue
             bot.log_handler.log.info("Loaded %sextension: %s", "module " if extension.ispkg else "", extension.name)
+        bot.log_handler.debug("Finished loading extensions")
 
         await bot.start()
 

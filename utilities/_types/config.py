@@ -13,6 +13,7 @@ class BotConfig(TypedDict):
     dev_guilds: NotRequired[list[int]]
     owner_ids: list[int]
     intents: int
+    log_level: NotRequired[int]
 
 
 class DatabaseConfig(TypedDict):
