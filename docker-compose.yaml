@@ -5,6 +5,8 @@ services:
     extra_hosts:
       - "database:host-gateway"
     restart: unless-stopped
+    environment:
+      - MPLCONFIGDIR=/app/configs/
     networks:
       default:
     volumes:
