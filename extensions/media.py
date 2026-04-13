@@ -38,17 +38,19 @@ DESKTOP_PATTERN: re.Pattern[str] = re.compile(
 )
 TWITTER_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(twitter|x)\.com/(?P<user>\w+)/status/(?P<id>\d+))\>?")
 REDDIT_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://v\.redd\.it/(?P<ID>\w+))\>?")
-INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(r"\<?(https?://(?:www\.)instagram\.com/reel/(?P<id>[a-zA-Z0-9\-_]+)\/?)\>?")
+INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(
+    r"\<?(https?://(?:www\.)instagram\.com/reel/(?P<id>[a-zA-Z0-9\-_]+)\/?)(?P<query>\?.*)\>?"
+)
 
 SUBSTITUTIONS: dict[str, SubstitutionData] = {
     "twitter.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
     "x.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
+    "www.instagram.com": {"repost_urls": ["kkinstagram.com"], "remove_query": True},
+    "instagram.com": {"repost_urls": ["kkinstagram.com"], "remove_query": True},
 }
 
 AUTO_REPOST_GUILDS: list[discord.Object] = [
-    discord.Object(id=774561547930304536, type=discord.Guild),
     discord.Object(id=174702278673039360, type=discord.Guild),
-    discord.Object(id=149998214810959872, type=discord.Guild),
 ]
 AUTO_REPOST_GUILD_IDS: set[int] = {guild.id for guild in AUTO_REPOST_GUILDS}
 
@@ -300,7 +302,7 @@ class MediaReposter(commands.Cog):
         content = content[:1000] + f"\n\n-# Reposted (correctly) from:\n{message.author} ({message.author.id})"
 
         view = SelfDeleteView(author_id=message.author.id)
-        view.message = await message.channel.send(content, view=view)
+        view.message = await message.channel.send(content, view=view, allowed_mentions=discord.AllowedMentions(users=True))
         if message.channel.permissions_for(message.guild.me).manage_messages and any(
             [
                 DESKTOP_PATTERN.fullmatch(message.content),
@@ -311,6 +313,8 @@ class MediaReposter(commands.Cog):
             ],
         ):
             await message.delete()
+        elif message.channel.permissions_for(message.guild.me).manage_messages:
+            await message.edit(suppress=True)
 
 
 async def setup(bot: Mipha) -> None:

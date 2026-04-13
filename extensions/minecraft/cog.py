@@ -37,20 +37,25 @@ class MCServerConverter(commands.Converter["Details | None"]):
         return resolved
 
 
-class Minecraft(commands.GroupCog):
+class Minecraft(commands.Cog):
     def __init__(self, bot: Mipha, /, *, config: dict[str, Details]) -> None:
         self.bot = bot
         self.config: dict[str, Details] = config
         self.status_handler = StatusHandler(config)
         self._mc_uuid_cache: LRU[str, str | None] = LRU(256)
 
-    @commands.hybrid_command(aliases=["mc"])
+    @commands.hybrid_group(name="minecraft")
+    async def inner_minecraft(self, ctx: Context) -> None:
+        if not ctx.invoked_subcommand and not ctx.interaction:
+            await ctx.send_help(ctx.command)
+
+    @inner_minecraft.command()
     @app_commands.describe(
         server="Which server to send the command to?", args="The command and command arguments to send to the server."
     )
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
-    async def minecraft(self, ctx: Context, server: Annotated["Details | None", MCServerConverter], *, args: str) -> None:  # noqa: UP037 # required for converter use
+    async def rcon(self, ctx: Context, server: Annotated["Details | None", MCServerConverter], *, args: str) -> None:  # noqa: UP037 # required for converter use
         """Command for quickly executing RCON commands within a managed minecraft server!"""
         async with ctx.typing(ephemeral=True):
             if not server:
@@ -66,15 +71,18 @@ class Minecraft(commands.GroupCog):
             if ctx.author.id not in server["ops"]:
                 return await ctx.send("You're not authorized to mess with this server.", ephemeral=True)
 
-            output = await rcon(
-                command,
-                *command_args,
-                host=server["host"],
-                port=server["port"],
-                passwd=server["password"],
-                timeout=None,
-                enforce_id=False,
-            )
+            try:
+                output = await rcon(
+                    command,
+                    *command_args,
+                    host=server["host"],
+                    port=server["rcon_port"],
+                    passwd=server["password"],
+                    timeout=15,
+                    enforce_id=False,
+                )
+            except TimeoutError:
+                return await ctx.send("The command timed out. Check the logs?")
 
             if output:
                 output = to_codeblock(output, language="txt", escape_md=False)
@@ -107,25 +115,76 @@ class Minecraft(commands.GroupCog):
 
             return uuid
 
-    @commands.hybrid_command(name="mcavatar")
+    @inner_minecraft.command(name="mcavatar")
     @app_commands.describe(username="The minecraft username to search for.")
     async def player_avatar(self, ctx: Context, *, username: str) -> None:
         """Display a minecraft avatar."""
-        uuid = await self._uuid_lookup(username)
-        if not uuid:
-            return await ctx.send(f"No such user {username!r}")
+        async with ctx.typing(ephemeral=False):
+            uuid = await self._uuid_lookup(username)
+            if not uuid:
+                return await ctx.send(f"No such user {username!r}")
 
-        async with self.bot.session.get(f"https://visage.surgeplay.com/full/512/{uuid}.png") as resp:
-            resp.raise_for_status()
-            data = await resp.read()
+            async with self.bot.session.get(
+                f"https://vzge.me/full/512/{uuid}.png",
+                headers={"User-Agent": "Mipha Discord bot (https://github.com/AbstractUmbra/Mipha)"},
+            ) as resp:
+                resp.raise_for_status()
+                data = await resp.read()
 
-        return await ctx.send(file=discord.File(io.BytesIO(data), filename=f"{username}.png"))
+            return await ctx.send(file=discord.File(io.BytesIO(data), filename=f"{username}.png"))
 
-    @commands.hybrid_command(name="status")
+    @inner_minecraft.command(name="backup")
+    @app_commands.describe(server="The modded minecraft server to execute a backup for, provided I am able to.")
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=True, users=True)
+    async def backup_execution(self, ctx: Context, *, server: Annotated["Details | None", MCServerConverter]) -> None:  # noqa: UP037
+        """Executes a backup of a modded server, provided I both manage it and have backup details configured."""
+        async with ctx.typing(ephemeral=True):
+            if not server:
+                await ctx.send("Sorry, but I don't think I manage that server?", ephemeral=True)
+                return None
+
+            backup_details = server.get("backup")
+            if not backup_details:
+                await ctx.send("Sorry, but that server doesn't have backup details saved.", ephemeral=True)
+                return None
+
+            if ctx.author.id not in server["ops"]:
+                return await ctx.send("You're not authorized to interact with this server.", ephemeral=True)
+
+            try:
+                output = await rcon(
+                    backup_details["command"],
+                    *backup_details["args"],
+                    host=server["host"],
+                    port=server["rcon_port"],
+                    passwd=server["password"],
+                    timeout=15,
+                    enforce_id=False,
+                )
+            except TimeoutError:
+                return await ctx.send("The command timed out. Check the logs.", ephemeral=True)
+
+            if output:
+                output = to_codeblock(output, language="txt", escape_md=False)
+                return await ctx.send(
+                    f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` has output:-\n\n{output}",
+                    ephemeral=True,
+                )
+
+            return await ctx.send(
+                f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` returned with no output.",
+                ephemeral=True,
+            )
+
+    @inner_minecraft.command(name="status")
     @app_commands.describe(
         server="The minecraft server to query, autocomplete will search my managed servers, but type whatever you need."
     )
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    @app_commands.allowed_installs(guilds=True, users=True)
     async def server_status(self, ctx: Context, *, server: str) -> None:
+        """Grabs and presents the server status about a server. This includes online players and their names."""
         config = self.config.get(server)
         kwargs = {"server_string": server, "server_config": config}
         try:
@@ -137,8 +196,9 @@ class Minecraft(commands.GroupCog):
 
         return await ctx.send(embed=embed, file=file)
 
-    @minecraft.autocomplete("server")
+    @rcon.autocomplete("server")
     @server_status.autocomplete("server")
+    @backup_execution.autocomplete("server")
     async def minecraft_server_autocomplete(self, interaction: Interaction, _: str) -> list[app_commands.Choice[str]]:
         ret: list[str] = []
 
