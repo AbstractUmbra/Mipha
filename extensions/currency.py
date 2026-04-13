@@ -13,8 +13,6 @@ from utilities.shared.async_config import Config
 from utilities.shared.fuzzy import extract
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from bot import Mipha
     from utilities.context import Context, Interaction
 
@@ -111,25 +109,17 @@ class CurrencyCog(commands.Cog):
         self.config: Config[dict[CurrencyLiteral, CurrencyConfig]] = config
         self.__token: str = self.config["token"]  # pyright: ignore[reportAttributeAccessIssue] # we lie
 
-    async def perform_updates(self, from_: CurrencyLiteral, to: CurrencyLiteral, /) -> None:
+    async def perform_updates(self, from_: CurrencyLiteral) -> None:
         now = datetime.datetime.now(datetime.UTC)
 
-        arr: list[CurrencyLiteral] = [from_, to]
+        config_entry = self.config["0"][from_]
+        last_updated = self.get_last_updated(config_entry)
 
-        to_update: list[CurrencyLiteral] = []
-        for item in arr:
-            config_entry = self.config["0"][item]
-            last_updated = self.get_last_updated(config_entry)
+        if not ((now - last_updated).days >= 1):
+            LOGGER.info("Cache hit for %r", from_)
 
-            if (now - last_updated).days >= 1:
-                LOGGER.info("Expired or missing information on %r, updating", item)
-                to_update.append(item)
-
-        if to_update:
-            LOGGER.info("Expired or missing information on %r, updating", " & ".join(map(repr, item)))
-            await self.update_config(to_update)
-        else:
-            LOGGER.info("Cache hit for %r", " & ".join(map(repr, item)))
+        LOGGER.info("Expired or missing information on %r, updating", from_)
+        await self.update_config(from_)
 
     def get_last_updated(self, key: CurrencyConfig) -> datetime.datetime:
         value = key["last_updated"]
@@ -139,23 +129,21 @@ class CurrencyCog(commands.Cog):
             else (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=30))
         )
 
-    async def update_config(self, keys: Sequence[CurrencyLiteral]) -> None:
+    async def update_config(self, from_: CurrencyLiteral) -> None:
         async with self.bot.session.get(
             "https://api.freecurrencyapi.com/v1/latest",
             headers={"apikey": self.__token},
-            params={"base_currency": ",".join(keys)},
+            params={"base_currency": from_},
         ) as resp:
             resp.raise_for_status()
             data: dict[Literal["data"], dict[CurrencyLiteral, float]] = await resp.json()
 
             local_data = self.config["0"]
             now = datetime.datetime.now(datetime.UTC).isoformat()
-            for key in keys:
-                LOGGER.info("Updating currency config for key %r", key)
-                local_data[key].update({"last_updated": now, "values": data["data"]})
+            local_data[from_].update({"last_updated": now, "values": data["data"]})
 
             await self.config.put("0", local_data)
-        LOGGER.info("Currency config for %r now updated.", key)
+            LOGGER.info("Currency config for %r now updated.", from_)
 
     @commands.hybrid_command()
     @app_commands.rename(from_="from")
@@ -173,7 +161,7 @@ class CurrencyCog(commands.Cog):
         if ctx.interaction:
             await ctx.interaction.response.defer()
 
-        await self.perform_updates(from_, to)
+        await self.perform_updates(from_)
 
         from_config_key = self.config["0"][from_]
         to_config_key = self.config["0"][to]
