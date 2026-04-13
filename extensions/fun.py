@@ -204,11 +204,10 @@ class Fun(commands.Cog):
 
         url = "https://api-free.deepl.com/v2/translate"
         form = aiohttp.FormData()
-        form.add_field("auth_key", value=self.deepl_key)
         form.add_field("text", value=new_content)
         form.add_field("target_lang", value="EN")
 
-        response = await self.bot.session.post(url, data=form)
+        response = await self.bot.session.post(url, headers={"Authorization": f"DeepL-Auth-Key {self.deepl_key}"}, data=form)
         data = await response.json()
 
         lang = data["translations"][0]["detected_source_language"]
