@@ -88,9 +88,14 @@ class _BooruConfig(TypedDict):
     user_id: str
 
 
+class _NhentaiConfig(TypedDict):
+    token: str
+
+
 class LewdConfig(TypedDict):
     gelbooru: _BooruConfig
     danbooru: _BooruConfig
+    nhentai: _NhentaiConfig
 
 
 class Logging(TypedDict):
