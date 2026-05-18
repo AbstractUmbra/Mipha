@@ -201,6 +201,14 @@ class RNG(commands.Cog):
 
         return await ctx.send("\n".join(results))
 
+    @commands.command()
+    async def flip(self, ctx: Context) -> None:
+        """Flips a coin."""
+        winner, _ = self._bestof_choices("heads", "tails", 7)
+        fmt = f"{winner.title()!r} wins!"
+
+        return await ctx.send(fmt)
+
 
 async def setup(bot: Mipha) -> None:
     await bot.add_cog(RNG(bot))
