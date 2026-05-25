@@ -17,7 +17,7 @@ dependencies = [
     "lxml==6.1.0",
     "matplotlib>=3.10.8",
     "mystbin-py",
-    "numpy>=2.4.4",
+    "numpy>=2.4.6",
     "orjson",
     "parsedatetime",
     "pillow",
