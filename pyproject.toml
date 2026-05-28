@@ -24,7 +24,7 @@ dependencies = [
     "psutil",
     "pygit2",
     "pykakasi @ git+https://codeberg.org/miurahr/pykakasi.git@master",
-    "python-a2s @ git+https://github.com/Yepoleb/python-a2s.git@typing",
+    "python-a2s @ git+https://github.com/Yepoleb/python-a2s.git@master",
     "python-dateutil",
     "tabulate",
     "typing-extensions",
