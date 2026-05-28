@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 LOGGER: logging.Logger = logging.getLogger(__name__)
 BUFFER_PATH = pathlib.Path("./buffer/")
 BUFFER_PATH.mkdir(exist_ok=True, mode=0o770)
-FXTWITTER_API_URL = "https://api.fxtwitter.com/{author}/status/{post_id}"
+FXTWITTER_API_URL = "https://api.fxtwitter.com/2/status/{post_id}"
 
 ydl = yt_dlp.YoutubeDL({"outtmpl": "buffer/%(id)s.%(ext)s", "quiet": True, "logger": LOGGER})  # pyright: ignore[reportArgumentType] # can't narrow this dict to typeshed
 
@@ -248,41 +248,58 @@ class MediaReposter(commands.Cog):
 
         return None
 
-    async def _has_twitter_video(self, match: re.Match[str]) -> bool:
+    async def _check_twitter_metadata(self, match: re.Match[str]) -> bool:
         author = match["user"]
         post_id = match["id"]
 
         async with self.bot.session.get(FXTWITTER_API_URL.format(author=author, post_id=post_id)) as resp:
             data: FXTwitterResponse = await resp.json()
 
-        return bool(data["tweet"].get("media", {}).get("videos"))
+        ret = False
+        tweet_status = data["status"]
+        if not tweet_status:
+            return ret
+
+        if tweet_status.get("media", {}).get("videos"):
+            ret = True
+        if tweet_status.get("quote"):
+            ret = True
+
+        return ret
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
+        LOGGER.debug("Message received: %r in channel: %r", str(message.id), str(message.channel.id))
         if self.enabled is False:
+            LOGGER.debug("Media reposting is disabled.")
             return
 
         if not message.guild or message.guild.id not in AUTO_REPOST_GUILD_IDS or message.webhook_id:
+            LOGGER.debug("Media reposting is disabled for this guild, or it is a webhook message.")
             return
 
         assert isinstance(message.author, discord.Member)  # guarded in previous if
         if not self._check_author(message.author):
+            LOGGER.debug("Message author is not allowed to auto-repost.")
             return
 
         resolved = self._resolve_matches(message.content)
 
         if not resolved:
+            LOGGER.debug("No matches found in message content.")
             return
 
         source, matches = resolved
 
         new_urls = []
         for match in matches:
-            if source is URLSource.twitter and not await self._has_twitter_video(match):
+            if source is URLSource.twitter and not await self._check_twitter_metadata(match):
+                LOGGER.debug("Found twitter post but it is not a video nor a quote: %r", match[0])
                 continue
 
             url = yarl.URL(match[0])
             if not url.host or not (sub_ := SUBSTITUTIONS.get(url.host)):
+                LOGGER.debug("Got a malformed URL.")
                 return
 
             new_url = url.with_host(random.choice(sub_["repost_urls"]))  # noqa: S311 # not crypto
@@ -292,17 +309,17 @@ class MediaReposter(commands.Cog):
             new_urls.append(new_url)
 
         if not new_urls:
+            LOGGER.debug("No valid URLs found for transformation.")
             return
 
         content = "\n".join([str(url) for url in new_urls])
 
-        if message.mentions:
-            content = " ".join(m.mention for m in message.mentions) + "\n\n" + content
-
         content = content[:1000] + f"\n\n-# Reposted (correctly) from:\n{message.author} ({message.author.id})"
 
         view = SelfDeleteView(author_id=message.author.id)
-        view.message = await message.channel.send(content, view=view, allowed_mentions=discord.AllowedMentions(users=True))
+        view.message = await message.reply(
+            content, view=view, allowed_mentions=discord.AllowedMentions(users=True), mention_author=False
+        )
         if message.channel.permissions_for(message.guild.me).manage_messages and any(
             [
                 DESKTOP_PATTERN.fullmatch(message.content),
