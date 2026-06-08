@@ -75,7 +75,7 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
 
     @executor_function
     def find_next_index_url(self, soup: bs4.BeautifulSoup) -> str:
-        nav = soup.find(name="a", string=NEXT_PAGE_PATTERN)  # pyright: ignore[reportArgumentType, reportCallIssue] # shitty typeshed
+        nav = soup.find(name="a", string=NEXT_PAGE_PATTERN)
         if not nav or not isinstance(nav, bs4.Tag):
             raise ValueError("Soup was not valid.")
 

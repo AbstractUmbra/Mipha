@@ -605,7 +605,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
             msg = f"Message with the ID of {message.id} cannot be found in <#{message.channel.id}>."
             raise commands.BadArgument(msg) from err
 
-        # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")  # noqa: E501, ERA001
+        # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")  # noqa: ERA001
         # thanks daggy
 
         await ctx.send(

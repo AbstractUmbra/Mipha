@@ -398,7 +398,7 @@ class Gatekeeper:
         while self.role_id is not None:
             member_id, action = await self.queue.get()
 
-            try:
+            try:  # noqa: PLW0717
                 if action is GatekeeperRoleState.pending_add:
                     await add_role(
                         self.id,
@@ -922,7 +922,7 @@ class GatekeeperChannelSelect(discord.ui.ChannelSelect["GatekeeperSetUpView"]):
             return
 
         reason = f"Gatekeeper permission sync requested by {interaction.user} (ID: {interaction.user.id})"
-        try:
+        try:  # noqa: PLW0717
             if everyone_perms.read_messages:
                 overwrite = channel.overwrites_for(interaction.guild.default_role)
                 overwrite.read_messages = False

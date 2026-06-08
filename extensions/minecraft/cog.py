@@ -168,12 +168,18 @@ class Minecraft(commands.Cog):
             if output:
                 output = to_codeblock(output, language="txt", escape_md=False)
                 return await ctx.send(
-                    f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` has output:-\n\n{output}",
+                    (
+                        f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` "
+                        f"has output:-\n\n{output}"
+                    ),
                     ephemeral=True,
                 )
 
             return await ctx.send(
-                f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` returned with no output.",
+                (
+                    f"Command `{backup_details['command']}` with arguments `{' '.join(backup_details['args'])}` "
+                    "returned with no output."
+                ),
                 ephemeral=True,
             )
 

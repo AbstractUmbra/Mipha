@@ -133,7 +133,7 @@ class Time(commands.Cog):
     async def timezone(self, ctx: TimeContext, *, member: discord.Member | None = None) -> None:
         """Get a member's stored timezone."""
         if ctx.invoked_subcommand:
-            pass
+            return
 
         full_member = member or ctx.author
 

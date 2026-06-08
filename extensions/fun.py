@@ -406,7 +406,7 @@ class Fun(commands.Cog):
                 raise commands.BadArgument("The passed emoji must be a custom emoji, sorry.")
             bytes_ = await target.read()
         elif isinstance(target, str):
-            try:
+            try:  # noqa: PLW0717
                 async with ctx.bot.session.get(target) as resp:
                     bytes_ = await resp.read()
                     try:
