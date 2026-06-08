@@ -271,7 +271,7 @@ class MangaCog(commands.Cog, name="Manga"):
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
             expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
-            paste = await self.bot.create_paste(content=clean, password=password, expires=expires)
+            paste = await self.bot.create_paste(content=clean, password=password, expires_at=expires)
             clean = (
                 f"Error was too long to send in a codeblock, so I have pasted it [here]({paste})."
                 f"\nThe password is {password} and it expires at {discord.utils.format_dt(expires, 'F')}."

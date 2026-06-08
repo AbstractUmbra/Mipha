@@ -364,7 +364,7 @@ class Context[CogT_co: commands.Cog](commands.Context["Mipha"]):
             paste_url = await self.bot.create_paste(
                 content=content,
                 password=password,
-                expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
+                expires_at=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
             )
 
             content = (

@@ -16,10 +16,10 @@ dependencies = [
     "lru_dict",
     "lxml==6.1.1",
     "matplotlib>=3.10.9",
-    "mystbin-py",
     "numpy>=2.4.6",
     "orjson",
     "parsedatetime",
+    "pastey.py @ git+https://github.com/PythonistaGuild/pastey.py.git@main",
     "pillow",
     "psutil",
     "pygit2",
@@ -33,7 +33,8 @@ dependencies = [
 ]
 requires-python = "<4.0,>=3.13"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MPL-2.0"
+license-files = ["LICEN[CS]E"]
 
 [dependency-groups]
 dev = ["ruff", "asyncpg-stubs", "pre-commit"]
@@ -132,6 +133,9 @@ inline-quotes = "double"
 "typing.TypeGuard".msg = "TypeGuard is fundamentally unsafe"
 "typing_extensions.TypeIs".msg = "TypeIs is fundamentally unsafe, even when using it as described to be safe"
 "typing_extensions.TypeGuard".msg = "TypeGuard is fundamentally unsafe"
+
+[tool.setuptools]
+py-modules = []
 
 [tool.pyright]
 useLibraryCodeForTypes = true

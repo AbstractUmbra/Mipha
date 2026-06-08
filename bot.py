@@ -20,7 +20,7 @@ import aiohttp
 import asyncpg
 import discord
 import jishaku
-import mystbin
+import pastey
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import (
@@ -248,6 +248,7 @@ class Mipha(commands.Bot):  # noqa: PLR0904
     """Mipha's bot class."""
 
     log_handler: LogHandler
+    pastey_client: pastey.Client
     pool: asyncpg.Pool[asyncpg.Record]
     user: discord.ClientUser
     session: aiohttp.ClientSession
@@ -256,7 +257,6 @@ class Mipha(commands.Bot):  # noqa: PLR0904
     socket_stats: Counter[Any]
     command_types_used: Counter[bool]
     bot_app_info: discord.AppInfo
-    mb_client: mystbin.Client
     tree: MiphaCommandTree
     _original_help_command: commands.HelpCommand | None  # for help command overriding
     _stats_cog_gateway_handler: logging.Handler
@@ -273,6 +273,7 @@ class Mipha(commands.Bot):  # noqa: PLR0904
         "_stats_cog_gateway_handler",
         "command_stats",
         "log_handler",
+        "pastey_client",
         "pool",
         "session",
         "socket_stats",
@@ -556,6 +557,29 @@ class Mipha(commands.Bot):  # noqa: PLR0904
         if guild.id in self._blacklist_data:
             await guild.leave()
 
+    async def create_paste(
+        self,
+        *,
+        content: str | None = None,
+        files: list[pastey.File] | None = None,
+        expires_at: datetime.datetime | None = None,
+        password: str | None = None,
+        view_limit: int | None = None,
+    ) -> pastey.Paste:
+        if not content and not files:
+            raise ValueError("You require `content` or `files` to be passed.")
+
+        files = files or []
+
+        if content:
+            files.insert(0, pastey.File(content=content, name="raw-content-insert.txt"))
+
+        assert files  # guarded
+
+        return await self.pastey_client.create_paste(
+            files=files, expires_at=expires_at, password=password, remaining_views=view_limit
+        )
+
     async def start(self) -> None:
         try:
             await super().start(token=self.config["bot"]["token"], reconnect=True)
@@ -577,30 +601,7 @@ class Mipha(commands.Bot):  # noqa: PLR0904
         self.start_time: datetime.datetime = datetime.datetime.now(datetime.UTC)
 
         self.bot_app_info = await self.application_info()
-        self.mb_client = mystbin.Client(session=self.session, root_url="https://mystbin.abstractumbra.dev")
         await self._reload_tz_handler()
-
-    async def create_paste(
-        self,
-        *,
-        content: str | None = None,
-        files: list[tuple[str, str]] | None = None,
-        password: str | None = None,
-        expires: datetime.datetime | None = None,
-    ) -> str:
-        if not content and not files:
-            raise ValueError("Either `content` or `files` must be provided.")
-
-        if content:
-            post_files = [mystbin.File(filename="output.py", content=content)]
-        elif files:
-            post_files = [mystbin.File(filename=name, content=content) for name, content in files]
-        else:
-            raise ValueError("An argument for `content` or `files` must be provided.")
-
-        paste = await self.mb_client.create_paste(files=post_files, password=password, expires=expires)
-
-        return paste.url
 
 
 async def main() -> None:
@@ -610,6 +611,7 @@ async def main() -> None:
     async with (
         Mipha(raw_cfg) as bot,
         aiohttp.ClientSession(json_serialize=discord.utils._to_json) as session,
+        pastey.Client(session=session) as pastey_client,
         asyncpg.create_pool(
             host=bot.config["postgresql"]["host"],
             user=bot.config["postgresql"]["user"],
@@ -626,6 +628,7 @@ async def main() -> None:
         bot.pool = pool
 
         bot.session = session
+        bot.pastey_client = pastey_client
 
         bot.log_handler.debug("Made it to extension loading.")
         await bot.load_extension("jishaku")

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import re
 from typing import TYPE_CHECKING
 
 import discord
-import mystbin
+import pastey
 from discord import app_commands
 from discord.ext import commands
 
+from utilities.shared.formats import ts
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
@@ -17,6 +19,7 @@ if TYPE_CHECKING:
 
 CODEBLOCK_RE = re.compile(r"```(?P<lang>\w+)?\n(?P<content>.*?)```", re.DOTALL)
 BLANK_LINES_RE = re.compile(r"\n\s*\n+")
+LOGGER = logging.getLogger(__name__)
 
 
 class Codeblock:
@@ -66,8 +69,14 @@ def extract_codeblocks_with_placeholders(input_: str) -> tuple[str, list[Codeblo
     return "\n".join(output), codeblocks
 
 
+async def delete_paste(client: Mipha, id_: str, safety: str) -> bool:
+    resp = await client.session.delete(f"https://api.pastey.gg/{id_}", headers={"X-Safety-Token": safety})
+
+    return resp.status == 204
+
+
 class PasteView(BaseView):
-    def __init__(self, paste: mystbin.Paste, /, *, author_id: int) -> None:
+    def __init__(self, paste: pastey.Paste, /, *, author_id: int) -> None:
         super().__init__(timeout=datetime.timedelta(hours=24).seconds)
         self.paste = paste
         self.author_id = author_id
@@ -82,7 +91,7 @@ class PasteView(BaseView):
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.paste.delete()
+        await delete_paste(interaction.client, self.paste.id, self.paste.safety_token)  # pyright: ignore[reportArgumentType] # it's not None here
 
         button.label = "Paste deleted"
         button.disabled = True
@@ -99,7 +108,11 @@ class Dpy(commands.Cog):
     def __init__(self, bot: Mipha, /) -> None:
         self.bot = bot
         self.mystbin_context_menu = app_commands.ContextMenu(
-            name="Message to Mystbin", callback=self.to_mystbin_callback, type=discord.AppCommandType.message
+            name="Message to Pastey",
+            callback=self.to_mystbin_callback,
+            type=discord.AppCommandType.message,
+            allowed_contexts=discord.app_commands.AppCommandContext(guild=True, dm_channel=True, private_channel=True),
+            allowed_installs=discord.app_commands.AppInstallationType(guild=True, user=True),
         )
         self.bot.tree.add_command(self.mystbin_context_menu)
 
@@ -109,35 +122,29 @@ class Dpy(commands.Cog):
     async def to_mystbin_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(ephemeral=False, thinking=True)
 
-        files = []
         if message.content:
             contents, codeblocks = extract_codeblocks_with_placeholders(message.content)
-            files.append(mystbin.File(filename="message-contents.txt", content=collapse_blank_lines(contents)))
-
-            for idx, codeblock in enumerate(codeblocks, start=1):
-                # handle edge-cases like empty codeblocks (i.e., ``````)
-                if not codeblock:
-                    continue
-                file_ext = f".{codeblock.language}" if codeblock.language else ""
-                file = mystbin.File(filename=f"message-contents-code_block_{idx}{file_ext}", content=codeblock.content)
-                files.append(file)
+            files: list[pastey.File] = []
+            if contents:
+                files.append(pastey.File(content=contents, name="message-contents.txt"))
+            for idx, cb in enumerate(codeblocks, start=1):
+                files.append(pastey.File(content=cb.content, name=f"codeblock-{idx}.{cb.language}"))
 
         for attachment in message.attachments:
             if not attachment.content_type or attachment.content_type.split("/")[0].lower() != "text":
                 continue
+            files.append(pastey.File(content=(await attachment.read()).decode("utf-8"), name=attachment.filename))
 
-            file = mystbin.File(filename=attachment.filename, content=(await attachment.read()).decode("utf-8"))
-            files.append(file)
+        LOGGER.debug("files: %r", files)
 
-        paste = await self.bot.mb_client.create_paste(
-            files=files, expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24))
-        )
+        expiry = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24)
+        paste = await self.bot.create_paste(files=files, expires_at=expiry)
 
         view = PasteView(paste, author_id=message.author.id)
         await interaction.followup.send(
             (
                 f"I've created that paste for you based on [this message]({message.jump_url})."
-                f"\n\nIt will expire in 24 hours, "
+                f"\n\nIt will expire in {ts(expiry):R}, "
                 "but the message author can delete it early with the button below!"
             ),
             view=view,
