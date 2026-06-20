@@ -15,7 +15,7 @@ dependencies = [
     "legofy",
     "lru_dict",
     "lxml==6.1.1",
-    "matplotlib>=3.10.9",
+    "matplotlib>=3.11.0",
     "numpy>=2.4.6",
     "orjson",
     "parsedatetime",
