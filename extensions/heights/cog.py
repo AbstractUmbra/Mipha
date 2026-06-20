@@ -44,7 +44,7 @@ class HeightTransformer(app_commands.Transformer):
         feet_calc = feet * 30.48
         inch_calc = inch * 2.54
 
-        return feet_calc * inch_calc
+        return feet_calc + inch_calc
 
     async def transform(self, interaction: Interaction, value: str) -> float:
         match = self.height_regex.search(value)
@@ -106,10 +106,10 @@ class Heights(commands.GroupCog):
         self,
         interaction: Interaction,
         height: app_commands.Transform[float, HeightTransformer],
-        display_name: str | None = None,
+        display_name: app_commands.Range[str, 1, 20] | None = None,
     ) -> None:
         """Sets your height!"""
-        if height >= 210:
+        if height >= 210 or height <= 60:
             await interaction.response.send_message("I think you're lying.", ephemeral=True)
             return None
 
@@ -127,12 +127,17 @@ class Heights(commands.GroupCog):
 
         return await interaction.followup.send("Height not confirmed, aborting.", ephemeral=True)
 
+    @set_height.error
+    async def set_height_handler(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
+        if isinstance(error, app_commands.TransformerError):
+            await interaction.response.send_message("Unable to convert your input into a height.", ephemeral=True)
+
     @app_commands.command(name="delete")
     async def delete_height(self, interaction: Interaction) -> None:
         """Remove any height data stored on you."""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         async with self.pool.acquire() as conn:
             await conn.execute("DELETE FROM heights WHERE user_id = ?;", interaction.user.id)
 
-        await interaction.followup.send("Gone.")
+        await interaction.followup.send("Gone.", ephemeral=True)
