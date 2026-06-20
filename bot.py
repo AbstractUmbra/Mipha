@@ -570,6 +570,7 @@ class Mipha(commands.Bot):  # noqa: PLR0904
             raise ValueError("You require `content` or `files` to be passed.")
 
         files = files or []
+        files = files[:5]
 
         if content:
             files.insert(0, pastey.File(content=content, name="raw-content-insert.txt"))
