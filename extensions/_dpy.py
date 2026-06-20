@@ -121,10 +121,10 @@ class Dpy(commands.Cog):
 
     async def to_mystbin_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(ephemeral=False, thinking=True)
+        files: list[pastey.File] = []
 
         if message.content:
             contents, codeblocks = extract_codeblocks_with_placeholders(message.content)
-            files: list[pastey.File] = []
             if contents:
                 files.append(pastey.File(content=contents, name="message-contents.txt"))
             for idx, cb in enumerate(codeblocks, start=1):
