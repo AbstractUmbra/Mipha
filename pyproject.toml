@@ -16,7 +16,7 @@ dependencies = [
     "lru_dict",
     "lxml==6.1.1",
     "matplotlib>=3.10.9",
-    "numpy>=2.4.6",
+    "numpy>=2.5.0",
     "orjson",
     "parsedatetime",
     "pastey.py @ git+https://github.com/PythonistaGuild/pastey.py.git@main",
