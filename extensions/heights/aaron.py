@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import matplotlib.pyplot as plt
 import numpy as np
 from discord import Enum
-from matplotlib.ticker import FuncFormatter, MultipleLocator
+from matplotlib.ticker import FuncFormatter, MultipleLocator, NullFormatter
 from PIL import Image, ImageOps
 
 if TYPE_CHECKING:
@@ -16,9 +16,12 @@ if TYPE_CHECKING:
 
 RESOURCES_DIR = pathlib.Path(__file__).parent / "resources"
 PERSON = RESOURCES_DIR / "person.png"
-JOBS = RESOURCES_DIR / "steve_jobs.png"
-ZERO = RESOURCES_DIR / "zero_two.png"
-MEWTWO = RESOURCES_DIR / "mewtwo.png"
+
+ADDITIONAL = {
+    "Steve Jobs": (RESOURCES_DIR / "steve_jobs.png", 188.0),
+    "Zero Two": (RESOURCES_DIR / "zero_two.png", 170.0),
+    "Mew Two": (RESOURCES_DIR / "mewtwo.png", 201.0),
+}
 
 
 __all__ = ("make_figure",)
@@ -31,7 +34,12 @@ class SortKey(Enum):
     name_asc = 4
 
 
-def make_figure(inp_: dict[str, float], sort_key: SortKey = SortKey.height_desc) -> BytesIO:
+def make_figure(
+    inp_: dict[str, float],
+    sort_key: SortKey = SortKey.height_desc,
+    person_spacing_in: float = 1,
+    min_fig_width_in: float = 6.0,
+) -> BytesIO:
     reverse = False
     if sort_key is SortKey.height_desc or sort_key is SortKey.height_asc:
         key = lambda i: (-i[1], i[0])
@@ -42,18 +50,27 @@ def make_figure(inp_: dict[str, float], sort_key: SortKey = SortKey.height_desc)
         if sort_key is SortKey.name_asc:
             reverse = True
 
-    sort: dict[str, float] = dict(sorted(inp_.items(), key=key, reverse=reverse))
-    names: list[str] = [*sort.keys()]
-    heights: list[float] = [*sort.values()]
+    combined = [(name, h, None) for name, h in inp_.items()] + [
+        (name, h, img) for name, (img, h) in ADDITIONAL.items()
+    ]
 
-    min_height: float = round(min(heights), -1) - 10
-    max_height: float = round(max(heights), -1) + 10
+    sort = sorted(combined, key=key, reverse=reverse)
+    names = [item[0] for item in sort]
+    heights = [item[1] for item in sort]
+
+    images = [item[2] for item in sort]
+
+    min_height: float = 0.0
+    max_height: float = round(max(heights), -1) + 25
 
     x = np.arange(len(names))
 
+    x_span = len(names) + 3
+    fig_width = max(min_fig_width_in, person_spacing_in * x_span)
+
     # figure and axis
     axes: Axes
-    _, axes = plt.subplots(figsize=(33.335, 6), layout="constrained")
+    fig, axes = plt.subplots(figsize=(fig_width, 6), layout="constrained")
 
     # x axis
     axes.set_xlabel("Person")
@@ -81,13 +98,15 @@ def make_figure(inp_: dict[str, float], sort_key: SortKey = SortKey.height_desc)
 
     axes.yaxis.set_major_locator(MultipleLocator(base=1 * 10))  # every 10 cm
     axes.yaxis.set_major_formatter("{x:.0f}")
-    axes.yaxis.set_minor_locator(MultipleLocator(base=1 * 2))  # every 2 cm
+    axes.yaxis.set_minor_locator(MultipleLocator(base=1 * 5))  # every 5 cm
     axes.yaxis.set_minor_formatter("{x:.0f}")
+    axes.yaxis.set_minor_formatter(NullFormatter())
 
     right_axes.yaxis.set_major_locator(MultipleLocator(base=2.54 * 12))  # every 12 in
     right_axes.yaxis.set_major_formatter(FuncFormatter(cm_to_ft_and_in))
-    right_axes.yaxis.set_minor_locator(MultipleLocator(base=2.54 * 1))  # every 1 in
+    right_axes.yaxis.set_minor_locator(MultipleLocator(base=2.54 * 6))  # every 6 in
     right_axes.yaxis.set_minor_formatter(FuncFormatter(cm_to_ft_and_in))
+    right_axes.yaxis.set_minor_formatter(NullFormatter())
 
     for tick in axes.get_yticklabels(which="minor"):
         tick.set_fontname("sans-serif")
@@ -95,45 +114,58 @@ def make_figure(inp_: dict[str, float], sort_key: SortKey = SortKey.height_desc)
     for tick in right_axes.get_yticklabels(which="minor"):
         tick.set_fontname("sans-serif")
 
-    # images
+    fig.canvas.draw()
+    ax_bbox = axes.get_position()
+    ax_width_in = ax_bbox.width * fig.get_figwidth()
+    ax_height_in = ax_bbox.height * fig.get_figheight()
+
+    x_range = axes.get_xlim()[1] - axes.get_xlim()[0]
+    y_range = axes.get_ylim()[1] - axes.get_ylim()[0]
+
+    inches_per_xunit = ax_width_in / x_range
+    inches_per_yunit = ax_height_in / y_range
+
     person = Image.open(PERSON).convert("RGBA")
 
-    scaled_heights = [(height - min_height) for height in heights]
-    raw_widths = np.array(scaled_heights) * (person.width / person.height)
+    for xs, height, custom_img in zip(x, heights, images, strict=False):
+        if custom_img:
+            image = Image.open(custom_img).convert("RGBA")
+        else:
+            image = Image.merge(
+                "RGBA",
+                (
+                    *ImageOps.colorize(
+                        ImageOps.grayscale(person),
+                        white=(0, 0, 0),
+                        black=(
+                            random.randint(210, 255),
+                            random.randint(130, 170),
+                            random.randint(225, 255),
+                        ),
+                    ).split(),  # r, g, b
+                    person.split()[-1],  # alpha
+                ),
+            )
 
-    w_min, w_max = raw_widths.min(), raw_widths.max()
-    scaled_widths = (raw_widths - w_min) / (w_max - w_min) * (3 - 1) + 1
+        height_extent = height - min_height
+        physical_height_in = height_extent * inches_per_yunit
+        physical_width_in = physical_height_in * (image.width / image.height)
+        width_extent = physical_width_in / inches_per_xunit
 
-    for xs, height, name in zip(x, heights, names, strict=False):
-        image = Image.merge(
-            "RGBA",
-            (
-                *ImageOps.colorize(
-                    ImageOps.grayscale(person),
-                    white=(0, 0, 0),
-                    black=(
-                        random.randint(210, 255),
-                        random.randint(130, 170),
-                        random.randint(225, 255),
-                    ),
-                ).split(),  # r, g, b
-                person.split()[-1],  # alpha
-            ),
-        )
-        if name == "MewTwo":
-            image = Image.open(MEWTWO).convert("RGBA")
-        elif name == "Steve Jobs":
-            image = Image.open(JOBS).convert("RGBA")
-        elif name == "Zero Two":
-            image = Image.open(ZERO).convert("RGBA")
         axes.imshow(
             np.array(image),
             aspect="auto",
             origin="upper",
-            extent=(xs - (scaled_widths[xs] / 2), xs + (scaled_widths[xs] / 2), min_height, height),
+            extent=(
+                xs - (width_extent / 2),
+                xs + (width_extent / 2),
+                min_height,
+                height,
+            ),
         )
-        axes.annotate(f"{height}", (xs, height), va="bottom", ha="center") # pyright: ignore[reportArgumentType]
-        axes.annotate(cm_to_ft_and_in(height, 0), (xs, height + 2), va="bottom", ha="center") # pyright: ignore[reportArgumentType]
+
+        label_text = f"{cm_to_ft_and_in(height, 0)}\n{height}"
+        axes.annotate(label_text, (xs, height + 3), va="bottom", ha="center")  # pyright: ignore[reportArgumentType]
 
     mean = sum(heights) / len(heights)
     axes.axhline(mean, color="red", ls="-.")
