@@ -51,8 +51,8 @@ def make_figure(
     names: list[str] = [*sort.keys()]
     heights: list[float] = [*sort.values()]
 
-    min_height: float = round(min(heights), -1) - 10
-    max_height: float = round(max(heights), -1) + 10
+    min_height: float = 0.0
+    max_height: float = round(max(heights), -1) + 25
 
     x = np.arange(len(names))
 
@@ -89,13 +89,15 @@ def make_figure(
 
     axes.yaxis.set_major_locator(MultipleLocator(base=1 * 10))  # every 10 cm
     axes.yaxis.set_major_formatter("{x:.0f}")
-    axes.yaxis.set_minor_locator(MultipleLocator(base=1 * 2))  # every 2 cm
+    axes.yaxis.set_minor_locator(MultipleLocator(base=1 * 5))  # every 5 cm
     axes.yaxis.set_minor_formatter("{x:.0f}")
+    axes.yaxis.set_minor_formatter(NullFormatter())
 
     right_axes.yaxis.set_major_locator(MultipleLocator(base=2.54 * 12))  # every 12 in
     right_axes.yaxis.set_major_formatter(FuncFormatter(cm_to_ft_and_in))
-    right_axes.yaxis.set_minor_locator(MultipleLocator(base=2.54 * 1))  # every 1 in
+    right_axes.yaxis.set_minor_locator(MultipleLocator(base=2.54 * 6))  # every 6 in
     right_axes.yaxis.set_minor_formatter(FuncFormatter(cm_to_ft_and_in))
+    right_axes.yaxis.set_minor_formatter(NullFormatter())
 
     for tick in axes.get_yticklabels(which="minor"):
         tick.set_fontname("sans-serif")
@@ -140,7 +142,6 @@ def make_figure(
                 ),
             )
 
-
         height_extent = height - min_height
         physical_height_in = height_extent * inches_per_yunit
         physical_width_in = physical_height_in * (image.width / image.height)
@@ -150,10 +151,16 @@ def make_figure(
             np.array(image),
             aspect="auto",
             origin="upper",
-            extent=(xs - (width_extent / 2), xs + (width_extent / 2), min_height, height),
+            extent=(
+                xs - (width_extent / 2),
+                xs + (width_extent / 2),
+                min_height,
+                height,
+            ),
         )
-        axes.annotate(f"{height}", (xs, height), va="bottom", ha="center") # pyright: ignore[reportArgumentType]
-        axes.annotate(cm_to_ft_and_in(height, 0), (xs, height + 2), va="bottom", ha="center") # pyright: ignore[reportArgumentType]
+
+        label_text = f"{cm_to_ft_and_in(height, 0)}\n{height}"
+        axes.annotate(label_text, (xs, height + 3), va="bottom", ha="center")  # pyright: ignore[reportArgumentType]
 
     mean = sum(heights) / len(heights)
     axes.axhline(mean, color="red", ls="-.")
