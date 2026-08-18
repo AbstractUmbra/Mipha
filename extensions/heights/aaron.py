@@ -16,9 +16,12 @@ if TYPE_CHECKING:
 
 RESOURCES_DIR = pathlib.Path(__file__).parent / "resources"
 PERSON = RESOURCES_DIR / "person.png"
-JOBS = RESOURCES_DIR / "steve_jobs.png"
-ZERO = RESOURCES_DIR / "zero_two.png"
-MEWTWO = RESOURCES_DIR / "mewtwo.png"
+
+ADDITIONAL = {
+    "Steve Jobs": (RESOURCES_DIR / "steve_jobs.png", 188.0),
+    "Zero Two": (RESOURCES_DIR / "zero_two.png", 170.0),
+    "Mew Two": (RESOURCES_DIR / "mewtwo.png", 201.0),
+}
 
 
 __all__ = ("make_figure",)
@@ -47,9 +50,15 @@ def make_figure(
         if sort_key is SortKey.name_asc:
             reverse = True
 
-    sort: dict[str, float] = dict(sorted(inp_.items(), key=key, reverse=reverse))
-    names: list[str] = [*sort.keys()]
-    heights: list[float] = [*sort.values()]
+    combined = [(name, h, None) for name, h in inp_.items()] + [
+        (name, h, img) for name, (img, h) in ADDITIONAL.items()
+    ]
+
+    sort = sorted(combined, key=key, reverse=reverse)
+    names = [item[0] for item in sort]
+    heights = [item[1] for item in sort]
+
+    images = [item[2] for item in sort]
 
     min_height: float = 0.0
     max_height: float = round(max(heights), -1) + 25
@@ -118,13 +127,9 @@ def make_figure(
 
     person = Image.open(PERSON).convert("RGBA")
 
-    for xs, height, name in zip(x, heights, names, strict=False):
-        if name == "MewTwo":
-            image = Image.open(MEWTWO).convert("RGBA")
-        elif name == "Steve Jobs":
-            image = Image.open(JOBS).convert("RGBA")
-        elif name == "Zero Two":
-            image = Image.open(ZERO).convert("RGBA")
+    for xs, height, custom_img in zip(x, heights, images, strict=False):
+        if custom_img:
+            image = Image.open(custom_img).convert("RGBA")
         else:
             image = Image.merge(
                 "RGBA",
