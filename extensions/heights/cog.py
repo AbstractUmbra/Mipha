@@ -21,17 +21,25 @@ if TYPE_CHECKING:
     from bot import Mipha
     from utilities.context import Interaction
 
-DANNYWARE_ID: int = 149998214810959872
-
 DB_SCHEMA_FILE = pathlib.Path(__file__).parent / "schema.sql"
 
 
-def pred(guild: discord.Guild, id_: int) -> bool:
-    return id_ in range(1, 10) or bool(guild.get_member(id_))
+def get_scope(interaction: Interaction) -> int:
+    if interaction.guild:
+        return interaction.guild.id
+    elif interaction.channel and interaction.channel.type == discord.ChannelType.group:
+        return interaction.channel.id
+
+    raise InvalidScope
+
+
+class InvalidScope(app_commands.AppCommandError): ...
 
 
 class HeightTransformer(app_commands.Transformer):
-    height_regex: re.Pattern[str] = re.compile(r"(?P<feet>\d(?:\'|ft)\d{1,2}\"?)|(?P<cm>\d{2,3}(?:\.\d)?(?:cm)?)")
+    height_regex: re.Pattern[str] = re.compile(
+        r"(?P<feet>\d(?:\'|ft)\d{1,2}\"?)|(?P<cm>\d{2,3}(?:\.\d)?(?:cm)?)"
+    )
 
     def feetinch_to_cm(self, value: str) -> float:
         value = value.replace("ft", "'")
@@ -46,7 +54,7 @@ class HeightTransformer(app_commands.Transformer):
 
         return feet_calc + inch_calc
 
-    async def transform(self, interaction: Interaction, value: str) -> float:
+    async def transform(self, _: Interaction, value: str) -> float:
         match = self.height_regex.search(value)
         if not match:
             raise ValueError("Unable to parse input for height.")
@@ -59,7 +67,6 @@ class HeightTransformer(app_commands.Transformer):
         return float(cm_group.removesuffix("cm"))
 
 
-@app_commands.guilds(discord.Object(id=DANNYWARE_ID), discord.Object(id=705500489248145459))
 class Heights(commands.GroupCog):
     def __init__(self, bot: Mipha, /, pool: asqlite.Pool) -> None:
         self.bot = bot
@@ -73,28 +80,74 @@ class Heights(commands.GroupCog):
     async def cog_unload(self) -> None:
         await self.pool.close()
 
-    async def fetch_all_records(self) -> list[Row]:
-        async with self.pool.acquire() as conn:
-            return await conn.fetchall("SELECT * FROM heights;")
+    async def cog_app_command_error(
+        self, interaction: Interaction, error: app_commands.AppCommandError
+    ):
+        strat = (
+            interaction.response.send_message
+            if not interaction.response.is_done()
+            else interaction.followup.send
+        )
 
-    async def set_record(self, *, user_id: int, name: str, height: float) -> None:
+        if isinstance(error, InvalidScope):
+            return await strat(
+                "This command can only be used in Servers or Group DMs.",
+                ephemeral=True,
+            )
+        elif isinstance(error, app_commands.TransformerError):
+            return await strat(
+                "Unable to convert your input into a height.",
+                ephemeral=True,
+            )
+
+        raise error
+
+    async def fetch_scoped_records(self, scope_id: int) -> list[Row]:
         async with self.pool.acquire() as conn:
-            await conn.execute("INSERT OR REPLACE INTO heights VALUES (?, ?, ?);", user_id, name, height)
+            return await conn.fetchall(
+                "SELECT * FROM heights WHERE scope_id = ?;", scope_id
+            )
+
+    async def set_record(
+        self,
+        *,
+        user_id: int,
+        scope_id: int,
+        name: str,
+        height: float,
+    ) -> None:
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "INSERT OR REPLACE INTO heights VALUES (?, ?, ?, ?);",
+                user_id,
+                scope_id,
+                name,
+                height,
+            )
 
     @app_commands.command(name="image")
-    @app_commands.describe(ephemeral="Whether to hide the output of the command, or not.", sort="The way to sort the image.")
-    @app_commands.guild_only()
+    @app_commands.describe(
+        ephemeral="Whether to hide the output of the command, or not.",
+        sort="The way to sort the image.",
+    )
+    @app_commands.allowed_contexts(guilds=True, private_channels=True, dms=False)
     async def get_height_image(
-        self, interaction: Interaction, sort: SortKey = SortKey.height_desc, ephemeral: bool = False
+        self,
+        interaction: Interaction,
+        sort: SortKey = SortKey.height_desc,
+        ephemeral: bool = False,
     ) -> None:
         """Retrieve all stored heights based on current guild members."""
-        assert interaction.guild
+
+        scope_id = get_scope(interaction)
 
         await interaction.response.defer(ephemeral=ephemeral)
-        await interaction.guild.chunk()
 
-        rows = await self.fetch_all_records()
-        transformed = {r["name"]: r["height"] for r in rows if pred(interaction.guild, r["user_id"])}
+        rows = await self.fetch_scoped_records(scope_id)
+        if not rows:
+            return await interaction.followup.send("No heights recorded yet.")
+
+        transformed = {r["name"]: r["height"] for r in rows}
 
         buff = await asyncio.to_thread(make_figure, transformed, sort_key=sort)
 
@@ -102,6 +155,7 @@ class Heights(commands.GroupCog):
 
     @app_commands.command(name="set")
     @app_commands.describe(height="Your height in centimetres, or feet'inches")
+    @app_commands.allowed_contexts(guilds=True, private_channels=True, dms=False)
     async def set_height(
         self,
         interaction: Interaction,
@@ -110,34 +164,53 @@ class Heights(commands.GroupCog):
     ) -> None:
         """Sets your height!"""
         if height >= 210 or height <= 60:
-            await interaction.response.send_message("I think you're lying.", ephemeral=True)
+            await interaction.response.send_message(
+                "I think you're lying.", ephemeral=True
+            )
+
             return None
 
-        view = ConfirmationView(timeout=15, author_id=interaction.user.id, delete_after=True)
+        scope_id = get_scope(interaction)
+
+        view = ConfirmationView(
+            timeout=15, author_id=interaction.user.id, delete_after=True
+        )
         await interaction.response.send_message(
-            content=f"Setting {height}cm as your height, confirm?", view=view, ephemeral=True
+            content=f"Setting {height}cm as your height, confirm?",
+            view=view,
+            ephemeral=True,
         )
 
         await view.wait()
 
         if view.value is True:
-            await self.set_record(user_id=interaction.user.id, name=display_name or interaction.user.name, height=height)
+            await self.set_record(
+                user_id=interaction.user.id,
+                scope_id=scope_id,
+                name=display_name or interaction.user.name,
+                height=height,
+            )
             await interaction.edit_original_response(content="Set!")
             return None
 
-        return await interaction.followup.send("Height not confirmed, aborting.", ephemeral=True)
-
-    @set_height.error
-    async def set_height_handler(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
-        if isinstance(error, app_commands.TransformerError):
-            await interaction.response.send_message("Unable to convert your input into a height.", ephemeral=True)
+        return await interaction.followup.send(
+            "Height not confirmed, aborting.", ephemeral=True
+        )
 
     @app_commands.command(name="delete")
+    @app_commands.allowed_contexts(guilds=True, private_channels=True, dms=False)
     async def delete_height(self, interaction: Interaction) -> None:
         """Remove any height data stored on you."""
+
+        scope_id = get_scope(interaction)
+
         await interaction.response.defer(ephemeral=True)
 
         async with self.pool.acquire() as conn:
-            await conn.execute("DELETE FROM heights WHERE user_id = ?;", interaction.user.id)
+            await conn.execute(
+                "DELETE FROM heights WHERE user_id = ? AND scope_id = ?;",
+                interaction.user.id,
+                scope_id,
+            )
 
         await interaction.followup.send("Gone.", ephemeral=True)

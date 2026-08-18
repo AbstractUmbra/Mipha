@@ -1,10 +1,8 @@
 CREATE TABLE IF NOT EXISTS heights (
-    user_id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    scope_id BIGINT NOT NULL,
     name TEXT NOT NULL,
-    height REAL NOT NULL
-);
+    height REAL NOT NULL,
 
-INSERT OR IGNORE INTO heights VALUES
-    (1, 'MewTwo', 201),
-    (2, 'Steve Jobs', 188),
-    (3, 'Zero Two', 177);
+    PRIMARY KEY (scope_id, user_id)
+);
