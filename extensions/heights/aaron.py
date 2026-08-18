@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import matplotlib.pyplot as plt
 import numpy as np
 from discord import Enum
-from matplotlib.ticker import FuncFormatter, MultipleLocator
+from matplotlib.ticker import FuncFormatter, MultipleLocator, NullFormatter
 from PIL import Image, ImageOps
 
 if TYPE_CHECKING:
