@@ -39,7 +39,7 @@ license-files = ["LICEN[CS]E"]
 [dependency-groups]
 dev = ["ruff", "asyncpg-stubs", "pre-commit"]
 minecraft = [
-    "mcstatus>=13.1.0",
+    "mcstatus>=14.0.0",
     "rcon @ git+https://github.com/conqp/rcon.git@master",
 ]
 
