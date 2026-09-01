@@ -168,7 +168,7 @@ class VoiceStalking(commands.Cog):
         config = self._create_default_config()
         await self._config.put(ctx.guild.id, config)
 
-        return await ctx.message.add_reaction(ctx.tick(True))  # noqa: FBT003
+        return await ctx.message.add_reaction(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call]
 
     @stalking.command()
     @commands.guild_only()

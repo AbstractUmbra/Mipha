@@ -78,7 +78,7 @@ def object_at(addr: int) -> Any | None:
     return None
 
 
-class Stats(commands.Cog):  # noqa: PLR0904
+class Stats(commands.Cog):  # ruff: ignore[too-many-public-methods]
     """Bot usage statistics."""
 
     def __init__(self, bot: Mipha) -> None:
@@ -722,7 +722,7 @@ class Stats(commands.Cog):  # noqa: PLR0904
 
     @commands.command(hidden=True)
     @commands.is_owner()
-    async def bothealth(self, ctx: Context) -> None:  # noqa: PLR0914, PLR0915
+    async def bothealth(self, ctx: Context) -> None:  # ruff: ignore[too-many-locals, too-many-statements]
         """Various bot health monitoring tools."""
 
         # This uses a lot of private methods because there is no
@@ -773,8 +773,8 @@ class Stats(commands.Cog):  # noqa: PLR0904
         all_tasks = asyncio.all_tasks(loop=self.bot.loop)
         event_tasks = [t for t in all_tasks if "Client._run_event" in repr(t) and not t.done()]
 
-        cogs_directory = os.path.dirname(__file__)  # noqa: PTH120
-        tasks_directory = os.path.join("discord", "ext", "tasks", "__init__.py")  # noqa: PTH118
+        cogs_directory = os.path.dirname(__file__)  # ruff: ignore[os-path-dirname]
+        tasks_directory = os.path.join("discord", "ext", "tasks", "__init__.py")  # ruff: ignore[os-path-join]
         inner_tasks = [t for t in all_tasks if cogs_directory in repr(t) or tasks_directory in repr(t)]
 
         bad_inner_tasks = ", ".join(hex(id(t)) for t in inner_tasks if t.done() and t._exception is not None)
@@ -1088,7 +1088,7 @@ async def setup(bot: Mipha) -> None:
     commands.Bot.on_error = on_error
 
 
-async def teardown(bot: Mipha) -> None:  # noqa: RUF029 # required for extension loading
+async def teardown(bot: Mipha) -> None:  # ruff: ignore[unused-async] # required for extension loading
     commands.Bot.on_error = old_on_error
     logging.getLogger().removeHandler(bot._stats_cog_gateway_handler)
     del bot._stats_cog_gateway_handler

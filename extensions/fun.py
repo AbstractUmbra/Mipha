@@ -94,7 +94,7 @@ class Fun(commands.Cog):
         self.deepl_key: str | None = deepl_key
 
     # @commands.Cog.listener("on_message")
-    async def quote(self, message: discord.Message) -> None:  # noqa: PLR0911
+    async def quote(self, message: discord.Message) -> None:  # ruff: ignore[too-many-return-statements]
         if message.author.bot or message.embeds or message.guild is None:
             return
 
@@ -231,7 +231,7 @@ class Fun(commands.Cog):
             draw = ImageDraw.Draw(image)
             left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
             w, h = right - left, bottom - top
-            images[index] = image = image.resize((round(w + padding), round(h + padding)))  # noqa: PLW2901 # correct usage
+            images[index] = image = image.resize((round(w + padding), round(h + padding)))  # ruff: ignore[redefined-loop-name] # correct usage
             draw = ImageDraw.Draw(image)
             draw.multiline_text((padding / 2, padding / 2), text=text, fill=colour, font=font)
         background, foreground = images
@@ -244,7 +244,7 @@ class Fun(commands.Cog):
         return buf
 
     def random_words(self, amount: int) -> list[str]:
-        with open("utilities/shared/scrabble.txt", encoding="utf8") as fp:  # noqa: PTH123
+        with open("utilities/shared/scrabble.txt", encoding="utf8") as fp:  # ruff: ignore[builtin-open]
             words = fp.readlines()
 
         return random.sample(words, amount)
@@ -287,7 +287,7 @@ class Fun(commands.Cog):
             ):
                 winners[message.author] = time.time() - start
                 is_ended.set()
-                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))  # noqa: FBT003 # shortcut
+                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
             return False
 
         task = ctx.bot.loop.create_task(ctx.bot.wait_for("message", check=check))
@@ -342,7 +342,7 @@ class Fun(commands.Cog):
         members = list(itertools.chain.from_iterable([c.members for c in ctx.guild.voice_channels]))
 
         upper = math.ceil(len(members) / 2)
-        choices = random.choices(members, k=upper)  # noqa: S311 # not crypto
+        choices = random.choices(members, k=upper)  # ruff: ignore[suspicious-non-cryptographic-random-usage] # not crypto
 
         await asyncio.gather(*[m.move_to(None) for m in choices])
 
@@ -366,7 +366,7 @@ class Fun(commands.Cog):
         output_buffer = io.BytesIO()
         with Image.open(buffer) as image, Image.open(resolved_path) as bricks:
             new_size = legofy.get_new_size(image, bricks, None)
-            image = image.resize(new_size, Image.Resampling.LANCZOS)  # noqa: PLW2901 # correct usage
+            image = image.resize(new_size, Image.Resampling.LANCZOS)  # ruff: ignore[redefined-loop-name] # correct usage
 
             pil_image = legofy.make_lego_image(image, bricks)
             pil_image.save(output_buffer, "png")
@@ -406,7 +406,7 @@ class Fun(commands.Cog):
                 raise commands.BadArgument("The passed emoji must be a custom emoji, sorry.")
             bytes_ = await target.read()
         elif isinstance(target, str):
-            try:  # noqa: PLW0717
+            try:  # ruff: ignore[too-many-statements-in-try-clause]
                 async with ctx.bot.session.get(target) as resp:
                     bytes_ = await resp.read()
                     try:

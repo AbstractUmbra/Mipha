@@ -60,11 +60,11 @@ JISHO_REPLACEMENTS = {
     "tags": "Notes",
     "see_also": "See Also",
 }
-JLPT_N1 = list(csv.reader(open("static/jlpt/n1.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
-JLPT_N2 = list(csv.reader(open("static/jlpt/n2.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
-JLPT_N3 = list(csv.reader(open("static/jlpt/n3.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
-JLPT_N4 = list(csv.reader(open("static/jlpt/n4.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
-JLPT_N5 = list(csv.reader(open("static/jlpt/n5.csv", encoding="utf-8")))  # noqa: SIM115, PTH123
+JLPT_N1 = list(csv.reader(open("static/jlpt/n1.csv", encoding="utf-8")))  # ruff: ignore[open-file-with-context-handler, builtin-open]
+JLPT_N2 = list(csv.reader(open("static/jlpt/n2.csv", encoding="utf-8")))  # ruff: ignore[open-file-with-context-handler, builtin-open]
+JLPT_N3 = list(csv.reader(open("static/jlpt/n3.csv", encoding="utf-8")))  # ruff: ignore[open-file-with-context-handler, builtin-open]
+JLPT_N4 = list(csv.reader(open("static/jlpt/n4.csv", encoding="utf-8")))  # ruff: ignore[open-file-with-context-handler, builtin-open]
+JLPT_N5 = list(csv.reader(open("static/jlpt/n5.csv", encoding="utf-8")))  # ruff: ignore[open-file-with-context-handler, builtin-open]
 JLPT_LOOKUP = MemeDict(
     {
         ("n1", "ｎ１", "1", "１"): JLPT_N1,
@@ -204,7 +204,7 @@ class JishoKanji:
                 href = item.get("href")
                 if href is None:
                     raise ValueError("Somethign was None that should not be None.")
-                link = f"https://{href.lstrip('//')}"  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad  # noqa: B005 # correct usage
+                link = f"https://{href.lstrip('//')}"  # pyright: ignore[reportAttributeAccessIssue] # bs4 types are bad  # ruff: ignore[strip-with-multi-characters] # correct usage
                 fmt.append((text, link))
 
         return fmt
@@ -505,7 +505,7 @@ class Nihongo(commands.Cog):
             draw = ImageDraw.Draw(image)
             left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
             w, h = right - left, bottom - top
-            images[index] = image = image.resize((round(w + padding), round(h + padding)))  # noqa: PLW2901 # correct usage
+            images[index] = image = image.resize((round(w + padding), round(h + padding)))  # ruff: ignore[redefined-loop-name] # correct usage
             draw = ImageDraw.Draw(image)
             draw.multiline_text((padding / 2, padding / 2), text=text, fill=colour, font=font)
         background, foreground = images
@@ -548,7 +548,7 @@ class Nihongo(commands.Cog):
         await ctx.send("Kana-racing begins in 5 seconds.")
         await asyncio.sleep(5)
 
-        randomized_kana = "".join(random.choices(chars, k=amount))  # noqa: S311 # not crypto
+        randomized_kana = "".join(random.choices(chars, k=amount))  # ruff: ignore[suspicious-non-cryptographic-random-usage] # not crypto
 
         func = partial(self._draw_kana, randomized_kana)
         image = await ctx.bot.loop.run_in_executor(None, func)
@@ -568,7 +568,7 @@ class Nihongo(commands.Cog):
             ):
                 winners[message.author] = time.time() - start
                 is_ended.set()
-                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))  # noqa: FBT003 # shortcut
+                ctx.bot.loop.create_task(message.add_reaction(ctx.tick(True)))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
             return False
 
         task = ctx.bot.loop.create_task(ctx.bot.wait_for("message", check=check))
@@ -600,12 +600,12 @@ class Nihongo(commands.Cog):
     async def jlpt(
         self,
         ctx: Context,
-        level: list[str] = commands.param(converter=JLPTConverter, default=JLPT_N5, displayed_default="n5"),  # noqa: B008 # this is how commands.param works
+        level: list[str] = commands.param(converter=JLPTConverter, default=JLPT_N5, displayed_default="n5"),  # ruff: ignore[function-call-in-default-argument] # this is how commands.param works
     ) -> None:
         """
         Returns a random word from the specified JLPT level.
         """
-        word, reading, meaning, _ = random.choice(level)  # noqa: S311 # not crypto
+        word, reading, meaning, _ = random.choice(level)  # ruff: ignore[suspicious-non-cryptographic-random-usage] # not crypto
         embed = discord.Embed(title=word, description=meaning, colour=discord.Colour.random())
         embed.add_field(name="Reading", value=f"『{reading}』")
 

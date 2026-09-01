@@ -156,6 +156,7 @@ class RTFSView(discord.ui.View):
 class RTFXDetails(NamedTuple):
     raw_url: str | None
     token: str | None
+    enabled: bool | None = False
 
     @property
     def url(self) -> URL | None:
@@ -182,7 +183,7 @@ class RTFX(commands.Cog):
     )
 
     def parse_object_inv(self, stream: SphinxObjectFileReader, url: str) -> dict[str, str]:
-        # key: URL  # noqa: ERA001
+        # key: URL  # ruff: ignore[commented-out-code]
         # n.b.: key doesn't have `discord` or `discord.ext.commands` namespaces
         result: dict[str, str] = {}
 
@@ -232,7 +233,7 @@ class RTFX(commands.Cog):
             if projname == "discord.py":
                 key = key.replace("discord.ext.commands.", "").replace("discord.", "")
 
-            result[f"{prefix}{key}"] = os.path.join(url, location)  # noqa: PTH118 # we're actually using this on a url for safe appending
+            result[f"{prefix}{key}"] = os.path.join(url, location)  # ruff: ignore[os-path-join] # we're actually using this on a url for safe appending
 
         return result
 
@@ -437,16 +438,20 @@ class RTFX(commands.Cog):
         exact="If you want to access the item by the exact name you're passing.",
         ephemeral="If you want this command execution to be private.",
     )
-    async def rtfs_callback(  # noqa: PLR0917
+    async def rtfs_callback(  # ruff: ignore[too-many-positional-arguments]
         self,
         interaction: Interaction,
         library: Libraries,
         search: str,
         limit: int = 3,
-        exact: bool = False,  # noqa: FBT001, FBT002 # required for slash parameters
-        ephemeral: bool = False,  # noqa: FBT001, FBT002 # required for slash parameters
+        exact: bool = False,  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument] # required for slash parameters
+        ephemeral: bool = False,  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument] # required for slash parameters
     ) -> None:
         """RTFM command for loading source code/searching from libraries."""
+        if not self.rtfs.enabled:
+            await interaction.response.send_message("This feature is currently disabled, sorry.", ephemeral=True)
+            return
+
         limit = min(max(3, limit), 25)
 
         rtfs = await self._get_rtfs(library=library, search=search, limit=limit, exact=exact)
@@ -461,6 +466,9 @@ class RTFX(commands.Cog):
     @app_commands.checks.dynamic_cooldown(_rtfs_refresh_cooldown)
     async def rtfs_refresh(self, interaction: Interaction) -> None:
         """Schedules an update of the RTFS library code in the API."""
+        if not self.rtfs.enabled:
+            await interaction.response.send_message("This feature is currently disabled, sorry.", ephemeral=True)
+            return None
         await interaction.response.defer(ephemeral=True)
 
         success = await self._update_rtfs()
@@ -496,11 +504,15 @@ class RTFX(commands.Cog):
         ctx: Context,
         python_version: str = commands.param(converter=PythonVersionConverter, default="3.13"),
         *,
-        codeblock: Codeblock = commands.param(converter=codeblock_converter),  # noqa: B008 # this is how commands.param works
+        codeblock: Codeblock = commands.param(converter=codeblock_converter),  # ruff: ignore[function-call-in-default-argument] # this is how commands.param works
     ) -> None:
         """
         Evaluates Python code through the latest (installed) version of Pyright on my system.
         """
+        if not self.pyright.enabled:
+            await ctx.send("This feature is currently disabled, sorry.", ephemeral=True)
+            return None
+
         code = codeblock.content
 
         try:
@@ -516,6 +528,6 @@ class RTFX(commands.Cog):
 async def setup(bot: Mipha) -> None:
     rtfs_config = bot.config.get("rtfs", {})
     pyright_config = bot.config.get("pyright", {})
-    rtfs = RTFXDetails(rtfs_config.get("url"), rtfs_config.get("token"))
-    pyright = RTFXDetails(pyright_config.get("url"), pyright_config.get("token"))
+    rtfs = RTFXDetails(rtfs_config.get("url"), rtfs_config.get("token"), rtfs_config.get("enabled"))
+    pyright = RTFXDetails(pyright_config.get("url"), pyright_config.get("token"), pyright_config.get("enabled"))
     await bot.add_cog(RTFX(bot, rtfs=rtfs, pyright=pyright))

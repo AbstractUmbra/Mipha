@@ -46,7 +46,7 @@ class TimezoneSource(SimpleListSource[tuple[str, datetime.timedelta]]):
             return seconds // (60 * 60)
 
         for member_str, offset in entries:
-            offset = offset or datetime.timedelta(0)  # noqa: PLW2901 # shortcircuit
+            offset = offset or datetime.timedelta(0)  # ruff: ignore[redefined-loop-name] # shortcircuit
 
             houred_offset = to_hour(offset)
             tz_dict[houred_offset].append(member_str)

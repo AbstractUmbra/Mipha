@@ -78,7 +78,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         pages = []
 
         for cog, cmds in mapping.items():
-            cmds = await self.filter_commands(cmds, sort=True)  # noqa: PLW2901 # correct usage
+            cmds = await self.filter_commands(cmds, sort=True)  # ruff: ignore[redefined-loop-name] # correct usage
             await self.format_commands(cog, cmds, pages=pages)
 
         total = len(pages)

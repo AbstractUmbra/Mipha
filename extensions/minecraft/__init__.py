@@ -3,7 +3,7 @@ from __future__ import annotations
 import pathlib
 from typing import TYPE_CHECKING
 
-from discord.utils import _from_json  # noqa: PLC2701 # this is okay
+from discord.utils import _from_json  # ruff: ignore[import-private-name] # this is okay
 
 if TYPE_CHECKING:
     from bot import Mipha
@@ -28,6 +28,6 @@ async def setup(bot: Mipha) -> None:
 
     data: dict[str, Details] = _from_json(config_path.read_text(encoding="utf-8"))
 
-    from .cog import Minecraft  # noqa: PLC0415
+    from .cog import Minecraft  # ruff: ignore[import-outside-top-level]
 
     await bot.add_cog(Minecraft(bot, config=data))

@@ -159,7 +159,7 @@ class MangaCog(commands.Cog, name="Manga"):
         self,
         ctx: Context,
         *,
-        item: hondana.Manga | hondana.Chapter | hondana.Author = commands.param(converter=MangaDexConverter),  # noqa: B008 # this is how commands.param works
+        item: hondana.Manga | hondana.Chapter | hondana.Author = commands.param(converter=MangaDexConverter),  # ruff: ignore[function-call-in-default-argument] # this is how commands.param works
     ) -> None:
         """
         This command takes a mangadex link to a chapter or manga and returns the data.

@@ -249,7 +249,7 @@ class Context[CogT_co: commands.Cog](commands.Context["Mipha"]):
         await view.wait()
         return view.value
 
-    def tick(self, opt: bool | None, label: str | None = None) -> str:  # noqa: FBT001 # shortcut
+    def tick(self, opt: bool | None, label: str | None = None) -> str:  # ruff: ignore[boolean-type-hint-positional-argument] # shortcut
         lookup = {
             True: "<:TickYes:735498312861351937>",
             False: "<:CrossNo:735498453181923377>",

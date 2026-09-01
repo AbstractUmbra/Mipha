@@ -60,40 +60,40 @@ extend-exclude = ["extensions/heights"]
 preview = true
 select = ["ALL"]
 ignore = [
-    "ANN401",
-    "ASYNC109", # dpy commonly uses this parameter
-    "ASYNC240", # i don't like trio/anyio
-    "C901",
-    "COM812",
-    "CPY001",
+    "any-type",
+    "async-function-with-timeout", # dpy commonly uses this parameter
+    "blocking-path-method-in-async-function", # i don't like trio/anyio
+    "complex-structure",
+    "missing-trailing-comma",
+    "missing-copyright-notice",
     "D",        # not needed here
     "DOC",
-    "EM101",    # in this case this is okay
-    "F401",
-    "F402",
-    "F403",
-    "F405",
-    "INP001",   # due to how I load modules this results in annoyances
-    "PD011",    # this is not a numpy codebase
-    "PERF203",
-    "PLC0414",  # pyright ruling for `as` imports needed
-    "PLR0912",
-    "PLR0913",
-    "PLR2004",  # I hate this rule
-    "PLR6301",
-    "Q000",
-    "RUF001",
-    "RUF009",
-    "RUF067",   # we do some stuff here
-    "S101",     # assert is used for type checking in this codebase
-    "SLF001",
-    "SIM105",
-    "TRY003",   # over-eager rule
-    "TRY301",   # unrealistic rule
-    "UP034",
+    "raw-string-in-exception",    # in this case this is okay
+    "unused-import",
+    "import-shadowed-by-loop-var",
+    "undefined-local-with-import-star",
+    "undefined-local-with-import-star-usage",
+    "implicit-namespace-package",   # due to how I load modules this results in annoyances
+    "pandas-use-of-dot-values",    # this is not a numpy codebase
+    "try-except-in-loop",
+    "useless-import-alias",  # pyright ruling for `as` imports needed
+    "too-many-branches",
+    "too-many-arguments",
+    "magic-value-comparison",  # I hate this rule
+    "no-self-use",
+    "bad-quotes-inline-string",
+    "ambiguous-unicode-character-string",
+    "function-call-in-dataclass-default-argument",
+    "non-empty-init-module",   # we do some stuff here
+    "assert",     # assert is used for type checking in this codebase
+    "private-member-access",
+    "suppressible-exception",
+    "raise-vanilla-args",   # over-eager rule
+    "raise-within-try",   # unrealistic rule
+    "extraneous-parentheses",
 ]
 unfixable = [
-    "E501", # line length handled in other ways by ruff format
+    "line-too-long", # line length handled in other ways by ruff format
     "ERA",  # Don't delete commented out code
 ]
 

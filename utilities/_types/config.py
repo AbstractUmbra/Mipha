@@ -27,11 +27,13 @@ class DatabaseConfig(TypedDict):
 
 
 class RTFSConfig(TypedDict):
+    enabled: bool
     url: str
     token: str
 
 
 class PyrightConfig(TypedDict):
+    enabled: bool
     url: str
     token: str
 
@@ -39,13 +41,6 @@ class PyrightConfig(TypedDict):
 class SonarrConfig(TypedDict):
     url: str
     token: str
-
-
-class RedisConfig(TypedDict):
-    url: str
-    port: int
-    password: str
-    mock: bool
 
 
 class WebhookConfig(TypedDict):
@@ -69,6 +64,8 @@ class MangaDexConfig(TypedDict):
 
 
 class UploaderConfig(TypedDict):
+    url: str
+    port: NotRequired[int]
     token: str
 
 
@@ -126,4 +123,3 @@ class RootConfig(TypedDict, total=False):
     duckling: DucklingConfig
     lewd: LewdConfig
     logging_webhooks: dict[str, Logging]  # guild_id: [channels]
-    pythonista: PythonistaConfig

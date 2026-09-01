@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-import datetime  # noqa: TC003 # dpy needs this at runtime
+import datetime  # ruff: ignore[typing-only-standard-library-import] # dpy needs this at runtime
 import inspect
 import os
 import traceback
@@ -22,7 +22,9 @@ from discord.ext import commands
 
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import checks, formats
-from utilities.shared.converters import DatetimeTransformer  # noqa: TC001 # dpy needs this at runtime
+from utilities.shared.converters import (
+    DatetimeTransformer,  # ruff: ignore[typing-only-first-party-import] # dpy needs this at runtime
+)
 from utilities.shared.formats import ts
 
 if TYPE_CHECKING:
@@ -55,11 +57,11 @@ _current = contextvars.ContextVar[Interaction]("_current")
 
 
 class PatchedContext(Context):
-    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN003, ANN002
+    def __init__(self, *args, **kwargs) -> None:  # ruff: ignore[missing-type-kwargs, missing-type-args]
         super().__init__(*args, **kwargs)
         self.first_interaction_sent: bool = False
 
-    async def send(self, content: str | None = None, **kwargs) -> discord.Message | None:  # noqa: ANN003
+    async def send(self, content: str | None = None, **kwargs) -> discord.Message | None:  # ruff: ignore[missing-type-kwargs]
         if not self.first_interaction_sent:
             self.first_interaction_sent = True
 
@@ -71,11 +73,11 @@ class PatchedContext(Context):
         return await super().send(content=content, **kwargs)
 
     @contextlib.asynccontextmanager
-    async def typing(self, *_, **__) -> AsyncGenerator[None]:  # noqa: ANN003, ANN002
+    async def typing(self, *_, **__) -> AsyncGenerator[None]:  # ruff: ignore[missing-type-kwargs, missing-type-args]
         yield
 
 
-class Meta(commands.Cog):  # noqa: PLR0904
+class Meta(commands.Cog):  # ruff: ignore[too-many-public-methods]
     """Commands for utilities related to Discord or the Bot itself."""
 
     def __init__(self, bot: Mipha) -> None:
@@ -150,7 +152,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
         self,
         interaction: discord.Interaction,
         when: app_commands.Transform[datetime.datetime, DatetimeTransformer],
-        ephemeral: bool = True,  # noqa: FBT001, FBT002 # required for d.py callbacks
+        ephemeral: bool = True,  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument] # required for d.py callbacks
     ) -> None:
         """
         Enter a date and/or time to get a discord formatted datetime for it.
@@ -228,9 +230,9 @@ class Meta(commands.Cog):  # noqa: PLR0904
         try:
             await self.bot._set_guild_prefixes(ctx.guild, current_prefixes)
         except commands.TooManyArguments as e:
-            await ctx.send(f"{ctx.tick(False)} {e}")  # noqa: FBT003 # shortcut
+            await ctx.send(f"{ctx.tick(False)} {e}")  # ruff: ignore[boolean-positional-value-in-call] # shortcut
         else:
-            await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
+            await ctx.send(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @prefix_add.error
     async def prefix_add_error(self, ctx: Context, error: commands.CommandError) -> None:
@@ -264,9 +266,9 @@ class Meta(commands.Cog):  # noqa: PLR0904
         try:
             await self.bot._set_guild_prefixes(ctx.guild, current_prefixes)
         except commands.TooManyArguments as e:
-            await ctx.send(f"{ctx.tick(False)} {e}")  # noqa: FBT003 # shortcut
+            await ctx.send(f"{ctx.tick(False)} {e}")  # ruff: ignore[boolean-positional-value-in-call] # shortcut
         else:
-            await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
+            await ctx.send(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @prefix.command(name="clear")
     @checks.is_mod()
@@ -280,7 +282,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
         assert ctx.guild is not None
 
         await self.bot._set_guild_prefixes(ctx.guild, [])
-        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
+        await ctx.send(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @commands.command()
     async def source(self, ctx: Context, *, command: str | None = None) -> None:
@@ -391,7 +393,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
 
     @commands.command(aliases=["guildinfo"], usage="")
     @commands.guild_only()
-    async def serverinfo(self, ctx: GuildContext, *, guild_id: int | None = None) -> None:  # noqa: PLR0914, PLR0915
+    async def serverinfo(self, ctx: GuildContext, *, guild_id: int | None = None) -> None:  # ruff: ignore[too-many-locals, too-many-statements]
         """Shows info about the current server."""
 
         if guild_id is not None and await self.bot.is_owner(ctx.author):
@@ -467,7 +469,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
 
         for feature, label in all_features.items():
             if feature in features:
-                info.append(f"{ctx.tick(True)}: {label}")  # noqa: FBT003 # shortcut
+                info.append(f"{ctx.tick(True)}: {label}")  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
         if info:
             e.add_field(name="Features", value="\n".join(info))
@@ -516,7 +518,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
         allowed, denied = [], []
 
         for name, value in permissions:
-            name = name.replace("_", " ").replace("guild", "server").title()  # noqa: PLW2901 # correct usage
+            name = name.replace("_", " ").replace("guild", "server").title()  # ruff: ignore[redefined-loop-name] # correct usage
             if value:
                 allowed.append(name)
             else:
@@ -576,7 +578,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
     async def debugpermissions(
         self,
         ctx: Context,
-        channel: MessageableGuildChannel = commands.param(converter=GuildChannel),  # noqa: B008 # this is how commands.param works
+        channel: MessageableGuildChannel = commands.param(converter=GuildChannel),  # ruff: ignore[function-call-in-default-argument] # this is how commands.param works
         author: discord.Member | None = None,
     ) -> None:
         """Shows permission resolution for a channel and an optional author."""
@@ -605,7 +607,7 @@ class Meta(commands.Cog):  # noqa: PLR0904
             msg = f"Message with the ID of {message.id} cannot be found in <#{message.channel.id}>."
             raise commands.BadArgument(msg) from err
 
-        # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")  # noqa: ERA001
+        # msg["content"] = msg["content"].replace("ð", "d").replace("Ð", "D").replace("þ", "th").replace("Þ", "Th")  # ruff: ignore[commented-out-code]
         # thanks daggy
 
         await ctx.send(

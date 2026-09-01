@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Literal
 import aiohttp
 import discord
 from discord.ext import commands
-from discord.ext.commands import Greedy  # noqa: TC002
+from discord.ext.commands import Greedy  # ruff: ignore[typing-only-third-party-import]
 from jishaku.functools import executor_function
 
 from utilities.shared import formats
@@ -73,7 +73,7 @@ class Admin(commands.Cog):
         except commands.ExtensionError as err:
             await ctx.send(f"{err.__class__.__name__}: {err}")
         else:
-            await ctx.message.add_reaction(ctx.tick(True))  # noqa: FBT003 # shortcut
+            await ctx.message.add_reaction(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @commands.command()
     async def unload(self, ctx: Context, *, module: str) -> None:
@@ -85,7 +85,7 @@ class Admin(commands.Cog):
         except commands.ExtensionError as err:
             await ctx.send(f"{err.__class__.__name__}: {err}")
         else:
-            await ctx.message.add_reaction(ctx.tick(True))  # noqa: FBT003 # shortcut
+            await ctx.message.add_reaction(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @commands.command(name="reload")
     async def _reload(self, ctx: Context, *, module: str) -> None:
@@ -99,10 +99,10 @@ class Admin(commands.Cog):
         except commands.ExtensionError as err:
             LOGGER.exception("Extension is fucked", exc_info=err)
             await ctx.send(f"{err.__class__.__name__}: {err}")
-            await ctx.message.add_reaction(ctx.tick(False))  # noqa: FBT003 # shortcut
+            await ctx.message.add_reaction(ctx.tick(False))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
             return None
 
-        return await ctx.message.add_reaction(ctx.tick(True))  # noqa: FBT003 # shortcut
+        return await ctx.message.add_reaction(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @commands.group(invoke_without_command=True)
     async def sql(self, ctx: Context, *, query: str) -> None:
@@ -116,7 +116,7 @@ class Admin(commands.Cog):
             start = time.perf_counter()
             results = await strategy(query)
             dati = (time.perf_counter() - start) * 1000.0
-        except Exception:  # noqa: BLE001 # too many potention asyncpg errors
+        except Exception:  # ruff: ignore[blind-except] # too many potention asyncpg errors
             await ctx.send(f"```py\n{traceback.format_exc()}\n```")
             return
 

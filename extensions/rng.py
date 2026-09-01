@@ -38,12 +38,12 @@ class RNG(commands.Cog):
             await ctx.send("Maximum is smaller than minimum.")
             return
 
-        await ctx.send(str(rng.randint(minimum, maximum)))  # noqa: S311
+        await ctx.send(str(rng.randint(minimum, maximum)))  # ruff: ignore[suspicious-non-cryptographic-random-usage]
 
     @random.command()
     async def lenny(self, ctx: Context) -> None:
         """Displays a random lenny face."""
-        lenny = rng.choice(  # noqa: S311
+        lenny = rng.choice(  # ruff: ignore[suspicious-non-cryptographic-random-usage]
             [
                 "( ͡° ͜ʖ ͡°)",
                 "( ͠° ͟ʖ ͡°)",
@@ -67,7 +67,7 @@ class RNG(commands.Cog):
         if len(choices) < 2:
             return await ctx.send("Not enough choices to pick from.")
 
-        return await ctx.send(rng.choice(choices))  # noqa: S311
+        return await ctx.send(rng.choice(choices))  # ruff: ignore[suspicious-non-cryptographic-random-usage]
 
     def _bestof_choices(self, first: str, second: str, best_of: int) -> tuple[str, list[str]]:
         """Plays a best of N game between two choices and returns the status of each game in a list."""
@@ -75,7 +75,7 @@ class RNG(commands.Cog):
         wins: list[int] = [0, 0]
         results: list[str] = []
         for _ in range(best_of):
-            winner = rng.choice([0, 1])  # noqa: S311
+            winner = rng.choice([0, 1])  # ruff: ignore[suspicious-non-cryptographic-random-usage]
             wins[winner] += 1
             choice = first if winner == 0 else second
             results.append(choice)

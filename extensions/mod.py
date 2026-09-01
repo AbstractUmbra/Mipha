@@ -85,7 +85,7 @@ class AutoModFlags(flags.BaseFlags):
         return 8
 
 
-class CannotEnableGatekeeper(Exception):  # noqa: N818
+class CannotEnableGatekeeper(Exception):  # ruff: ignore[error-suffix-on-exception-name]
     pass
 
 
@@ -360,7 +360,7 @@ class Gatekeeper:
             values = [self.id, *form.values()]
             values_as_str = ", ".join(f"${i}" for i in range(1, len(values) + 1))
             query = (
-                f"INSERT INTO guild_gatekeeper(id, {table_columns}) "  # noqa: S608
+                f"INSERT INTO guild_gatekeeper(id, {table_columns}) "  # ruff: ignore[hardcoded-sql-expression]
                 f"VALUES ({values_as_str}) ON CONFLICT(id) DO UPDATE SET {set_values};"
             )  # safe
             await conn.execute(query, *values)
@@ -395,7 +395,7 @@ class Gatekeeper:
         while self.role_id is not None:
             member_id, action = await self.queue.get()
 
-            try:  # noqa: PLW0717
+            try:  # ruff: ignore[too-many-statements-in-try-clause]
                 if action is GatekeeperRoleState.pending_add:
                     await add_role(
                         self.id, member_id, self.role_id, reason=f"RoboMod Gatekeeper is active since {self.started_at}"
@@ -558,7 +558,7 @@ class PreExistingMuteRoleView(discord.ui.View):
         try:
             await self.message.reply("Aborting.")
             await self.message.delete()
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
             pass
 
     async def interaction_check(self, interaction: Interaction) -> bool:
@@ -600,7 +600,7 @@ class LockdownPermissionIssueView(discord.ui.View):
         try:
             await self.message.reply("Aborting.")
             await self.message.delete()
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
             pass
 
     @discord.ui.button(label="Resolve Permission Issue", style=discord.ButtonStyle.green)
@@ -777,13 +777,13 @@ class GatekeeperRateLimitModal(discord.ui.Modal, title="Join Rate Trigger"):
     async def on_submit(self, interaction: Interaction, /) -> None:
         try:
             rate = int(self.rate.value)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             await interaction.response.send_message("Invalid number of joins given, must be a number.", ephemeral=True)
             return
 
         try:
             per = int(self.per.value)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             await interaction.response.send_message("Invalid number of seconds given, must be a number.", ephemeral=True)
             return
 
@@ -891,7 +891,7 @@ class GatekeeperChannelSelect(discord.ui.ChannelSelect["GatekeeperSetUpView"]):
             return
 
         reason = f"Gatekeeper permission sync requested by {interaction.user} (ID: {interaction.user.id})"
-        try:  # noqa: PLW0717
+        try:  # ruff: ignore[too-many-statements-in-try-clause]
             if everyone_perms.read_messages:
                 overwrite = channel.overwrites_for(interaction.guild.default_role)
                 overwrite.read_messages = False
@@ -1055,7 +1055,7 @@ class GatekeeperSetUpView(discord.ui.View):
     async def on_timeout(self) -> None:
         try:
             await self.message.delete()
-        except:  # noqa: E722, S110
+        except:  # ruff: ignore[bare-except, try-except-pass]
             pass
 
     def stop(self) -> None:
@@ -1209,7 +1209,7 @@ class GatekeeperSetUpView(discord.ui.View):
                 await interaction.response.send_message(
                     "Could not enable gatekeeper due to either a role or channel being unset or the message failing to send"
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # ruff: ignore[blind-except]
                 await interaction.response.send_message(f"Could not enable gatekeeper: {e}")
             else:
                 await interaction.response.send_message("Successfully enabled gatekeeper.")
@@ -1764,7 +1764,7 @@ class SpamChecker:
         ninety_days_ago = now - datetime.timedelta(days=90)
         return member.created_at > ninety_days_ago and member.joined_at is not None and member.joined_at > seven_days_ago
 
-    def is_spamming(self, message: discord.Message) -> SpamCheckerResult | None:  # noqa: PLR0911
+    def is_spamming(self, message: discord.Message) -> SpamCheckerResult | None:  # ruff: ignore[too-many-return-statements]
         if message.guild is None:
             return None
 
@@ -1896,7 +1896,7 @@ def can_mute() -> checks.Check[ModGuildContext]:
 # The actual cog
 
 
-class Mod(commands.Cog):  # noqa: PLR0904
+class Mod(commands.Cog):  # ruff: ignore[too-many-public-methods]
     """Moderation related commands."""
 
     def __init__(self, bot: Mipha) -> None:
@@ -1940,7 +1940,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
         self._avatar: bytes = await self.bot.user.display_avatar.read()
 
     async def cog_load(self) -> None:
-        asyncio.create_task(self._load_avatar())  # noqa: RUF006
+        asyncio.create_task(self._load_avatar())  # ruff: ignore[asyncio-dangling-task]
 
     async def cog_unload(self) -> None:
         self.batch_updates.stop()
@@ -2105,7 +2105,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
         guild_id: int,
         message: discord.Message,
         member: discord.Member,
-        multiple: bool = False,  # noqa: FBT001, FBT002
+        multiple: bool = False,  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument]
     ) -> None:
         if multiple:
             reason = f"Spamming mentions over multiple messages ({mention_count} mentions)"
@@ -2114,7 +2114,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
 
         try:
             await member.ban(reason=reason)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             log.info("[Mention Spam] Failed to ban member %s (ID: %s) in guild ID %s", member, member.id, guild_id)
         else:
             to_send = f"Banned {member} (ID: {member.id}) for spamming {mention_count} mentions."
@@ -2124,7 +2124,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
             log.info("[Mention Spam] Member %s (ID: %s) has been banned from guild ID %s", member, member.id, guild_id)
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message) -> None:  # noqa: PLR0911
+    async def on_message(self, message: discord.Message) -> None:  # ruff: ignore[too-many-return-statements]
         author = message.author
         if author.id in {self.bot.user.id, self.bot.owner_id}:
             return
@@ -2194,7 +2194,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
         await self.ban_for_mention_spam(mention_count, guild_id, message, author)
 
     @commands.Cog.listener()
-    async def on_member_join(self, member: discord.Member) -> None:  # noqa: PLR0915
+    async def on_member_join(self, member: discord.Member) -> None:  # ruff: ignore[too-many-statements]
         guild_id = member.guild.id
         config = await self.get_guild_config(guild_id)
         if config is None:
@@ -2694,7 +2694,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
             app_commands.Choice(name="Gatekeeper", value="gatekeeper"),
         ]
     )
-    async def robomod_disable(  # noqa: PLR0915
+    async def robomod_disable(  # ruff: ignore[too-many-statements]
         self, ctx: GuildContext, *, protection: Literal["all", "joins", "alerts", "raid", "mentions", "gatekeeper"] = "all"
     ) -> None:
         """Disables RoboMod on the server.
@@ -2732,7 +2732,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
             updates = f"automod_flags = guild_mod_config.automod_flags & ~{AutoModFlags.gatekeeper.flag}"
             message = "Gatekeeper has been disabled."
 
-        query = f"UPDATE guild_mod_config SET {updates} WHERE id=$1 RETURNING broadcast_webhook_url, alert_webhook_url"  # noqa: S608
+        query = f"UPDATE guild_mod_config SET {updates} WHERE id=$1 RETURNING broadcast_webhook_url, alert_webhook_url"  # ruff: ignore[hardcoded-sql-expression]
 
         guild_id = ctx.guild.id
         record: tuple[str | None, str | None] | None = await self.bot.pool.fetchrow(query, guild_id)  # pyright: ignore[reportAssignmentType]
@@ -3111,7 +3111,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
     @commands.hybrid_command(usage="[flags...]")
     @commands.guild_only()
     @checks.hybrid_permissions_check(ban_members=True)
-    async def massban(self, ctx: GuildContext, *, args: MassbanFlags) -> None:  # noqa: PLR0911, PLR0914, PLR0915
+    async def massban(self, ctx: GuildContext, *, args: MassbanFlags) -> None:  # ruff: ignore[too-many-return-statements, too-many-locals, too-many-statements]
         """Mass bans multiple members from the server.
 
         This command uses a syntax similar to Discord's search bar. To use this command
@@ -3172,11 +3172,13 @@ class Mod(commands.Cog):  # noqa: PLR0904
             if args.files:
                 predicates.append(args.files)
 
-            members.extend([
-                message.author
-                async for message in args.channel.history(limit=args.search, before=before, after=after)
-                if all(p(message) for p in predicates)
-            ])
+            members.extend(
+                [
+                    message.author
+                    async for message in args.channel.history(limit=args.search, before=before, after=after)
+                    if all(p(message) for p in predicates)
+                ]
+            )
         elif ctx.guild.chunked:
             members = ctx.guild.members
         else:
@@ -3420,7 +3422,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
         if moderator is None:
             try:
                 moderator = await self.bot.fetch_user(mod_id)
-            except Exception:  # noqa: BLE001
+            except Exception:  # ruff: ignore[blind-except]
                 # request failed somehow
                 moderator = f"Mod ID {mod_id}"
             else:
@@ -3435,7 +3437,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
     @commands.guild_only()
     @checks.hybrid_permissions_check(manage_messages=True)
     @app_commands.describe(search="How many messages to search for")
-    async def purge(  # noqa: PLR0911, PLR0915
+    async def purge(  # ruff: ignore[too-many-return-statements, too-many-statements]
         self, ctx: GuildContext, search: commands.Range[int, 1, 2000] | None = None, *, flags: PurgeFlags
     ) -> None:
         """Removes messages that meet a criteria.
@@ -3625,7 +3627,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
         role: discord.Role,
         guild: discord.Guild,
         invoker: discord.abc.User,
-        update_read_permissions: bool = False,  # noqa: FBT001, FBT002
+        update_read_permissions: bool = False,  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument]
         channels: Sequence[discord.abc.GuildChannel] | None = None,
     ) -> tuple[int, int, int]:
         success = 0
@@ -3815,7 +3817,7 @@ class Mod(commands.Cog):  # noqa: PLR0904
             if moderator is None:
                 try:
                     moderator = await self.bot.fetch_user(mod_id)
-                except Exception:  # noqa: BLE001
+                except Exception:  # ruff: ignore[blind-except]
                     # request failed somehow
                     moderator = f"Mod ID {mod_id}"
                 else:
@@ -4053,12 +4055,14 @@ class Mod(commands.Cog):  # noqa: PLR0904
                     failures.append(channel)
                 else:
                     success.append(channel)
-                    records.append({
-                        "guild_id": guild_id,
-                        "channel_id": channel.id,
-                        "allow": allow.value,
-                        "deny": deny.value,
-                    })
+                    records.append(
+                        {
+                            "guild_id": guild_id,
+                            "channel_id": channel.id,
+                            "allow": allow.value,
+                            "deny": deny.value,
+                        }
+                    )
 
         query = """
             INSERT INTO guild_lockdowns(guild_id, channel_id, allow, deny)

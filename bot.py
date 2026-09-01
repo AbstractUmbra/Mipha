@@ -24,7 +24,7 @@ import pastey
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import (
-    _ColourFormatter as ColourFormatter,  # noqa: PLC2701 # we do a little cheating
+    _ColourFormatter as ColourFormatter,  # ruff: ignore[import-private-name] # we do a little cheating
     stream_supports_colour,
 )
 
@@ -244,7 +244,7 @@ class LogHandler:
             self.log.removeHandler(hdlr)
 
 
-class Mipha(commands.Bot):  # noqa: PLR0904
+class Mipha(commands.Bot):  # ruff: ignore[too-many-public-methods]
     """Mipha's bot class."""
 
     log_handler: LogHandler
@@ -397,7 +397,7 @@ class Mipha(commands.Bot):  # noqa: PLR0904
             await self._prefix_data.put(guild.id, prefixes)
 
     async def _blacklist_add(self, object_id: int) -> None:
-        await self._blacklist_data.put(object_id, True)  # noqa: FBT003 # shortcut
+        await self._blacklist_data.put(object_id, True)  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     async def _blacklist_remove(self, object_id: int) -> None:
         try:
@@ -586,11 +586,11 @@ class Mipha(commands.Bot):  # noqa: PLR0904
             await super().start(token=self.config["bot"]["token"], reconnect=True)
         finally:
             path = pathlib.Path("logs/prev_events.log")
-            with path.open("w+", encoding="utf-8") as f:  # noqa: ASYNC230 # this is as the loop exists
+            with path.open("w+", encoding="utf-8") as f:  # ruff: ignore[blocking-open-call-in-async-function] # this is as the loop exists
                 for event in self._previous_websocket_events:
                     try:
                         last_log = to_json(event)
-                    except Exception:  # noqa: BLE001 # orjson or jsondecodeerror
+                    except Exception:  # ruff: ignore[blind-except] # orjson or jsondecodeerror
                         f.write(f"{event}\n")
                     else:
                         f.write(f"{last_log}\n")

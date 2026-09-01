@@ -55,7 +55,7 @@ class Minecraft(commands.Cog):
     )
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
-    async def rcon(self, ctx: Context, server: Annotated["Details | None", MCServerConverter], *, args: str) -> None:  # noqa: UP037 # required for converter use
+    async def rcon(self, ctx: Context, server: Annotated["Details | None", MCServerConverter], *, args: str) -> None:  # ruff: ignore[quoted-annotation] # required for converter use
         """Command for quickly executing RCON commands within a managed minecraft server!"""
         async with ctx.typing(ephemeral=True):
             if not server:
@@ -137,7 +137,7 @@ class Minecraft(commands.Cog):
     @app_commands.describe(server="The modded minecraft server to execute a backup for, provided I am able to.")
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
-    async def backup_execution(self, ctx: Context, *, server: Annotated["Details | None", MCServerConverter]) -> None:  # noqa: UP037
+    async def backup_execution(self, ctx: Context, *, server: Annotated["Details | None", MCServerConverter]) -> None:  # ruff: ignore[quoted-annotation]
         """Executes a backup of a modded server, provided I both manage it and have backup details configured."""
         async with ctx.typing(ephemeral=True):
             if not server:

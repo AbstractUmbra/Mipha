@@ -132,7 +132,7 @@ class MediaReposter(commands.Cog):
         try:
             info = await self._extract_video_info(url, loop=loop)
         except yt_dlp.DownloadError as err:  # pyright: ignore[reportAttributeAccessIssue] # this exists but isn't exported properly
-            assert err.msg  # noqa: PT017 # not pytest
+            assert err.msg  # ruff: ignore[pytest-assert-in-except] # not pytest
 
             if "no video" in err.msg.lower():
                 return await interaction.followup.send("This tweet has no video.", ephemeral=True)
@@ -302,7 +302,7 @@ class MediaReposter(commands.Cog):
                 LOGGER.debug("Got a malformed URL.")
                 return
 
-            new_url = url.with_host(random.choice(sub_["repost_urls"]))  # noqa: S311 # not crypto
+            new_url = url.with_host(random.choice(sub_["repost_urls"]))  # ruff: ignore[suspicious-non-cryptographic-random-usage] # not crypto
             if sub_["remove_query"] is True:
                 new_url = new_url.with_query(None)
 

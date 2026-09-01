@@ -131,7 +131,7 @@ class GYK(commands.GroupCog, name="graveyard_keeper"):
         item="The item to search for (please choose one of the options)",
         suppress="If you want to suppress the embed from the webpage, or not.",
     )
-    async def wiki(self, interaction: Interaction, item: str, suppress: bool = True) -> None:  # noqa: FBT001, FBT002
+    async def wiki(self, interaction: Interaction, item: str, suppress: bool = True) -> None:  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument]
         """Select an item from the Graveyard Keeper wiki to get a link for it!"""
         await interaction.response.send_message(
             f"[Here]({item})'s the Graveyard Keeper wiki page you requested!", suppress_embeds=suppress

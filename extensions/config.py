@@ -117,7 +117,7 @@ class ResolvedCommandPermissions:
         # use ?foo bar
         # ?foo bar <- guild allow
         # ?foo <- channel block
-        # result: blocked  # noqa: ERA001
+        # result: blocked  # ruff: ignore[commented-out-code]
         # this is why the two for loops are separate
 
         for command in command_names:
@@ -153,7 +153,7 @@ class ResolvedCommandPermissions:
         return self._is_command_blocked(ctx.command.qualified_name, ctx.channel.id)
 
 
-class Config(commands.Cog):  # noqa: PLR0904
+class Config(commands.Cog):  # ruff: ignore[too-many-public-methods]
     """Handles the bot's configuration system.
 
     This is how you disable or enable certain commands
@@ -297,7 +297,7 @@ class Config(commands.Cog):  # noqa: PLR0904
         else:
             await self._bulk_ignore_entries(ctx, entities)
 
-        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
+        await ctx.send(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @ignore.command(name="list")
     @checks.is_mod()
@@ -371,7 +371,7 @@ class Config(commands.Cog):  # noqa: PLR0904
             await ctx.db.execute(query, ctx.guild.id, entity_ids)
 
         self.is_plonked.invalidate_containing(f"{ctx.guild.id!r}:")
-        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
+        await ctx.send(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @unignore.command(name="all")
     @checks.is_mod()
@@ -410,7 +410,7 @@ class Config(commands.Cog):  # noqa: PLR0904
 
         async with pool.acquire() as connection, connection.transaction():
             # delete the previous entry regardless of what it was
-            query = f"DELETE FROM command_config WHERE guild_id=$1 AND name=$2 AND {subcheck};"  # noqa: S608 # our data only
+            query = f"DELETE FROM command_config WHERE guild_id=$1 AND name=$2 AND {subcheck};"  # ruff: ignore[hardcoded-sql-expression] # our data only
 
             # DELETE <num>
             await connection.execute(query, *args)
@@ -537,13 +537,13 @@ class Config(commands.Cog):  # noqa: PLR0904
     async def global_block(self, ctx: GuildContext, object_id: int) -> None:
         """Blocks a user or guild globally."""
         await self.bot._blacklist_add(object_id)
-        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
+        await ctx.send(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
     @_global.command(name="unblock")
     async def global_unblock(self, ctx: GuildContext, object_id: int) -> None:
         """Unblocks a user or guild globally."""
         await self.bot._blacklist_remove(object_id)
-        await ctx.send(ctx.tick(True))  # noqa: FBT003 # shortcut
+        await ctx.send(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call] # shortcut
 
 
 async def setup(bot: Mipha) -> None:
