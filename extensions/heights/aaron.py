@@ -165,7 +165,7 @@ def make_figure(
         )
 
         label_text = f"{cm_to_ft_and_in(height, 0)}\n{height}"
-        axes.annotate(label_text, (xs, height + 3), va="bottom", ha="center")  # pyright: ignore[reportArgumentType]
+        axes.annotate(label_text, (xs, height + 3), va="bottom", ha="center")
 
     mean = sum(heights) / len(heights)
     axes.axhline(mean, color="red", ls="-.")
