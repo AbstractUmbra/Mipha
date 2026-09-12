@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 class BadStalkingConfig(commands.UserInputError):
     def __init__(self, guild: discord.Guild, *args: Any) -> None:
-        message = f"Bad config in {guild} ({guild.id}) for voice stalking."
+        message = f"Bad config in {guild} ({guild.id}) for voice stalking. Channel with id: '{args[0]}' could not be found."
         super().__init__(message, *args)
 
 
@@ -56,8 +56,10 @@ class VoiceStalking(commands.Cog):
     async def cog_check(self, ctx: Context) -> bool:
         return await ctx.bot.is_owner(ctx.author)
 
-    def _create_default_config(self) -> VoiceStalkingConfig:
-        ret: VoiceStalkingConfig = {"notification_channel": 0, "excluded_channels": [], "filtered": False}
+    def _create_default_config(
+        self, channel: discord.TextChannel | discord.VoiceChannel | discord.Thread, /
+    ) -> VoiceStalkingConfig:
+        ret: VoiceStalkingConfig = {"notification_channel": channel.id, "excluded_channels": [], "filtered": False}
 
         return ret
 
@@ -131,9 +133,9 @@ class VoiceStalking(commands.Cog):
             raise RuntimeError("Unreachable code in voice stalking.")
 
         channel_id = config["notification_channel"]
-        channel = self.bot.get_channel(channel_id)
+        channel = member.guild.get_channel(channel_id)
         if channel is None:
-            raise BadStalkingConfig(member.guild)
+            raise BadStalkingConfig(member.guild, channel_id)
         assert isinstance(channel, (discord.TextChannel, discord.Thread))
 
         if state is VoiceStateType.move:
@@ -165,7 +167,7 @@ class VoiceStalking(commands.Cog):
         if config:
             return await ctx.send("It seems it's already set up here?")
 
-        config = self._create_default_config()
+        config = self._create_default_config(ctx.channel)
         await self._config.put(ctx.guild.id, config)
 
         return await ctx.message.add_reaction(ctx.tick(True))  # ruff: ignore[boolean-positional-value-in-call]
