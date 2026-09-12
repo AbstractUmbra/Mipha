@@ -43,14 +43,15 @@ INSTAGRAM_PATTERN: re.Pattern[str] = re.compile(
 )
 
 SUBSTITUTIONS: dict[str, SubstitutionData] = {
-    "twitter.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
-    "x.com": {"repost_urls": ["fixupx.com", "girlcockx.com"], "remove_query": True},
+    "twitter.com": {"repost_urls": ["fixupx.com"], "remove_query": True},
+    "x.com": {"repost_urls": ["fixupx.com"], "remove_query": True},
     "www.instagram.com": {"repost_urls": ["kkinstagram.com"], "remove_query": True},
     "instagram.com": {"repost_urls": ["kkinstagram.com"], "remove_query": True},
 }
 
 AUTO_REPOST_GUILDS: list[discord.Object] = [
     discord.Object(id=174702278673039360, type=discord.Guild),
+    discord.Object(id=1547968251076550776, type=discord.Guild),
 ]
 AUTO_REPOST_GUILD_IDS: set[int] = {guild.id for guild in AUTO_REPOST_GUILDS}
 
@@ -264,6 +265,8 @@ class MediaReposter(commands.Cog):
             ret = True
         if tweet_status.get("quote"):
             ret = True
+        if tweet_status.get("lang") not in {"en", "english"}:
+            ret = True
 
         return ret
 
@@ -305,6 +308,8 @@ class MediaReposter(commands.Cog):
             new_url = url.with_host(random.choice(sub_["repost_urls"]))  # ruff: ignore[suspicious-non-cryptographic-random-usage] # not crypto
             if sub_["remove_query"] is True:
                 new_url = new_url.with_query(None)
+            if source is URLSource.twitter:
+                new_url = new_url.joinpath("en")
 
             new_urls.append(new_url)
 
