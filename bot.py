@@ -20,7 +20,6 @@ import aiohttp
 import asyncpg
 import discord
 import jishaku
-import pastey
 from discord import app_commands
 from discord.ext import commands
 from discord.utils import (
@@ -41,6 +40,7 @@ from utilities.prefix import callable_prefix as _callable_prefix
 from utilities.shared.async_config import Config
 from utilities.shared.db import db_init
 from utilities.shared.formats import to_json
+from utilities.shared.paste import CreatePasteInput, Paste, create_paste
 from utilities.shared.timezones import TimezoneHandler
 
 if TYPE_CHECKING:
@@ -160,7 +160,11 @@ class MiphaCommandTree(app_commands.CommandTree):
         clean = "".join(trace)
         if len(clean) >= 2000:
             password = secrets.token_urlsafe(16)
-            paste = await interaction.client.create_paste(content=clean, password=password)
+            paste = await interaction.client.create_paste(
+                contents=[CreatePasteInput("Inner error", "python", clean)],
+                title="CommandTree Error",
+                password=password,
+            )
             e.description = (
                 f"Error was too long to send in a codeblock, so I have pasted it [here]({paste})."
                 f"\nThe password is `{password}`."
@@ -248,7 +252,6 @@ class Mipha(commands.Bot):  # ruff: ignore[too-many-public-methods]
     """Mipha's bot class."""
 
     log_handler: LogHandler
-    pastey_client: pastey.Client
     pool: asyncpg.Pool[asyncpg.Record]
     user: discord.ClientUser
     session: aiohttp.ClientSession
@@ -273,7 +276,6 @@ class Mipha(commands.Bot):  # ruff: ignore[too-many-public-methods]
         "_stats_cog_gateway_handler",
         "command_stats",
         "log_handler",
-        "pastey_client",
         "pool",
         "session",
         "socket_stats",
@@ -560,26 +562,24 @@ class Mipha(commands.Bot):  # ruff: ignore[too-many-public-methods]
     async def create_paste(
         self,
         *,
-        content: str | None = None,
-        files: list[pastey.File] | None = None,
-        expires_at: datetime.datetime | None = None,
+        contents: list[CreatePasteInput],
+        title: str,
         password: str | None = None,
-        view_limit: int | None = None,
-    ) -> pastey.Paste:
-        if not content and not files:
-            raise ValueError("You require `content` or `files` to be passed.")
-
-        files = files or []
-        files = files[:5]
-
-        if content:
-            files.insert(0, pastey.File(content=content, name="raw-content-insert.txt"))
-
-        assert files  # guarded
-
-        return await self.pastey_client.create_paste(
-            files=files, expires_at=expires_at, password=password, remaining_views=view_limit
+        expires: datetime.datetime | None = None,
+    ) -> Paste:
+        token = self.config.get("tokens", {}).get("paste")
+        if not token:
+            raise RuntimeError("No paste token set in the config.")
+        paste, paste_expires = await create_paste(
+            title=title,
+            contents=contents,
+            password=password,
+            expiry=expires,
+            session=self.session,
+            api_token=token,
         )
+
+        return Paste(paste, paste_expires)
 
     async def start(self) -> None:
         try:
@@ -612,7 +612,6 @@ async def main() -> None:
     async with (
         Mipha(raw_cfg) as bot,
         aiohttp.ClientSession(json_serialize=discord.utils._to_json) as session,
-        pastey.Client(session=session) as pastey_client,
         asyncpg.create_pool(
             host=bot.config["postgresql"]["host"],
             user=bot.config["postgresql"]["user"],
@@ -629,7 +628,6 @@ async def main() -> None:
         bot.pool = pool
 
         bot.session = session
-        bot.pastey_client = pastey_client
 
         bot.log_handler.debug("Made it to extension loading.")
         await bot.load_extension("jishaku")

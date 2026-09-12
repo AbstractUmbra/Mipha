@@ -6,11 +6,11 @@ import re
 from typing import TYPE_CHECKING
 
 import discord
-import pastey
 from discord import app_commands
 from discord.ext import commands
 
 from utilities.shared.formats import ts
+from utilities.shared.paste import CreatePasteInput, Paste
 from utilities.shared.ui import BaseView
 
 if TYPE_CHECKING:
@@ -69,14 +69,8 @@ def extract_codeblocks_with_placeholders(input_: str) -> tuple[str, list[Codeblo
     return "\n".join(output), codeblocks
 
 
-async def delete_paste(client: Mipha, id_: str, safety: str) -> bool:
-    resp = await client.session.delete(f"https://api.pastey.gg/{id_}", headers={"X-Safety-Token": safety})
-
-    return resp.status == 204
-
-
 class PasteView(BaseView):
-    def __init__(self, paste: pastey.Paste, /, *, author_id: int) -> None:
+    def __init__(self, paste: Paste, /, *, author_id: int) -> None:
         super().__init__(timeout=datetime.timedelta(hours=24).seconds)
         self.paste = paste
         self.author_id = author_id
@@ -91,7 +85,11 @@ class PasteView(BaseView):
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await delete_paste(interaction.client, self.paste.id, self.paste.safety_token)  # pyright: ignore[reportArgumentType] # it's not None here
+        await self.paste.delete(
+            self.paste.id,
+            session=interaction.client.session,
+            api_token=interaction.client.config.get("tokens", {}).get("paste", ""),
+        )
 
         button.label = "Paste deleted"
         button.disabled = True
@@ -108,8 +106,8 @@ class Dpy(commands.Cog):
     def __init__(self, bot: Mipha, /) -> None:
         self.bot = bot
         self.mystbin_context_menu = app_commands.ContextMenu(
-            name="Message to Pastey",
-            callback=self.to_mystbin_callback,
+            name="Message to Paste site",
+            callback=self.to_pasters_callback,
             type=discord.AppCommandType.message,
             allowed_contexts=discord.app_commands.AppCommandContext(guild=True, dm_channel=True, private_channel=True),
             allowed_installs=discord.app_commands.AppInstallationType(guild=True, user=True),
@@ -119,26 +117,34 @@ class Dpy(commands.Cog):
     async def cog_unload(self) -> None:
         self.bot.tree.remove_command(self.mystbin_context_menu.name, type=self.mystbin_context_menu.type)
 
-    async def to_mystbin_callback(self, interaction: Interaction, message: discord.Message) -> None:
+    async def to_pasters_callback(self, interaction: Interaction, message: discord.Message) -> None:
         await interaction.response.defer(ephemeral=False, thinking=True)
-        files: list[pastey.File] = []
+        files: list[CreatePasteInput] = []
 
         if message.content:
             contents, codeblocks = extract_codeblocks_with_placeholders(message.content)
             if contents:
-                files.append(pastey.File(content=contents, name="message-contents.txt"))
+                files.append(CreatePasteInput(code=contents, title="message-contents", language="txt"))
             for idx, cb in enumerate(codeblocks, start=1):
-                files.append(pastey.File(content=cb.content, name=f"codeblock-{idx}.{cb.language}"))
+                files.append(CreatePasteInput(code=cb.content, title=f"codeblock-{idx}.{cb.language}", language=cb.language))
 
         for attachment in message.attachments:
             if not attachment.content_type or attachment.content_type.split("/")[0].lower() != "text":
                 continue
-            files.append(pastey.File(content=(await attachment.read()).decode("utf-8"), name=attachment.filename))
+            files.append(
+                CreatePasteInput(
+                    code=(await attachment.read()).decode("utf-8"),
+                    title=attachment.filename,
+                    language=attachment.filename.rsplit(".")[-1],
+                )
+            )
 
         LOGGER.debug("files: %r", files)
 
         expiry = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24)
-        paste = await self.bot.create_paste(files=files, expires_at=expiry)
+        paste = await self.bot.create_paste(
+            contents=files, expires=expiry, title=f"{message.author.display_name}'s message repost"
+        )
 
         view = PasteView(paste, author_id=message.author.id)
         await interaction.followup.send(

@@ -53,6 +53,7 @@ class TokenConfig(TypedDict, total=False):
     wanikani: str
     tiktok: str
     deepl: str
+    paste: str
 
 
 class MangaDexConfig(TypedDict):

@@ -8,6 +8,7 @@ ENV UV_PYTHON_DOWNLOADS=0
 WORKDIR /project
 RUN apt-get update -y \
     && apt-get install --no-install-recommends --no-install-suggests -y git \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -29,7 +30,8 @@ LABEL org.opencontainers.image.licenses=MPL2.0
 # install latest ffmpeg
 RUN apt-get update -y \
     && apt-get upgrade -y \
-    && apt-get install --no-install-recommends --no-install-suggests -y ffmpeg \
+    && apt-get install --no-install-recommends --no-install-suggests -y ffmpeg ca-certificates \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 USER 1000:1000

@@ -16,6 +16,7 @@ import discord
 from discord.ext import commands
 from discord.utils import MISSING
 
+from .shared.paste import CreatePasteInput
 from .shared.ui import BaseView, ConfirmationView, SelfDeleteView
 
 if TYPE_CHECKING:
@@ -362,9 +363,10 @@ class Context[CogT_co: commands.Cog](commands.Context["Mipha"]):
         if (paste and content) or (content and len(content) >= 2000):
             password = secrets.token_urlsafe(10)
             paste_url = await self.bot.create_paste(
-                content=content,
+                contents=[CreatePasteInput("Content too long...", "txt", content)],
+                title="Mipha Created Paste",
                 password=password,
-                expires_at=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
+                expires=(datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)),
             )
 
             content = (
