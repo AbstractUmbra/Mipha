@@ -265,7 +265,8 @@ class MediaReposter(commands.Cog):
             ret = True
         if tweet_status.get("quote"):
             ret = True
-        if tweet_status.get("lang") not in {"en", "english"}:
+        lang = tweet_status.get("lang")
+        if lang and lang not in {"en", "english"}:
             ret = True
 
         return ret
