@@ -214,7 +214,7 @@ class Fun(commands.Cog):
         text = data["translations"][0]["text"]
 
         embed = discord.Embed(title="Translation:", colour=discord.Colour.random())
-        embed.description = f"Translated from {lang}:-\n\n{text}"
+        embed.description = f"Translated from {lang}:-\n\n>>> {text}"
         embed.set_footer(text=f"Requested by {ctx.author.display_name}", icon_url=ctx.author.display_avatar.url)
 
         await ctx.reply(
