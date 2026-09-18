@@ -158,7 +158,9 @@ class Meta(commands.Cog):  # ruff: ignore[too-many-public-methods]
         Enter a date and/or time to get a discord formatted datetime for it.
         Accepts friendly input like 'tomorrow at 3:30pm'.
         """
-        ret = ["`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("t", "T", "D", "f", "F", "R")]
+        ret = [
+            "`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("F", "f", "D", "d", "t", "T", "R", "s", "S")
+        ]
         ret.insert(0, "\u200b\n")
         await interaction.response.send_message("\n".join(ret), ephemeral=ephemeral)
 
