@@ -72,7 +72,7 @@ class Static(commands.Cog):
                 VALUES (?, ?);
                 """
 
-        when = when.replace(hour=8, minute=0, second=0, microsecond=0)
+        when = when.replace(hour=20, minute=0, second=0, microsecond=0)
 
         async with self.pool.acquire() as conn:
             await conn.execute(query, who.id, round(when.timestamp()))
@@ -99,7 +99,7 @@ class Static(commands.Cog):
             then: int = row["afk_date"]
             then_dt = datetime.datetime.fromtimestamp(then, tz=datetime.UTC)
 
-            now = datetime.datetime.now(datetime.UTC).replace(hour=8, minute=0, second=0, microsecond=0)
+            now = datetime.datetime.now(datetime.UTC).replace(hour=20, minute=0, second=0, microsecond=0)
             if then_dt < now:
                 to_delete.append(row["id"])
 
@@ -107,7 +107,7 @@ class Static(commands.Cog):
             return
 
         async with self.pool.acquire() as conn:
-            await conn.executemany("DELETE FROM afks WHERE id IN (?);", ", ".join(str(to_delete)))
+            await conn.executemany("DELETE FROM afks WHERE id IN (?);", ", ".join(map(str, to_delete)))
         LOGGER.info("[Static] :: Cleanup of expired records finished.")
 
     async def update_afk_message(self) -> None:
