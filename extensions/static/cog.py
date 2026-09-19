@@ -126,7 +126,10 @@ class Static(commands.Cog):
         transformed = transform(rows)
         transformed.sort(key=operator.itemgetter("when"))
 
-        grouped = itertools.groupby(transformed, key=operator.itemgetter("when"))
+        then = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=31)
+        filtered = list(filter(lambda r: r["when"] < then, transformed))
+
+        grouped = itertools.groupby(filtered, key=operator.itemgetter("when"))
 
         inner_fmt = ""
         guild = self.bot.get_guild(GUILD_ID)
@@ -148,6 +151,9 @@ class Static(commands.Cog):
                     )
                     continue
                 inner_fmt += f"    - {member.mention}\n"
+
+        if len(filtered) != len(transformed):
+            inner_fmt += "-# The above shows the next ~31 days only."
 
         partial = channel.get_partial_message(AFK_MESSAGE_ID)
         await partial.edit(content=AFK_MESSAGE_PROSE.format(people_list=inner_fmt))
