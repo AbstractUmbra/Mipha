@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 GUILD_ID: int = 1547968251076550776
 AFK_CHANNEL_ID: int = 1550058389437026324
 RAID_YAPPING_CHANNEL_ID: int = 1547969699772371025  # real
+# RAID_YAPPING_CHANNEL_ID: int = 1548012514703573023  # botspam
 AFK_MESSAGE_ID: int = 1550088874410377332
 MOUNT_FARM_ROLE_ID: int = 1551555982054658240
 SAVAGE_ROLE_ID: int = 1547968460582166558
@@ -39,7 +40,7 @@ RAID_DAYS = (1, 3, 4)  # tues, thurs, fri
 MOUNT_FARM_DAYS = (1,)  # tues
 SAVAGE_DAYS = (3, 4)  # thurs, fri
 
-ALEX_OFF_WEEK_START: datetime.datetime = datetime.datetime(2026, 9, 29, 20, tzinfo=zoneinfo.ZoneInfo("Europe/London"))
+ALEX_OFF_WEEK_START: datetime.date = datetime.date(2026, 9, 29)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -115,9 +116,14 @@ class Static(commands.Cog):
             source=now,
             current_week_included=True,
             before_time=datetime.time(hour=20, tzinfo=datetime.UTC),
+        ).date()
+        delta = then - ALEX_OFF_WEEK_START
+        LOGGER.debug(
+            "[Static] -> [Alex D&D] :: Resolved this week to %s (with modulo of %s)",
+            then,
+            delta.days % 14,
         )
-        LOGGER.debug("[Static] -> [Alex D&D] :: Resolved this week to %s", then)
-        if (then - ALEX_OFF_WEEK_START).days % 14 == 0:
+        if delta.days % 14 != 0:
             LOGGER.debug("[Static] -> [Alex D&D] :: Found this to be a present week.")
             return (3, 4)
         LOGGER.debug("[Static] -> [Alex D&D] :: Found this to be a non-present week.")
@@ -159,8 +165,11 @@ class Static(commands.Cog):
         events: list[discord.ScheduledEvent] = []
 
         for idx, day in enumerate(savage_days, start=1):
-            # we assume `source` is the start of the week (Sunday).
-            then = (source + datetime.timedelta(days=day)).replace(hour=20, minute=0)
+            LOGGER.debug("[Static] -> [Events Handling] :: Creating event for Savage on day %s", day)
+            then = resolve_next_weekday(
+                target=Weekday(day), source=source, current_week_included=True, before_time=datetime.time(hour=8)
+            ).replace(hour=20, minute=0, second=0, microsecond=0)
+            LOGGER.debug("[Static] -> [Events Handling] :: Day found to be at %s", then)
 
             if day == 3:
                 then += datetime.timedelta(minutes=30)
@@ -180,6 +189,7 @@ class Static(commands.Cog):
         mount_farm_then = (source + datetime.timedelta(days=mount_farm_day[0])).replace(
             hour=20, minute=30 if mount_farm_day == 3 else 0
         )
+        LOGGER.debug("[Static] -> [Events Handling] :: Mount Farm day found as %s", mount_farm_then)
         events.append(
             await guild.create_scheduled_event(
                 name="Meat Cleavers DT Mount Farming",
@@ -346,11 +356,15 @@ class Static(commands.Cog):
         return ret
 
     @tasks.loop(time=datetime.time(hour=0, tzinfo=zoneinfo.ZoneInfo("Europe/London")))
-    async def post_raid_times(self) -> None:
+    async def post_raid_times(self, *, force: bool = False) -> None:
         source = datetime.datetime.now(zoneinfo.ZoneInfo("Europe/London"))
 
-        if source.weekday() != 6:
+        if not force and source.weekday() != 6:
             return
+
+        source = resolve_next_weekday(
+            target=Weekday.monday, source=source, current_week_included=True, before_time=datetime.time(hour=8)
+        )
 
         savage_days = self._resolve_savage_days(source=source)
         LOGGER.debug("[Static] -> [Event Loop] :: Savage days for wc %s are %s", source, savage_days)
@@ -384,11 +398,12 @@ class Static(commands.Cog):
             savage_event_urls="\n".join([event.url for event in events]),
         )
 
-        await raid_channel.send(formatted, allowed_mentions=discord.AllowedMentions.none())
+        await raid_channel.send(formatted, allowed_mentions=discord.AllowedMentions(roles=True))
 
     @tasks.loop(time=datetime.time(hour=12, tzinfo=zoneinfo.ZoneInfo("Europe/London")))
     async def check_afks(self) -> None:
         tz = zoneinfo.ZoneInfo("Europe/London")
+        await self.cleanup_afk_table()
         rows = await self.fetch_afk_records()
 
         today = datetime.datetime.now(tz).date()
@@ -419,6 +434,8 @@ class Static(commands.Cog):
             bullets += f"- {member.mention}\n"
 
         if not bullets:
+            await self.cleanup_afk_table()
+            await self.update_afk_message()
             return
 
         channel = guild.get_channel(AFK_CHANNEL_ID)
