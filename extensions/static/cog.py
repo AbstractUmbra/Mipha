@@ -213,25 +213,11 @@ class Static(commands.Cog):
 
     async def cleanup_afk_table(self) -> None:
         LOGGER.info("[Static] :: Cleanup of expired records starting.")
-        rows = await self.fetch_afk_records()
 
-        tz = zoneinfo.ZoneInfo("Europe/London")
-
-        to_delete: list[int] = []
-
-        for row in rows:
-            then: int = row["afk_date"]
-            then_dt = datetime.datetime.fromtimestamp(then, tz=tz)
-
-            now = datetime.datetime.now(tz).replace(hour=20, minute=0, second=0, microsecond=0)
-            if then_dt < now:
-                to_delete.append(row["id"])
-
-        if not to_delete:
-            return
+        now = datetime.datetime.now(zoneinfo.ZoneInfo("Europe/London")).replace(hour=8, minute=0, second=0, microsecond=0)
 
         async with self.pool.acquire() as conn:
-            await conn.executemany("DELETE FROM afks WHERE id IN (?);", ", ".join(map(str, to_delete)))
+            await conn.execute("DELETE FROM afks WHERE afk_date < ?;", round(now.timestamp()))
         LOGGER.info("[Static] :: Cleanup of expired records finished.")
 
     async def update_afk_message(self) -> None:
