@@ -173,6 +173,7 @@ class Static(commands.Cog):
 
             if day == 3:
                 then += datetime.timedelta(minutes=30)
+
             events.append(
                 await guild.create_scheduled_event(
                     name=f"Meat Cleavers Savage (Night {idx})",
@@ -186,8 +187,9 @@ class Static(commands.Cog):
                     ),
                 )
             )
-        mount_farm_then = (source + datetime.timedelta(days=mount_farm_day[0])).replace(
-            hour=20, minute=30 if mount_farm_day == 3 else 0
+        resolved_farm_day = mount_farm_day[0]
+        mount_farm_then = (source + datetime.timedelta(days=resolved_farm_day)).replace(
+            hour=20, minute=30 if resolved_farm_day == 3 else 0
         )
         LOGGER.debug("[Static] -> [Events Handling] :: Mount Farm day found as %s", mount_farm_then)
         events.append(
