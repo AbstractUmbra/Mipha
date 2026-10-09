@@ -331,6 +331,10 @@ class Static(commands.Cog):
         await interaction.edit_original_response(content="Deleted!")
         await self.update_afk_message()
 
+    async def _cleanup_steps(self) -> None:
+        await self.cleanup_afk_table()
+        await self.update_afk_message()
+
     @delete_afk.autocomplete(name="to_delete")
     async def delete_afk_autocomplete(self, interaction: Interaction, _: str) -> list[app_commands.Choice[int]]:
         rows = await self.fetch_afk_records()
@@ -420,24 +424,27 @@ class Static(commands.Cog):
                 afks.append(row["who"])
 
         if not afks:
+            LOGGER.debug("[Static] -> {AFK} :: No AFKs recorded on %s. Continuing cleanly, and performing cleanup.", today)
+            await self._cleanup_steps()
             return
 
         guild = self.bot.get_guild(GUILD_ID)
         if not guild:
-            LOGGER.error("[Static] :: Unable to get static guild. Problem?")
+            LOGGER.error("[Static] -> {AFK} :: Unable to get static guild. Problem? Performing cleanup.")
+            await self._cleanup_steps()
             return
 
         bullets = ""
         for id_ in afks:
             member = guild.get_member(id_)
             if not member:
-                LOGGER.error("[Static] :: Unable to get member with id %s. Problem?", id_)
+                LOGGER.error("[Static] -> {AFK} :: Unable to get member with id %s. Problem?", id_)
                 continue
             bullets += f"- {member.mention}\n"
 
         if not bullets:
-            await self.cleanup_afk_table()
-            await self.update_afk_message()
+            LOGGER.debug("[Static] -> {AFK} :: No members found from the AFK list. Cleaning up.")
+            await self._cleanup_steps()
             return
 
         channel = guild.get_channel(AFK_CHANNEL_ID)
@@ -445,8 +452,9 @@ class Static(commands.Cog):
 
         await channel.send(AFK_PROSE.format(people_list=bullets), allowed_mentions=discord.AllowedMentions.none())
 
-        await self.cleanup_afk_table()
-        await self.update_afk_message()
+        LOGGER.debug("[Static] -> {AFK} :: AFK Check complete, starting cleanup.")
+
+        await self._cleanup_steps()
 
     @check_afks.before_loop
     @post_raid_times.before_loop
