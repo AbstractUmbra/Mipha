@@ -68,7 +68,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
                 title=cog.qualified_name if cog else "Unsorted",
             )
             embed.description = f"> {cog.description}\n{desc}" if cog else f"> No description\n{desc}"
-            embed.set_footer(text=f'Use "{self.context.clean_prefix}help <command>" for more information.')
+            embed.set_footer(text=f'Use "{self.context.clean_prefix} help <command>" for more information.')
             pages.append(embed)
 
     async def send_bot_help(
@@ -116,7 +116,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         embed = discord.Embed(colour=discord.Colour.blurple())
         embed.title = f"{self.context.clean_prefix}{group.qualified_name} {group.signature}"
         embed.description = f"{group.help or ''}\n\n**Subcommands**\n\n{subs}"
-        embed.set_footer(text=f'Use "{self.context.clean_prefix}help <command>" for more information.')
+        embed.set_footer(text=f'Use "{self.context.clean_prefix} help <command>" for more information.')
         return await self.context.send(embed=embed)
 
     async def send_command_help(self, command: commands.Command) -> None:
@@ -128,7 +128,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         embed = discord.Embed(colour=discord.Colour.blurple())
         embed.title = f"{self.context.clean_prefix}{command.qualified_name} {command.signature}"
         embed.description = command.help or "No help provided"
-        embed.set_footer(text=f'Use "{self.context.clean_prefix}help <command>" for more information.')
+        embed.set_footer(text=f'Use "{self.context.clean_prefix} help <command>" for more information.')
         await self.context.send(embed=embed)
 
 
