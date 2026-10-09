@@ -184,6 +184,19 @@ class Meta(commands.Cog):  # ruff: ignore[too-many-public-methods]
         msg = "\n".join(map(to_string, characters))
         await ctx.send(msg, suppress_embeds=True)
 
+    @commands.command()
+    async def unique_reactions(self, ctx: Context, *, message: discord.Message) -> None:
+        """Collate and send the mentions of each unique user who reacted to a message!"""
+        users: list[discord.Member | discord.User] = []
+
+        for reaction in message.reactions:
+            users.extend([user async for user in reaction.users()])
+
+        deduped = list(set(users))
+
+        mentions = "\n".join([u.mention for u in deduped])
+        await ctx.send(f"```\n{mentions}\n```")
+
     @commands.group(name="prefix", invoke_without_command=True)
     async def prefix(self, ctx: Context) -> None:
         """Manages the server's custom prefixes.
