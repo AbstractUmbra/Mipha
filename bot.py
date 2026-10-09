@@ -385,7 +385,7 @@ class Mipha(commands.Bot):  # ruff: ignore[too-many-public-methods]
         raw: bool = False,
     ) -> list[str]:
         if raw:
-            return self._prefix_data.get(guild.id, ["hey babe "])
+            return self._prefix_data.get(guild.id, ["hey babe ", "Hey babe "])
 
         snowflake_proxy = ProxyObject(guild)
         return local_(self, snowflake_proxy)  # pyright: ignore[reportArgumentType] # lying here
@@ -622,7 +622,7 @@ async def main() -> None:
             max_inactive_connection_lifetime=0,
             init=db_init,
         ) as pool,
-        LogHandler(level=raw_cfg["bot"].get("log_level", 20)) as log_handler,
+        LogHandler(level=raw_cfg["bot"].get("log_level", logging.INFO)) as log_handler,
     ):
         bot.log_handler = log_handler
         bot.pool = pool
