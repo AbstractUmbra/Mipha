@@ -3,3 +3,9 @@ CREATE TABLE IF NOT EXISTS afks (
     who INTEGER NOT NULL,
     afk_date INTEGER NOT NULL -- timestamp
 );
+
+CREATE TABLE IF NOT EXISTS prog (
+    id INTEGER PRIMARY KEY NOT NULL,
+    fight_number INTEGER NOT NULL -- hehe
+);
+INSERT INTO prog VALUES (0, 2) ON CONFLICT(id) DO NOTHING;

@@ -7,7 +7,6 @@ import operator
 import pathlib
 import zoneinfo
 from typing import TYPE_CHECKING, TypedDict
-from urllib.parse import quote
 
 import discord
 from discord import app_commands
@@ -78,6 +77,26 @@ class AFKMessageRecord(TypedDict):
     when: datetime.datetime
 
 
+def _to_prog_point(fight_number: int) -> list[str]:
+    fights: list[str] = []
+    if 1 <= fight_number <= 4:
+        start = 1
+    elif 5 <= fight_number <= 8:
+        start = 5
+    elif 9 <= fight_number <= 12:
+        start = 9
+    else:
+        raise ValueError("'fight_num' is not a valid arcadion tier fight number, expected 1-12.")
+
+    for num in range(start, fight_number + 1):
+        if num != fight_number:
+            fights.append(f"M{num}S (1 clear)!")
+            continue
+        fights.append(f"M{num}S!")
+
+    return fights
+
+
 class Static(commands.Cog):
     def __init__(self, bot: Mipha, /, pool: asqlite.Pool) -> None:
         self.bot = bot
@@ -93,6 +112,19 @@ class Static(commands.Cog):
     async def cog_unload(self) -> None:
         self.check_afks.cancel()
         self.post_raid_times.cancel()
+
+    async def _get_fight_number(self) -> int:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchone("SELECT fight_number FROM prog WHERE id = 0;")
+
+        if not row:
+            raise RuntimeError("Could not fetch the current prog point")
+
+        return row["fight_number"]
+
+    async def _set_fight_number(self, fight_number: int, /) -> None:
+        async with self.pool.acquire() as conn:
+            await conn.execute("UPDATE prog SET fight_number = ?;", fight_number)
 
     async def _insert_afk(self, *, when: datetime.datetime, who: discord.Member | discord.User) -> None:
         query = """
@@ -129,26 +161,6 @@ class Static(commands.Cog):
         LOGGER.debug("[Static] -> [Alex D&D] :: Found this to be a non-present week.")
         return (1, 4)
 
-    def _create_gcalendar_event(self, what: str, times: tuple[datetime.datetime, datetime.datetime]) -> str:
-        # https://calendar.google.com/calendar/render?action=TEMPLATE&dates=20260926T130000Z%2F20260926T160000Z&location=%5BEU%5D%20Light%20DC&text=LFG%20Forked%20Tower%3A%20Blood%203rd%20Boss%20Prog%20Run%20-%20Yuma
-        ret = "https://calendar.google.com/calendar/render?action=TEMPLATE"
-        # dates
-        start, end = times
-
-        def gcal_safe(dt: datetime.datetime) -> str:
-            return dt.strftime("%Y%m%d%H%M%S")
-
-        ret += f"&dates={gcal_safe(start)}/{gcal_safe(end)}"
-        ret += "&ctz=Europe/London"
-
-        # details
-        ret += f"&details={quote(what)}"
-
-        # location
-        ret += f"&location={quote('Discord VC | Lich @ Light')}"
-
-        return f"[Add to Google Calendar]({ret})"
-
     async def create_next_events(
         self, savage_days: tuple[int, int], *, source: datetime.datetime | None = None, guild: discord.Guild | None = None
     ) -> list[discord.ScheduledEvent]:
@@ -163,6 +175,8 @@ class Static(commands.Cog):
         )
 
         events: list[discord.ScheduledEvent] = []
+
+        prog_point = _to_prog_point(await self._get_fight_number())
 
         for idx, day in enumerate(savage_days, start=1):
             LOGGER.debug("[Static] -> [Events Handling] :: Creating event for Savage on day %s", day)
@@ -182,9 +196,7 @@ class Static(commands.Cog):
                     entity_type=discord.EntityType.external,
                     privacy_level=discord.PrivacyLevel.guild_only,
                     location="Discord is shitty, but in Raid VC | Lich @ Light",
-                    description=self._create_gcalendar_event(
-                        f"Meat Cleavers Savage (Night {idx})", times=(then, then + datetime.timedelta(hours=2))
-                    ),
+                    description=f"-{'-\n'.join(prog_point)}",
                 )
             )
         resolved_farm_day = mount_farm_day[0]
@@ -200,9 +212,6 @@ class Static(commands.Cog):
                 entity_type=discord.EntityType.external,
                 privacy_level=discord.PrivacyLevel.guild_only,
                 location="Discord is shitty, but in Raid VC | Lich @ Light",
-                description=self._create_gcalendar_event(
-                    "Meat Cleavers Mount Farming!", times=(mount_farm_then, mount_farm_then + datetime.timedelta(hours=2))
-                ),
             )
         )
 
@@ -253,7 +262,9 @@ class Static(commands.Cog):
         then = datetime.datetime.now(tz) + datetime.timedelta(days=31)
         filtered = list(filter(lambda r: r["when"] < then, transformed))
 
-        grouped = itertools.groupby(filtered, key=operator.itemgetter("when"))
+        grouped: itertools.groupby[datetime.datetime, AFKMessageRecord] = itertools.groupby(
+            filtered, key=operator.itemgetter("when")
+        )
 
         inner_fmt = ""
         guild = self.bot.get_guild(GUILD_ID)
