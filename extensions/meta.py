@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord import app_commands
 from discord.ext import commands
+from discord.utils import TimestampStyle  # ruff: ignore[typing-only-third-party-import] # this is used at runtime
 
 from utilities.context import Context, GuildContext, Interaction
 from utilities.shared import checks, formats
@@ -144,6 +145,7 @@ class Meta(commands.Cog):  # ruff: ignore[too-many-public-methods]
     @app_commands.command()
     @app_commands.describe(
         when="When to show a timestamp for, accepts 'tomorrow at 7pm' etc.",
+        timestamp_format="The Discord specific timestamp style to use, if any.",
         ephemeral="Whether to show the whole channel or just you.",
     )
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
@@ -152,12 +154,17 @@ class Meta(commands.Cog):  # ruff: ignore[too-many-public-methods]
         self,
         interaction: discord.Interaction,
         when: app_commands.Transform[datetime.datetime, DatetimeTransformer],
+        timestamp_format: TimestampStyle | None = None,
         ephemeral: bool = True,  # ruff: ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument] # required for d.py callbacks
     ) -> None:
         """
         Enter a date and/or time to get a discord formatted datetime for it.
         Accepts friendly input like 'tomorrow at 3:30pm'.
         """
+        if timestamp_format:
+            await interaction.response.send_message("`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=timestamp_format))
+            return
+
         ret = [
             "`{0:{spec}}` -> {0:{spec}}".format(ts(when), spec=fmt) for fmt in ("F", "f", "D", "d", "t", "T", "R", "s", "S")
         ]
