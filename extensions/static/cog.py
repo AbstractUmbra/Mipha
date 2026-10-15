@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 GUILD_ID: int = 1547968251076550776
 AFK_CHANNEL_ID: int = 1550058389437026324
 RAID_YAPPING_CHANNEL_ID: int = 1547969699772371025  # real
-# RAID_YAPPING_CHANNEL_ID: int = 1548012514703573023  # botspam
 AFK_MESSAGE_ID: int = 1550088874410377332
 MOUNT_FARM_ROLE_ID: int = 1551555982054658240
 SAVAGE_ROLE_ID: int = 1547968460582166558
@@ -138,8 +137,6 @@ class Static(commands.Cog):
                 INSERT INTO afks (who, afk_date)
                 VALUES (?, ?);
                 """
-
-        when = when.replace(hour=20, minute=0, second=0, microsecond=0)
 
         async with self.pool.acquire() as conn:
             await conn.execute(query, who.id, round(when.timestamp()))
@@ -331,6 +328,13 @@ class Static(commands.Cog):
             await interaction.edit_original_response(
                 content="You don't need to record this one, it's not your day or not a raid day, but I appreciate you!"
             )
+            return
+
+        when = when.replace(hour=20, minute=0, second=0, microsecond=0, tzinfo=zoneinfo.ZoneInfo("Europe/London"))
+        now = datetime.datetime.now(zoneinfo.ZoneInfo("Europe/London"))
+
+        if when < now:
+            await interaction.edit_original_response(content=f"No need to record this one, {ts(when):F} is in the past!")
             return
 
         await self._insert_afk(when=when, who=resolved_who)
