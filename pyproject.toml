@@ -16,7 +16,7 @@ dependencies = [
     "lru_dict",
     "lxml==6.1.1",
     "matplotlib>=3.11.1",
-    "numpy>=2.5.2",
+    "numpy>=2.5.3",
     "orjson",
     "parsedatetime",
     "pillow",
