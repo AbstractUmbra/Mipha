@@ -41,6 +41,11 @@ SAVAGE_DAYS = (3, 4)  # thurs, fri
 
 ALEX_OFF_WEEK_START: datetime.date = datetime.date(2026, 9, 29)
 
+CHANNEL_CLEANUP_DATA = {
+    1547969216286826516: 1551249043915808790,  # guidelines
+    1550058389437026324: 1550088874410377332,  # afk
+}
+
 LOGGER = logging.getLogger(__name__)
 
 AFK_PROSE = """
@@ -102,6 +107,7 @@ class Static(commands.Cog):
         self.bot = bot
         self.pool = pool
         self.check_afks.start()
+        self.channel_cleanups.start()
         self.post_raid_times.start()
 
     async def cog_load(self) -> None:
@@ -111,6 +117,7 @@ class Static(commands.Cog):
 
     async def cog_unload(self) -> None:
         self.check_afks.cancel()
+        self.channel_cleanups.cancel()
         self.post_raid_times.cancel()
 
     async def _get_fight_number(self) -> int:
@@ -467,7 +474,24 @@ class Static(commands.Cog):
 
         await self._cleanup_steps()
 
+    @tasks.loop(time=datetime.time(hour=0, tzinfo=zoneinfo.ZoneInfo("Europe/London")))
+    async def channel_cleanups(self) -> None:
+        guild = self.bot.get_guild(GUILD_ID)
+        if not guild:
+            raise RuntimeError("Could not get the static guild. Problem?")
+
+        for channel_id, message_id in CHANNEL_CLEANUP_DATA.items():
+            channel = guild.get_channel(channel_id)
+            if not channel:
+                LOGGER.warning("[Static] -> {Channel Cleaning} :: Could not get channel with id %s. Problem?", channel_id)
+                continue
+
+            assert isinstance(channel, discord.TextChannel)  # we know it is
+
+            await channel.purge(limit=100, after=discord.Object(id=message_id, type=discord.Message))
+
     @check_afks.before_loop
     @post_raid_times.before_loop
+    @channel_cleanups.before_loop
     async def before_loops(self) -> None:
         await self.bot.wait_until_ready()
