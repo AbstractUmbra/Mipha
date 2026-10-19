@@ -200,7 +200,7 @@ class Static(commands.Cog):
                     entity_type=discord.EntityType.external,
                     privacy_level=discord.PrivacyLevel.guild_only,
                     location="Discord is shitty, but in Raid VC | Lich @ Light",
-                    description=f"-{'-\n'.join(prog_point)}",
+                    description=f"- {'\n- '.join(prog_point)}",
                 )
             )
         resolved_farm_day = mount_farm_day[0]
