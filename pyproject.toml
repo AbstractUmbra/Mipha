@@ -90,6 +90,7 @@ ignore = [
     "raise-vanilla-args",                          # over-eager rule
     "raise-within-try",                            # unrealistic rule
     "extraneous-parentheses",
+    "unconventional-import-alias",
 ]
 unfixable = [
     "line-too-long", # line length handled in other ways by ruff format
