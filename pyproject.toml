@@ -30,7 +30,7 @@ dependencies = [
     "uvloop",
     "yt-dlp",
 ]
-requires-python = "<4.0,>=3.13"
+requires-python = "<4.0,>=3.14"
 readme = "README.md"
 license = "MPL-2.0"
 license-files = ["LICEN[CS]E"]
@@ -52,7 +52,7 @@ explicit = true
 
 [tool.ruff]
 line-length = 125
-target-version = "py313"
+target-version = "py314"
 extend-exclude = ["extensions/heights"]
 
 [tool.ruff.lint]
@@ -141,7 +141,7 @@ py-modules = []
 include = ["utilities/**/*.py", "extensions/**/*.py", "bot.py"]
 useLibraryCodeForTypes = true
 typeCheckingMode = "basic"
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 strictListInference = true
 strictDictionaryInference = true
 strictSetInference = true
