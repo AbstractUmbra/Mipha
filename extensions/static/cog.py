@@ -37,6 +37,8 @@ DB_SCHEMA_FILE = pathlib.Path(__file__).parent / "schema.sql"
 RAID_DAYS = (1, 3, 4)  # tues, thurs, fri
 MOUNT_FARM_DAYS = (1,)  # tues
 SAVAGE_DAYS = (3, 4)  # thurs, fri
+SAVAGE_ENABLED: bool = False
+MOUNT_FARM_ENABLED: bool = True
 
 ALEX_OFF_WEEK_START: datetime.date = datetime.date(2026, 9, 29)
 
@@ -394,13 +396,22 @@ class Static(commands.Cog):
             target=Weekday.monday, source=source, current_week_included=True, before_time=datetime.time(hour=8)
         )
 
-        savage_days = self._resolve_savage_days(source=source)
-        LOGGER.debug("[Static] -> [Event Loop] :: Savage days for wc %s are %s", source, savage_days)
-        events = await self.create_next_events(savage_days=savage_days, source=source)
-        LOGGER.debug("[Static] -> [Event Loop] :: Events list as repr: %s", "\n".join([repr(x) for x in events]))
+        ping_roles: list[discord.abc.Snowflake] = []
+        if SAVAGE_ENABLED:
+            savage_days = self._resolve_savage_days(source=source)
+            LOGGER.debug("[Static] -> [Event Loop] :: Savage days for wc %s are %s", source, savage_days)
+            events = await self.create_next_events(savage_days=savage_days, source=source)
+            LOGGER.debug("[Static] -> [Event Loop] :: Events list as repr: %s", "\n".join([repr(x) for x in events]))
+            ping_roles.append(discord.Object(id=SAVAGE_ROLE_ID, type=discord.Role))
+        else:
+            LOGGER.debug("[Static] -> [Event Loop] :: Savage disabled for this week.")
 
-        mount_farm = events.pop()
-        LOGGER.debug("[Static] -> [Event Loop] :: Mount Farm popped as: %r", mount_farm)
+        if MOUNT_FARM_ENABLED:
+            mount_farm = events.pop()
+            LOGGER.debug("[Static] -> [Event Loop] :: Mount Farm popped as: %r", mount_farm)
+            ping_roles.append(discord.Object(id=MOUNT_FARM_ROLE_ID, type=discord.Role))
+        else:
+            LOGGER.debug("[Static] -> [Event Loop] :: Mount farm disabled for this week")
 
         guild = self.bot.get_guild(GUILD_ID)
         if not guild:
@@ -426,7 +437,7 @@ class Static(commands.Cog):
             savage_event_urls="\n".join([event.url for event in events]),
         )
 
-        await raid_channel.send(formatted, allowed_mentions=discord.AllowedMentions(roles=True))
+        await raid_channel.send(formatted, allowed_mentions=discord.AllowedMentions(roles=ping_roles))
 
     @tasks.loop(time=datetime.time(hour=12, tzinfo=zoneinfo.ZoneInfo("Europe/London")))
     async def check_afks(self) -> None:
