@@ -59,9 +59,16 @@ CurrencyLiteral = Literal[
 
 
 class CurrencyConfig(TypedDict):
-    last_updated: str | None
-    icon: str
-    values: dict[CurrencyLiteral, float]
+    code: str
+    decimal_digits: int
+    name: str
+    name_plural: str
+    rounding: int
+    symbol: str
+    symbol_native: str
+    type: str
+    last_updated: str | None  # custom
+    values: dict[CurrencyLiteral, float]  # custom
 
 
 class Currency(Enum):
@@ -109,10 +116,28 @@ class CurrencyCog(commands.Cog):
         self.config: Config[dict[CurrencyLiteral, CurrencyConfig]] = config
         self.__token: str = self.config["token"]  # pyright: ignore[reportAttributeAccessIssue] # we lie
 
+    async def first_setup(self) -> None:
+        async with self.bot.session.get(
+            "https://api.freecurrencyapi.com/v1/currencies", headers={"apiKey": self.__token}
+        ) as resp:
+            resp.raise_for_status()
+
+            data = await resp.json()
+
+            inner = self.config["0"]
+            inner = data["data"]
+
+            await self.config.put("0", inner)
+
     async def perform_updates(self, from_: CurrencyLiteral) -> None:
         now = datetime.datetime.now(datetime.UTC)
 
-        config_entry = self.config["0"][from_]
+        config_entry = self.config["0"].get(from_)
+        if not config_entry:
+            LOGGER.warning("No entry for %r, forcing an update.", from_)
+            await self.update_config(from_)
+            return
+
         last_updated = self.get_last_updated(config_entry)
 
         if not ((now - last_updated).days >= 1):
@@ -122,7 +147,7 @@ class CurrencyCog(commands.Cog):
         await self.update_config(from_)
 
     def get_last_updated(self, key: CurrencyConfig) -> datetime.datetime:
-        value = key["last_updated"]
+        value = key.get("last_updated")
         return (
             datetime.datetime.fromisoformat(value)
             if value
@@ -138,12 +163,14 @@ class CurrencyCog(commands.Cog):
             resp.raise_for_status()
             data: dict[Literal["data"], dict[CurrencyLiteral, float]] = await resp.json()
 
-            local_data = self.config["0"]
-            now = datetime.datetime.now(datetime.UTC).isoformat()
-            local_data[from_].update({"last_updated": now, "values": data["data"]})
+        local_data = self.config["0"]
+        now = datetime.datetime.now(datetime.UTC).isoformat()
+        inner: CurrencyConfig = local_data.get(from_, {})  # pyright: ignore[reportAssignmentType]
+        inner.update({"last_updated": now, "values": data["data"]})
+        local_data[from_] = inner
 
-            await self.config.put("0", local_data)
-            LOGGER.info("Currency config for %r now updated.", from_)
+        await self.config.put("0", local_data)
+        LOGGER.info("Currency config for %r now updated.", from_)
 
     @commands.hybrid_command()
     @app_commands.rename(from_="from")
@@ -162,17 +189,18 @@ class CurrencyCog(commands.Cog):
             await ctx.interaction.response.defer()
 
         await self.perform_updates(from_)
+        await self.perform_updates(to)
 
         from_config_key = self.config["0"][from_]
         to_config_key = self.config["0"][to]
 
         target = from_config_key["values"][to]
-        calculated = round(amount * target, 2)
+        calculated = round(amount * target, to_config_key["decimal_digits"])
 
         from_name = Currency[from_].name
-        from_icon = from_config_key["icon"]
+        from_icon = from_config_key["symbol"]
         to_name = Currency[to].name
-        to_icon = to_config_key["icon"]
+        to_icon = to_config_key["symbol"]
 
         await ctx.send(f"{from_icon}{amount} `{from_name}` converted to `{to_name}` is {to_icon}{calculated}")
 
@@ -188,5 +216,4 @@ class CurrencyCog(commands.Cog):
 
 async def setup(bot: Mipha, /) -> None:
     if CONFIG_FILE_PATH.exists():
-        return await bot.add_cog(CurrencyCog(bot, config=Config(CONFIG_FILE_PATH)))
-    return None
+        await bot.add_cog(CurrencyCog(bot, config=Config(CONFIG_FILE_PATH)))
