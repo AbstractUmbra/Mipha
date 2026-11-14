@@ -41,6 +41,8 @@ minecraft = [
     "mcstatus>=14.2.0",
     "rcon @ git+https://github.com/conqp/rcon.git@master",
 ]
+[tool.uv]
+constraint-dependencies = ["davey>=0.1.0,<0.2.0"]
 
 [tool.uv.sources]
 "lru_dict" = { index = "umbra" }
