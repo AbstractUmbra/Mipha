@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, NamedTuple, Self
 import discord
 from discord import app_commands
 from discord.ext import commands
-from jishaku.codeblocks import Codeblock, codeblock_converter
+from jishaku.codeblocks import Codeblock  # ruff: ignore[typing-only-third-party-import] # consumed at runtime
 from yarl import URL
 
 from utilities.shared import fuzzy
@@ -504,7 +504,7 @@ class RTFX(commands.Cog):
         ctx: Context,
         python_version: str = commands.param(converter=PythonVersionConverter, default="3.13"),
         *,
-        codeblock: Codeblock = commands.param(converter=codeblock_converter),  # ruff: ignore[function-call-in-default-argument] # this is how commands.param works
+        codeblock: Codeblock,
     ) -> None:
         """
         Evaluates Python code through the latest (installed) version of Pyright on my system.
