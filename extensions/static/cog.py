@@ -48,6 +48,7 @@ CHANNEL_CLEANUP_DATA = {
 }
 
 LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
 
 AFK_PROSE = """
 Reminder that the following folks are AFK today! ^^
@@ -155,15 +156,18 @@ class Static(commands.Cog):
             current_week_included=True,
             before_time=datetime.time(hour=20, tzinfo=datetime.UTC),
         ).date()
+
         delta = then - ALEX_OFF_WEEK_START
         LOGGER.debug(
             "[Static] -> [Alex D&D] :: Resolved this week to %s (with modulo of %s)",
             then,
             delta.days % 14,
         )
+
         if delta.days % 14 != 0:
             LOGGER.debug("[Static] -> [Alex D&D] :: Found this to be a present week.")
             return (3, 4)
+
         LOGGER.debug("[Static] -> [Alex D&D] :: Found this to be a non-present week.")
         return (1, 4)
 
@@ -222,13 +226,6 @@ class Static(commands.Cog):
         )
 
         return events
-
-    def _verify_afk(self, who: discord.Member, when: datetime.datetime) -> bool:
-        if who.get_role(SAVAGE_ROLE_ID) and when.weekday() in (self._resolve_savage_days(source=when)):
-            return True
-        if who.get_role(MOUNT_FARM_ROLE_ID) and when.weekday() in (MOUNT_FARM_DAYS):
-            return True
-        return bool(who.get_role(SUB_ROLE_ID) and when.weekday() in RAID_DAYS)
 
     async def fetch_afk_records(self) -> list[Row]:
         query = """
@@ -326,7 +323,7 @@ class Static(commands.Cog):
             if not resolved_who:
                 raise commands.CheckFailure("User who submitted this command is not present in the Raid guild.")
 
-        if not self._verify_afk(resolved_who, when):  # pyright: ignore[reportArgumentType] # guarded
+        if when.weekday() not in RAID_DAYS:
             await interaction.edit_original_response(
                 content="You don't need to record this one, it's not your day or not a raid day, but I appreciate you!"
             )
@@ -387,6 +384,10 @@ class Static(commands.Cog):
 
     @tasks.loop(time=datetime.time(hour=0, tzinfo=zoneinfo.ZoneInfo("Europe/London")))
     async def post_raid_times(self, *, force: bool = False) -> None:
+        if not SAVAGE_ENABLED and not MOUNT_FARM_ENABLED:
+            LOGGER.warning("[Static] -> [Event Loop] :: Nothing enabled, early exiting.")
+            return
+
         source = datetime.datetime.now(zoneinfo.ZoneInfo("Europe/London"))
 
         if not force and source.weekday() != 6:
@@ -397,17 +398,19 @@ class Static(commands.Cog):
         )
 
         ping_roles: list[discord.abc.Snowflake] = []
+        savage_days = self._resolve_savage_days(source=source)
+        LOGGER.debug("[Static] -> [Event Loop] :: Savage days for wc %s are %s", source, savage_days)
+        events = await self.create_next_events(savage_days=savage_days, source=source)
+        LOGGER.debug("[Static] -> [Event Loop] :: Events list as repr: %s", "\n".join([repr(x) for x in events]))
+
+        savage_day_one, savage_day_two, mount_farm, *_ = events
         if SAVAGE_ENABLED:
-            savage_days = self._resolve_savage_days(source=source)
-            LOGGER.debug("[Static] -> [Event Loop] :: Savage days for wc %s are %s", source, savage_days)
-            events = await self.create_next_events(savage_days=savage_days, source=source)
-            LOGGER.debug("[Static] -> [Event Loop] :: Events list as repr: %s", "\n".join([repr(x) for x in events]))
+            LOGGER.debug("[Static] -> [Event Loop] :: Resolved Savage days and %s and %s.", savage_day_one, savage_day_two)
             ping_roles.append(discord.Object(id=SAVAGE_ROLE_ID, type=discord.Role))
         else:
             LOGGER.debug("[Static] -> [Event Loop] :: Savage disabled for this week.")
 
         if MOUNT_FARM_ENABLED:
-            mount_farm = events.pop()
             LOGGER.debug("[Static] -> [Event Loop] :: Mount Farm popped as: %r", mount_farm)
             ping_roles.append(discord.Object(id=MOUNT_FARM_ROLE_ID, type=discord.Role))
         else:
