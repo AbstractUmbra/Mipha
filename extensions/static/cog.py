@@ -5,6 +5,7 @@ import itertools
 import logging
 import operator
 import pathlib
+import sqlite3
 import zoneinfo
 from typing import TYPE_CHECKING, TypedDict
 
@@ -82,6 +83,11 @@ class AFKMessageRecord(TypedDict):
     id: int
     who: int
     when: datetime.datetime
+
+
+class Events(TypedDict):
+    savage: list[discord.ScheduledEvent]
+    mount_farm: list[discord.ScheduledEvent]
 
 
 def _to_prog_point(fight_number: int) -> list[str]:
@@ -176,7 +182,7 @@ class Static(commands.Cog):
 
     async def create_next_events(
         self, savage_days: tuple[int, int], *, source: datetime.datetime | None = None, guild: discord.Guild | None = None
-    ) -> list[discord.ScheduledEvent]:
+    ) -> Events:
         guild = guild or self.bot.get_guild(GUILD_ID)
         source = source or datetime.datetime.now(zoneinfo.ZoneInfo("Europe/London"))
         if not guild:
@@ -187,46 +193,48 @@ class Static(commands.Cog):
             "[Static] -> [Events Handling] :: Creating events for the week, mount farm day is %s", mount_farm_day[0]
         )
 
-        events: list[discord.ScheduledEvent] = []
+        events: Events = {"savage": [], "mount_farm": []}
 
         prog_point = _to_prog_point(await self._get_fight_number())
 
-        for idx, day in enumerate(savage_days, start=1):
-            LOGGER.debug("[Static] -> [Events Handling] :: Creating event for Savage on day %s", day)
-            then = resolve_next_weekday(
-                target=Weekday(day), source=source, current_week_included=True, before_time=datetime.time(hour=8)
-            ).replace(hour=20, minute=0, second=0, microsecond=0)
-            LOGGER.debug("[Static] -> [Events Handling] :: Day found to be at %s", then)
+        if SAVAGE_ENABLED:
+            for idx, day in enumerate(savage_days, start=1):
+                LOGGER.debug("[Static] -> [Events Handling] :: Creating event for Savage on day %s", day)
+                then = resolve_next_weekday(
+                    target=Weekday(day), source=source, current_week_included=True, before_time=datetime.time(hour=8)
+                ).replace(hour=20, minute=0, second=0, microsecond=0)
+                LOGGER.debug("[Static] -> [Events Handling] :: Day found to be at %s", then)
 
-            if day == 3:
-                then += datetime.timedelta(minutes=30)
+                if day == 3:
+                    then += datetime.timedelta(minutes=30)
 
-            events.append(
-                await guild.create_scheduled_event(
-                    name=f"Meat Cleavers Savage (Night {idx})",
-                    start_time=then.astimezone(datetime.UTC),
-                    end_time=then + datetime.timedelta(hours=2),
-                    entity_type=discord.EntityType.external,
-                    privacy_level=discord.PrivacyLevel.guild_only,
-                    location="Discord is shitty, but in Raid VC | Lich @ Light",
-                    description=f"- {'\n- '.join(prog_point)}",
+                events["savage"].append(
+                    await guild.create_scheduled_event(
+                        name=f"Meat Cleavers Savage (Night {idx})",
+                        start_time=then.astimezone(datetime.UTC),
+                        end_time=then + datetime.timedelta(hours=2),
+                        entity_type=discord.EntityType.external,
+                        privacy_level=discord.PrivacyLevel.guild_only,
+                        location="Discord is shitty, but in Raid VC | Lich @ Light",
+                        description=f"- {'\n- '.join(prog_point)}",
+                    )
                 )
-            )
         resolved_farm_day = mount_farm_day[0]
         mount_farm_then = (source + datetime.timedelta(days=resolved_farm_day)).replace(
             hour=20, minute=30 if resolved_farm_day == 3 else 0
         )
         LOGGER.debug("[Static] -> [Events Handling] :: Mount Farm day found as %s", mount_farm_then)
-        events.append(
-            await guild.create_scheduled_event(
-                name="Meat Cleavers DT Mount Farming",
-                start_time=mount_farm_then.astimezone(datetime.UTC),
-                end_time=mount_farm_then + datetime.timedelta(hours=2),
-                entity_type=discord.EntityType.external,
-                privacy_level=discord.PrivacyLevel.guild_only,
-                location="Discord is shitty, but in Raid VC | Lich @ Light",
+        if MOUNT_FARM_ENABLED:
+            events["mount_farm"].append(
+                await guild.create_scheduled_event(
+                    name="Meat Cleavers DT Mount Farming",
+                    start_time=mount_farm_then.astimezone(datetime.UTC),
+                    end_time=mount_farm_then + datetime.timedelta(hours=2),
+                    entity_type=discord.EntityType.external,
+                    privacy_level=discord.PrivacyLevel.guild_only,
+                    location="Discord is shitty, but in Raid VC | Lich @ Light",
+                )
             )
-        )
 
         return events
 
@@ -410,15 +418,16 @@ class Static(commands.Cog):
         events = await self.create_next_events(savage_days=savage_days, source=source)
         LOGGER.debug("[Static] -> [Event Loop] :: Events list as repr: %s", "\n".join([repr(x) for x in events]))
 
-        savage_day_one, savage_day_two, mount_farm, *_ = events
         if SAVAGE_ENABLED:
-            LOGGER.debug("[Static] -> [Event Loop] :: Resolved Savage days and %s and %s.", savage_day_one, savage_day_two)
+            LOGGER.debug(
+                "[Static] -> [Event Loop] :: Resolved Savage days and %s and %s.", events["savage"][0], events["savage"][1]
+            )
             ping_roles.append(discord.Object(id=SAVAGE_ROLE_ID, type=discord.Role))
         else:
             LOGGER.debug("[Static] -> [Event Loop] :: Savage disabled for this week.")
 
         if MOUNT_FARM_ENABLED:
-            LOGGER.debug("[Static] -> [Event Loop] :: Mount Farm popped as: %r", mount_farm)
+            LOGGER.debug("[Static] -> [Event Loop] :: Mount Farm popped as: %r", events["mount_farm"][0])
             ping_roles.append(discord.Object(id=MOUNT_FARM_ROLE_ID, type=discord.Role))
         else:
             LOGGER.debug("[Static] -> [Event Loop] :: Mount farm disabled for this week")
@@ -442,9 +451,9 @@ class Static(commands.Cog):
 
         formatted = SCHEDULE_PROSE.format(
             mount_farm_role_mention=mount_farm_role.mention,
-            mount_farm_event_url=mount_farm.url,
+            mount_farm_event_url=events["mount_farm"][0].url if MOUNT_FARM_ENABLED else "",
             savage_mention=savage_role.mention,
-            savage_event_urls="\n".join([event.url for event in events]),
+            savage_event_urls=("\n".join([event.url for event in events["savage"]]) if SAVAGE_ENABLED else ""),
         )
 
         await raid_channel.send(formatted, allowed_mentions=discord.AllowedMentions(roles=ping_roles))
