@@ -142,7 +142,10 @@ class Static(commands.Cog):
                 """
 
         async with self.pool.acquire() as conn:
-            await conn.execute(query, who.id, round(when.timestamp()))
+            try:
+                await conn.execute(query, who.id, round(when.timestamp()))
+            except sqlite3.IntegrityError as err:
+                raise ValueError("You've already entered this one") from err
 
     async def _delete_afk(self, id_: int, /) -> None:
         async with self.pool.acquire() as conn:
@@ -336,7 +339,11 @@ class Static(commands.Cog):
             await interaction.edit_original_response(content=f"No need to record this one, {ts(when):F} is in the past!")
             return
 
-        await self._insert_afk(when=when, who=resolved_who)
+        try:
+            await self._insert_afk(when=when, who=resolved_who)
+        except ValueError:
+            await interaction.edit_original_response(content="I think this one is already entered!")
+            return
 
         await interaction.edit_original_response(content="AFK recorded!")
         LOGGER.info("[Static] :: %s created an afk for %s at %s.", interaction.user, resolved_who, when)

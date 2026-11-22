@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS afks (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     who INTEGER NOT NULL,
-    afk_date INTEGER NOT NULL -- timestamp
+    afk_date INTEGER NOT NULL, -- timestamp
+    UNIQUE (who, afk_date)
 );
 
 CREATE TABLE IF NOT EXISTS prog (
